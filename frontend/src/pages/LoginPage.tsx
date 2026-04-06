@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Heart, Lock } from 'lucide-react'
 import { login } from '../api/auth'
+import { isSupabaseConfigured } from '../lib/supabase'
 import { SITE_DISPLAY_NAME } from '../site'
 
 export function LoginPage() {
@@ -21,7 +22,7 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     const fe: { user?: string; pass?: string } = {}
-    if (!username.trim()) fe.user = 'Username is required.'
+    if (!username.trim()) fe.user = isSupabaseConfigured() ? 'Email is required.' : 'Username is required.'
     if (!password) fe.pass = 'Password is required.'
     setFieldErrors(fe)
     if (Object.keys(fe).length > 0) return
@@ -52,6 +53,11 @@ export function LoginPage() {
             <h1 className="font-heading text-2xl font-bold text-foreground">Staff sign in</h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Secure access to the {SITE_DISPLAY_NAME} management portal.
+              {isSupabaseConfigured() && (
+                <span className="mt-2 block">
+                  Sign in with your Supabase Auth user (email + password).
+                </span>
+              )}
             </p>
           </div>
 
@@ -66,12 +72,13 @@ export function LoginPage() {
             )}
             <div>
               <label htmlFor="staff-user" className="text-sm font-medium text-foreground">
-                Username
+                {isSupabaseConfigured() ? 'Email' : 'Username'}
               </label>
               <input
                 id="staff-user"
                 name="username"
-                autoComplete="username"
+                autoComplete={isSupabaseConfigured() ? 'email' : 'username'}
+                type={isSupabaseConfigured() ? 'email' : 'text'}
                 className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}

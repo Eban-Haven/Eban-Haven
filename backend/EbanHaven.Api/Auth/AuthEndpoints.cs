@@ -49,7 +49,10 @@ public static class AuthEndpoints
         {
             if (user.Identity?.IsAuthenticated != true)
                 return Results.Unauthorized();
-            return Results.Ok(new { user = user.Identity.Name });
+            var display = user.Claims.FirstOrDefault(c => c.Type == "email")?.Value
+                ?? user.FindFirst(ClaimTypes.Email)?.Value
+                ?? user.Identity.Name;
+            return Results.Ok(new { user = display });
         }).RequireAuthorization();
     }
 }

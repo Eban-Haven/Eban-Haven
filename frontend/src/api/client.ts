@@ -1,12 +1,35 @@
-/** All API calls include cookies (staff session). */
-export function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  return fetch(input, {
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
+
+/** Base URL for the ASP.NET API (no trailing slash). Empty = same origin. */
+export function apiBaseUrl(): string {
+  return (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+}
+
+function resolveUrl(input: string): string {
+  if (input.startsWith('http://') || input.startsWith('https://')) return input
+  const base = apiBaseUrl()
+  if (!base) return input
+  return `${base}${input.startsWith('/') ? '' : '/'}${input}`
+}
+
+/** All API calls: cookies for legacy staff login; Bearer when Supabase session exists. */
+export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers)
+  if (init?.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  if (isSupabaseConfigured()) {
+    try {
+      const { data: { session } } = await getSupabase().auth.getSession()
+      if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`)
+    } catch {
+      /* Supabase not initialized */
+    }
+  }
+  return fetch(resolveUrl(input), {
     ...init,
     credentials: 'include',
-    headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
+    headers,
   })
 }
 

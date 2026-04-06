@@ -44,3 +44,11 @@
 /Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/obj/Debug/net8.0/EbanHaven.Api.csproj.AssemblyReference.cache
 /Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/obj/Debug/net8.0/EbanHaven.Api.sourcelink.json
 /Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/obj/Debug/net8.0/EbanHaven.Api.csproj.CopyComplete
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.AspNetCore.Authentication.JwtBearer.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.IdentityModel.Abstractions.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.IdentityModel.JsonWebTokens.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.IdentityModel.Logging.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.IdentityModel.Protocols.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/Microsoft.IdentityModel.Tokens.dll
+/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/bin/Debug/net8.0/System.IdentityModel.Tokens.Jwt.dll

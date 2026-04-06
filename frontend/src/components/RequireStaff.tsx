@@ -1,20 +1,34 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { getMe } from '../api/auth'
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 
 export function RequireStaff({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<'loading' | 'in' | 'out'>('loading')
   const location = useLocation()
 
-  useEffect(() => {
-    let cancelled = false
-    void getMe().then((u) => {
-      if (!cancelled) setState(u ? 'in' : 'out')
-    })
-    return () => {
-      cancelled = true
-    }
+  const refresh = useCallback(() => {
+    void getMe().then((u) => setState(u ? 'in' : 'out'))
   }, [])
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return
+    try {
+      const supabase = getSupabase()
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(() => {
+        refresh()
+      })
+      return () => subscription.unsubscribe()
+    } catch {
+      return
+    }
+  }, [refresh])
 
   if (state === 'loading') {
     return (
