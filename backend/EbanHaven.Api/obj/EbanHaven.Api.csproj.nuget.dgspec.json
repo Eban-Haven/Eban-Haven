@@ -10,7 +10,7 @@
         "projectUniqueName": "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/EbanHaven.Api.csproj",
         "projectName": "EbanHaven.Api",
         "projectPath": "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/EbanHaven.Api.csproj",
-        "packagesPath": "/Users/parisward/.nuget/packages/",
+        "packagesPath": "/var/folders/fg/cj6t_cjs3z95233k7n_s538w0000gn/T/cursor-sandbox-cache/b7ad5dc4c204bd9eb69c78079739138c/nuget",
         "outputPath": "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -37,6 +37,12 @@
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
+          "dependencies": {
+            "CsvHelper": {
+              "target": "Package",
+              "version": "[33.0.1, )"
+            }
+          },
           "imports": [
             "net461",
             "net462",

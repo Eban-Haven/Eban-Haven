@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Cookie, X } from 'lucide-react'
 
@@ -41,23 +42,28 @@ export function CookieConsent() {
                 <Cookie className="h-5 w-5 text-accent" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="mb-1 font-serif text-sm font-semibold">We value your privacy</h3>
+                <h3 className="mb-1 font-heading text-sm font-semibold">We value your privacy</h3>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  We use cookies to enhance your experience and analyze site usage. By accepting, you
-                  consent to our use of cookies as described in our Privacy Policy.
+                  We use cookies in line with GDPR-style transparency: essential cookies keep the site working;
+                  optional analytics help us improve the public experience. You can decline non-essential cookies
+                  or withdraw consent later by clearing cookies for this site. Details are in our{' '}
+                  <Link to="/privacy" className="text-primary underline-offset-2 hover:underline">
+                    Privacy Policy
+                  </Link>
+                  .
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={accept}
-                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+                    className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
                   >
                     Accept All
                   </button>
                   <button
                     type="button"
                     onClick={decline}
-                    className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
+                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted"
                   >
                     Decline
                   </button>

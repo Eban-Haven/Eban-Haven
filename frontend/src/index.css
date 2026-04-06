@@ -1,24 +1,51 @@
 @import 'tailwindcss';
 
+/*
+ * Color system from haven-hope-flow.base44.app (shadcn / Tailwind :root light theme).
+ * HSL values match the deployed CSS variable components.
+ */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
 
   --color-background: hsl(40 33% 98%);
   --color-foreground: hsl(200 25% 12%);
   --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(200 25% 12%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(200 25% 12%);
   --color-primary: hsl(174 55% 28%);
   --color-primary-foreground: hsl(0 0% 100%);
   --color-secondary: hsl(37 65% 90%);
+  --color-secondary-foreground: hsl(200 25% 12%);
   --color-muted: hsl(40 20% 94%);
   --color-muted-foreground: hsl(200 10% 45%);
   --color-accent: hsl(32 80% 55%);
   --color-accent-foreground: hsl(0 0% 100%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 98%);
   --color-border: hsl(40 15% 88%);
+  --color-input: hsl(40 15% 88%);
+  --color-ring: hsl(174 55% 28%);
+
+  /* Admin sidebar (reference: haven-hope-flow Base44 admin shell) */
+  --color-sidebar: hsl(200 25% 10%);
+  --color-sidebar-foreground: hsl(40 20% 92%);
+  --color-sidebar-primary: hsl(174 55% 45%);
+  --color-sidebar-primary-foreground: hsl(0 0% 100%);
+  --color-sidebar-accent: hsl(200 20% 16%);
+  --color-sidebar-accent-foreground: hsl(40 20% 92%);
+  --color-sidebar-border: hsl(200 15% 18%);
 
   --radius-lg: 0.75rem;
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
+}
+
+/* Reference site uses utility class `font-heading` → Playfair Display */
+@layer utilities {
+  .font-heading {
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  }
 }
 
 @layer base {

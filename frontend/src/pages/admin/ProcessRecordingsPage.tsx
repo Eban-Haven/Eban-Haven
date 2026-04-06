@@ -1,55 +1,94 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { createProcessRecording, getCases, getProcessRecordings, type Case, type ProcessRecording } from '../../api/admin'
+import {
+  alertError,
+  btnPrimary,
+  card,
+  cardForm,
+  input,
+  label,
+  pageDesc,
+  pageTitle,
+  sectionFormTitle,
+} from './adminStyles'
+import {
+  createProcessRecording,
+  getProcessRecordings,
+  getResidents,
+  type ProcessRecording,
+  type ResidentSummary,
+} from '../../api/admin'
+
+const sessionTypes = ['Individual', 'Group'] as const
 
 export function ProcessRecordingsPage() {
+  const [residents, setResidents] = useState<ResidentSummary[]>([])
   const [rows, setRows] = useState<ProcessRecording[]>([])
-  const [cases, setCases] = useState<Case[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [residentId, setResidentId] = useState<number>(0)
   const [saving, setSaving] = useState(false)
-  const [caseId, setCaseId] = useState('')
-  const [therapist, setTherapist] = useState('')
-  const [summary, setSummary] = useState('')
-  const [recordedAt, setRecordedAt] = useState(() => {
-    const d = new Date()
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
-    return d.toISOString().slice(0, 16)
-  })
 
-  const load = useCallback(async () => {
+  const [socialWorker, setSocialWorker] = useState('')
+  const [sessionType, setSessionType] = useState<string>('Individual')
+  const [duration, setDuration] = useState('')
+  const [emoStart, setEmoStart] = useState('')
+  const [emoEnd, setEmoEnd] = useState('')
+  const [narrative, setNarrative] = useState('')
+  const [interventions, setInterventions] = useState('')
+  const [followUp, setFollowUp] = useState('')
+  const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().slice(0, 10))
+
+  const loadResidents = useCallback(async () => {
+    try {
+      const r = await getResidents({})
+      setResidents(r)
+      setResidentId((prev) => prev || r[0]?.id || 0)
+    } catch {
+      /* handled in load */
+    }
+  }, [])
+
+  const loadRecordings = useCallback(async () => {
     setLoading(true)
     try {
-      const [rec, c] = await Promise.all([getProcessRecordings(), getCases()])
-      setRows(rec)
-      setCases(c)
-      setCaseId((prev) => prev || c[0]?.id || '')
+      await loadResidents()
+      const rec = await getProcessRecordings(residentId || undefined)
+      setRows(residentId ? rec.filter((x) => x.residentId === residentId) : rec.slice(-80))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [residentId, loadResidents])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void loadRecordings()
+  }, [loadRecordings])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!caseId || !therapist.trim() || !summary.trim()) return
+    if (!residentId || !socialWorker.trim() || !narrative.trim()) return
     setSaving(true)
     setError(null)
     try {
       await createProcessRecording({
-        caseId,
-        recordedAt: new Date(recordedAt).toISOString(),
-        therapist: therapist.trim(),
-        summary: summary.trim(),
+        residentId,
+        sessionDate: `${sessionDate}T12:00:00`,
+        socialWorker: socialWorker.trim(),
+        sessionType,
+        sessionDurationMinutes: duration ? Number(duration) : undefined,
+        emotionalStateObserved: emoStart.trim() || undefined,
+        emotionalStateEnd: emoEnd.trim() || undefined,
+        sessionNarrative: narrative.trim(),
+        interventionsApplied: interventions.trim() || undefined,
+        followUpActions: followUp.trim() || undefined,
       })
-      setSummary('')
-      await load()
+      setNarrative('')
+      setInterventions('')
+      setFollowUp('')
+      await loadRecordings()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -57,108 +96,150 @@ export function ProcessRecordingsPage() {
     }
   }
 
-  function caseLabel(id: string) {
-    const c = cases.find((x) => x.id === id)
-    return c?.referenceCode ?? id.slice(0, 8)
-  }
+  const filtered = residentId
+    ? rows.filter((r) => r.residentId === residentId).sort((a, b) => a.sessionDate.localeCompare(b.sessionDate))
+    : [...rows].sort((a, b) => a.sessionDate.localeCompare(b.sessionDate))
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="font-serif text-2xl font-bold text-white">Process recordings</h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Clinical / social-work session notes tied to a case (demo — not HIPAA-ready).
+        <h2 className={pageTitle}>Process recording</h2>
+        <p className={pageDesc}>
+          Dated counseling session notes per resident: session type (individual or group), emotional state at start
+          and end, narrative summary, interventions (caring, healing, teaching, legal, etc.), follow-up actions, and
+          flags. History is shown oldest → newest for the selected resident.
         </p>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-          {error}
-        </div>
-      )}
+      {error && <div className={alertError}>{error}</div>}
 
-      <form
-        onSubmit={onSubmit}
-        className="rounded-xl border border-slate-800 bg-slate-900/80 p-5 space-y-4 max-w-xl"
-      >
-        <p className="text-sm font-medium text-slate-300">New recording</p>
-        <label className="block text-xs text-slate-500">
-          Case
+      <div className={`${card} flex flex-wrap items-end gap-3`}>
+        <label className={label}>
+          Filter by resident
           <select
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-            value={caseId}
-            onChange={(e) => setCaseId(e.target.value)}
-            required
+            className={`${input} min-w-[12rem]`}
+            value={residentId || ''}
+            onChange={(e) => setResidentId(Number(e.target.value))}
           >
-            {cases.length === 0 ? (
-              <option value="">No cases — add one in Caseload first</option>
-            ) : (
-              cases.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.referenceCode}
-                </option>
-              ))
-            )}
+            <option value={0}>All (recent)</option>
+            {residents.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.internalCode} — {r.caseStatus}
+              </option>
+            ))}
           </select>
         </label>
-        <label className="block text-xs text-slate-500">
-          Staff / therapist
-          <input
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-            value={therapist}
-            onChange={(e) => setTherapist(e.target.value)}
+      </div>
+
+      <form onSubmit={onSubmit} className={cardForm}>
+        <p className={sectionFormTitle}>New process recording</p>
+        <label className={label}>
+          Resident
+          <select
+            className={input}
+            value={residentId || ''}
+            onChange={(e) => setResidentId(Number(e.target.value))}
             required
-          />
+          >
+            {residents.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.internalCode}
+              </option>
+            ))}
+          </select>
         </label>
-        <label className="block text-xs text-slate-500">
-          Recorded at
+        <label className={label}>
+          Session date
+          <input type="date" className={input} value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} />
+        </label>
+        <label className={label}>
+          Social worker (ID or name)
+          <input className={input} value={socialWorker} onChange={(e) => setSocialWorker(e.target.value)} required />
+        </label>
+        <label className={label}>
+          Session type
+          <select className={input} value={sessionType} onChange={(e) => setSessionType(e.target.value)}>
+            {sessionTypes.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={label}>
+          Duration (minutes)
+          <input type="number" min={0} className={input} value={duration} onChange={(e) => setDuration(e.target.value)} />
+        </label>
+        <label className={label}>
+          Emotional state (start)
+          <input className={input} value={emoStart} onChange={(e) => setEmoStart(e.target.value)} placeholder="e.g. Anxious" />
+        </label>
+        <label className={label}>
+          Emotional state (end)
+          <input className={input} value={emoEnd} onChange={(e) => setEmoEnd(e.target.value)} placeholder="e.g. Hopeful" />
+        </label>
+        <label className={label}>
+          Interventions applied
           <input
-            type="datetime-local"
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white sm:max-w-xs"
-            value={recordedAt}
-            onChange={(e) => setRecordedAt(e.target.value)}
+            className={input}
+            value={interventions}
+            onChange={(e) => setInterventions(e.target.value)}
+            placeholder="Caring, Healing, Legal Services…"
           />
         </label>
-        <label className="block text-xs text-slate-500">
-          Summary
-          <textarea
-            rows={4}
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            required
-          />
+        <label className={label}>
+          Follow-up actions
+          <input className={input} value={followUp} onChange={(e) => setFollowUp(e.target.value)} />
         </label>
-        <button
-          type="submit"
-          disabled={saving || cases.length === 0}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500 disabled:opacity-50"
-        >
+        <label className={label}>
+          Narrative summary
+          <textarea className={input} rows={4} value={narrative} onChange={(e) => setNarrative(e.target.value)} required />
+        </label>
+        <button type="submit" disabled={saving || residents.length === 0} className={btnPrimary}>
           {saving ? 'Saving…' : 'Save recording'}
         </button>
       </form>
 
-      <div className="space-y-4">
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">Session history</h3>
         {loading ? (
-          <p className="text-slate-500">Loading…</p>
-        ) : rows.length === 0 ? (
-          <p className="text-slate-500">No recordings yet.</p>
+          <p className="text-muted-foreground">Loading…</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-muted-foreground">No recordings for this view.</p>
         ) : (
-          rows.map((r) => (
-            <article
-              key={r.id}
-              className="rounded-xl border border-slate-800 bg-slate-900/60 p-5"
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="text-sm font-medium text-teal-300">{caseLabel(r.caseId)}</span>
-                <time className="text-xs text-slate-500">
-                  {new Date(r.recordedAt).toLocaleString()}
-                </time>
-              </div>
-              <p className="mt-1 text-xs text-slate-400">By {r.therapist}</p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-300">{r.summary}</p>
-            </article>
-          ))
+          <div className="space-y-4">
+            {filtered.map((r) => (
+              <article key={r.id} className={card}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium text-primary">
+                    {r.residentInternalCode} · {r.sessionType}
+                  </span>
+                  <time className="text-xs text-muted-foreground">
+                    {new Date(r.sessionDate).toLocaleDateString()} · {r.socialWorker}
+                  </time>
+                </div>
+                {r.sessionDurationMinutes != null && (
+                  <p className="mt-1 text-xs text-muted-foreground">{r.sessionDurationMinutes} minutes</p>
+                )}
+                {(r.emotionalStateObserved || r.emotionalStateEnd) && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Mood: {r.emotionalStateObserved ?? '?'} → {r.emotionalStateEnd ?? '?'}
+                  </p>
+                )}
+                {r.interventionsApplied && (
+                  <p className="mt-2 text-xs font-medium text-foreground">Interventions: {r.interventionsApplied}</p>
+                )}
+                <p className="mt-2 text-sm leading-relaxed text-foreground">{r.sessionNarrative}</p>
+                {r.followUpActions && (
+                  <p className="mt-2 text-xs text-muted-foreground">Follow-up: {r.followUpActions}</p>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Progress noted: {r.progressNoted ? 'Yes' : 'No'} · Concerns: {r.concernsFlagged ? 'Yes' : 'No'} ·
+                  Referral: {r.referralMade ? 'Yes' : 'No'}
+                </p>
+              </article>
+            ))}
+          </div>
         )}
       </div>
     </div>

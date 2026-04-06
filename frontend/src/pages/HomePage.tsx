@@ -1,18 +1,20 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, BookOpen, Heart, Home, UserRound, Users } from 'lucide-react'
-import { IMAGES } from '../site'
+import { ArrowRight, BookOpen, Heart, Home, UserRound } from 'lucide-react'
+import { getImpactSummary, type PublicImpactSummary } from '../api/impact'
+import { IMAGES, SITE_DISPLAY_NAME } from '../site'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.7 } },
 }
 
-const stats = [
-  { value: '150+', label: 'Girls Served' },
-  { value: '6', label: 'Safe Homes' },
-  { value: '92%', label: 'Recovery Rate' },
-  { value: '500+', label: 'Supporters' },
+const fallbackStats = [
+  { value: '—', label: 'Girls served (live data on Impact)' },
+  { value: '—', label: 'Safe homes' },
+  { value: '—', label: 'Education progress (avg.)' },
+  { value: '—', label: 'Supporters' },
 ] as const
 
 const programs = [
@@ -23,7 +25,7 @@ const programs = [
       'Secure, nurturing homes where girls can begin their journey of healing in a protected environment.',
   },
   {
-    icon: Users,
+    icon: Heart,
     title: 'Counseling & Therapy',
     description:
       'Structured counseling sessions and trauma-informed care guided by professional social workers.',
@@ -55,7 +57,39 @@ const itemMission = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.7 } },
 }
 
+/* Reference: shadcn Button size lg + rounded-lg (--radius 0.75rem) */
+const btnPrimary =
+  'inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-8 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 lg:text-base'
+const btnOutlineLight =
+  'inline-flex h-11 items-center justify-center rounded-lg border border-white/30 bg-transparent px-8 text-sm font-medium text-white transition-colors hover:bg-white/10 lg:text-base'
+
+function statsFromImpact(i: PublicImpactSummary) {
+  return [
+    { value: String(i.activeResidents), label: 'Residents supported (active aggregate)' },
+    { value: String(i.safehouseCount), label: 'Active safehouses' },
+    { value: `${i.avgEducationProgressPercent.toFixed(0)}%`, label: 'Avg. education progress' },
+    { value: String(i.supporterCount), label: 'Supporters in network' },
+  ] as const
+}
+
 export function HomePage() {
+  const [impact, setImpact] = useState<PublicImpactSummary | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void getImpactSummary()
+      .then((d) => {
+        if (!cancelled) setImpact(d)
+      })
+      .catch(() => {
+        /* keep fallback */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const stats = impact ? statsFromImpact(impact) : fallbackStats
+
   return (
     <div>
       <section className="relative flex min-h-[85vh] items-center overflow-hidden">
@@ -83,31 +117,25 @@ export function HomePage() {
             </motion.div>
             <motion.h1
               variants={fadeUp}
-              className="font-serif text-4xl font-bold leading-tight text-white md:text-5xl lg:text-6xl"
+              className="font-heading text-4xl font-bold leading-tight text-white md:text-5xl lg:text-6xl"
             >
               Every girl deserves
-              <span className="mt-0 block text-accent">a safe haven</span>
+              <span className="block text-accent">a safe haven</span>
             </motion.h1>
             <motion.p
               variants={fadeUp}
               className="mt-6 max-w-xl text-base leading-relaxed text-white/80 lg:text-lg"
             >
-              Eban Haven provides safe homes, rehabilitation, and healing for girls who are survivors
-              of abuse and trafficking. Together, we can restore hope and transform lives.
+              {SITE_DISPLAY_NAME} provides safe homes, rehabilitation, and healing for girls who are
+              survivors of abuse and trafficking. Together, we can restore hope and transform lives.
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-4">
-              <Link
-                to="/impact"
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 lg:text-base"
-              >
+              <Link to="/impact" className={btnPrimary}>
                 See Our Impact
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link
-                to="/admin"
-                className="inline-flex items-center rounded-lg border border-white/30 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-white/10 lg:text-base"
-              >
-                Staff Portal
+              <Link to="/login" className={btnOutlineLight}>
+                Staff login
               </Link>
             </motion.div>
           </motion.div>
@@ -125,7 +153,7 @@ export function HomePage() {
           <div className="grid grid-cols-2 gap-8 lg:grid-cols-4">
             {stats.map((s) => (
               <div key={s.label} className="text-center">
-                <p className="font-serif text-3xl font-bold text-primary lg:text-4xl">{s.value}</p>
+                <p className="font-heading text-3xl font-bold text-primary lg:text-4xl">{s.value}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{s.label}</p>
               </div>
             ))}
@@ -150,7 +178,7 @@ export function HomePage() {
               </motion.span>
               <motion.h2
                 variants={itemMission}
-                className="mt-3 font-serif text-3xl font-bold leading-tight text-foreground lg:text-4xl"
+                className="mt-3 font-heading text-3xl font-bold leading-tight text-foreground lg:text-4xl"
               >
                 Restoring hope, one life at a time
               </motion.h2>
@@ -158,18 +186,18 @@ export function HomePage() {
                 variants={itemMission}
                 className="mt-6 leading-relaxed text-muted-foreground"
               >
-                Eban Haven contracts with in-country individuals and organizations to provide
-                safehouses and comprehensive rehabilitation services. Our holistic approach addresses
-                every aspect of recovery — from immediate safety and counseling to education, health
-                services, and reintegration planning.
+                {SITE_DISPLAY_NAME} contracts with in-country individuals and organizations to
+                provide safehouses and comprehensive rehabilitation services. Our holistic approach
+                addresses every aspect of recovery — from immediate safety and counseling to
+                education, health services, and reintegration planning.
               </motion.p>
               <motion.p
                 variants={itemMission}
                 className="mt-4 leading-relaxed text-muted-foreground"
               >
-                We believe every girl deserves the chance to heal, grow, and thrive. Our dedicated
-                team of social workers, educators, and partners works tirelessly to ensure no one
-                falls through the cracks.
+                We believe every girl deserves the chance to heal, grow, and thrive. Our dedicated team
+                of social workers, educators, and partners works tirelessly to ensure no one falls
+                through the cracks.
               </motion.p>
             </motion.div>
             <motion.div
@@ -208,7 +236,7 @@ export function HomePage() {
             <span className="text-xs font-semibold uppercase tracking-widest text-accent">
               What We Do
             </span>
-            <h2 className="mt-3 font-serif text-3xl font-bold text-foreground lg:text-4xl">
+            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
               Comprehensive care for every girl
             </h2>
             <p className="mt-4 text-muted-foreground">
@@ -236,7 +264,7 @@ export function HomePage() {
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
                   <p.icon className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-serif text-lg font-semibold text-foreground">{p.title}</h3>
+                <h3 className="font-heading text-lg font-semibold text-foreground">{p.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{p.description}</p>
               </motion.div>
             ))}
@@ -252,7 +280,7 @@ export function HomePage() {
             viewport={{ once: true, margin: '-100px' }}
             variants={fadeUp}
           >
-            <h2 className="font-serif text-3xl font-bold text-primary-foreground lg:text-4xl">
+            <h2 className="font-heading text-3xl font-bold text-primary-foreground lg:text-4xl">
               Join us in making a difference
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
@@ -260,10 +288,7 @@ export function HomePage() {
               for girls in need.
             </p>
             <div className="mt-8">
-              <Link
-                to="/impact"
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 lg:text-base"
-              >
+              <Link to="/impact" className={btnPrimary}>
                 Learn How You Can Help
                 <ArrowRight className="h-4 w-4" />
               </Link>

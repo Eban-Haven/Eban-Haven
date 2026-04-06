@@ -1,9 +1,12 @@
 import { Routes, Route } from 'react-router-dom'
 import { PublicLayout } from './layouts/PublicLayout'
 import { AdminLayout } from './layouts/AdminLayout'
+import { RequireStaff } from './components/RequireStaff'
 import { HomePage } from './pages/HomePage'
 import { ImpactPage } from './pages/ImpactPage'
 import { PrivacyPage } from './pages/PrivacyPage'
+import { LoginPage } from './pages/LoginPage'
+import { AccessibilityPage } from './pages/AccessibilityPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
 import { DonorsPage } from './pages/admin/DonorsPage'
 import { CaseloadPage } from './pages/admin/CaseloadPage'
@@ -18,8 +21,17 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/impact" element={<ImpactPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/accessibility" element={<AccessibilityPage />} />
       </Route>
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route
+        path="/admin"
+        element={
+          <RequireStaff>
+            <AdminLayout />
+          </RequireStaff>
+        }
+      >
         <Route index element={<AdminDashboardPage />} />
         <Route path="donors" element={<DonorsPage />} />
         <Route path="caseload" element={<CaseloadPage />} />

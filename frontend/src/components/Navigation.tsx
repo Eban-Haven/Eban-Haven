@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Heart, Menu, X } from 'lucide-react'
-import { useSite } from '../context/SiteContext'
+import { SITE_DISPLAY_NAME } from '../site'
 
 const links = [
   { to: '/', label: 'Home' },
@@ -13,8 +13,6 @@ const links = [
 export function Navigation() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
-  const { name } = useSite()
-
   const isActive = (path: string) => location.pathname === path
 
   return (
@@ -25,7 +23,9 @@ export function Navigation() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary">
               <Heart className="h-5 w-5 fill-current text-primary-foreground" />
             </div>
-            <span className="font-serif text-xl font-semibold text-foreground">{name}</span>
+            <span className="font-heading text-xl font-semibold text-foreground">
+              {SITE_DISPLAY_NAME}
+            </span>
           </Link>
 
           <div className="hidden items-center gap-8 md:flex">
@@ -43,10 +43,10 @@ export function Navigation() {
               </Link>
             ))}
             <Link
-              to="/admin"
+              to="/login"
               className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
             >
-              Staff Portal
+              Staff login
             </Link>
           </div>
 
@@ -80,11 +80,11 @@ export function Navigation() {
                   </Link>
                 ))}
                 <Link
-                  to="/admin"
+                  to="/login"
                   className="block text-sm font-medium text-primary"
                   onClick={() => setOpen(false)}
                 >
-                  Staff Portal →
+                  Staff login →
                 </Link>
               </div>
             </motion.div>

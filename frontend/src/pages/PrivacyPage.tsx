@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
+import { PUBLIC_CONTACT, SITE_DISPLAY_NAME } from '../site'
 
 const section = {
   hidden: { opacity: 0, y: 20 },
@@ -9,7 +10,7 @@ const section = {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="mb-3 font-serif text-xl font-semibold text-foreground">{title}</h2>
+      <h2 className="mb-3 font-heading text-xl font-semibold text-foreground">{title}</h2>
       <div className="space-y-2 text-sm leading-relaxed">{children}</div>
     </div>
   )
@@ -26,7 +27,7 @@ export function PrivacyPage() {
         >
           <motion.h1
             variants={section}
-            className="font-serif text-3xl font-bold text-foreground lg:text-4xl"
+            className="font-heading text-3xl font-bold text-foreground lg:text-4xl"
           >
             Privacy Policy
           </motion.h1>
@@ -43,7 +44,7 @@ export function PrivacyPage() {
         >
           <Section title="1. Introduction">
             <p>
-              Eban Haven (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a US-based 501(c)(3)
+              {SITE_DISPLAY_NAME} (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is a US-based 501(c)(3)
               nonprofit organization that operates safe homes for girls who are survivors of sexual
               abuse or sex trafficking. We are committed to protecting the privacy and safety of all
               individuals whose data we collect, including residents, donors, staff, volunteers, and
@@ -51,17 +52,19 @@ export function PrivacyPage() {
             </p>
             <p>
               This Privacy Policy explains how we collect, use, disclose, and safeguard your
-              information when you visit our website, make a donation, or interact with our services.
-              Please read this policy carefully.
+              information when you visit our website, make a donation, or interact with our
+              services. Please read this policy carefully.
             </p>
           </Section>
 
           <Section title="2. Data Controller">
-            <p>Eban Haven is the data controller responsible for your personal data. You can contact us at:</p>
             <p>
-              Email: privacy@ebanhaven.org
+              {SITE_DISPLAY_NAME} is the data controller responsible for your personal data. You can contact us at:
+            </p>
+            <p>
+              Email: {PUBLIC_CONTACT.privacyEmail}
               <br />
-              Address: Eban Haven, P.O. Box 12345, United States
+              Address: {SITE_DISPLAY_NAME}, {PUBLIC_CONTACT.addressLine}
             </p>
           </Section>
 
@@ -91,6 +94,12 @@ export function PrivacyPage() {
               confidential, access-controlled, and processed only for the legitimate purpose of
               providing rehabilitation services.
             </p>
+            <p className="mt-3">
+              <strong className="text-foreground">Public impact statistics:</strong> The public
+              &quot;Our Impact&quot; area shows only aggregated, anonymized metrics (counts, averages, trends).
+              Individual residents are not identifiable there. Identifiable records remain in authenticated
+              staff systems protected by role-based access.
+            </p>
           </Section>
 
           <Section title="4. How We Use Your Information">
@@ -104,21 +113,126 @@ export function PrivacyPage() {
             </ul>
           </Section>
 
-          <Section title="5. Cookies">
-            <p>
-              We use cookies and similar technologies to enhance your experience. You can manage
-              preferences through the cookie banner or your browser settings.
+          <Section title="5. Legal Basis for Processing (GDPR)">
+            <p>Under the General Data Protection Regulation (GDPR), we process personal data based on:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <strong className="text-foreground">Consent:</strong> When you opt-in to receive
+                communications or accept cookies
+              </li>
+              <li>
+                <strong className="text-foreground">Contractual necessity:</strong> When processing
+                is necessary to fulfill a donation or service agreement
+              </li>
+              <li>
+                <strong className="text-foreground">Legitimate interests:</strong> When processing is
+                necessary for organizational operations and safety
+              </li>
+              <li>
+                <strong className="text-foreground">Legal obligation:</strong> When required by
+                applicable law
+              </li>
+              <li>
+                <strong className="text-foreground">Vital interests:</strong> When necessary to
+                protect the life or safety of a resident
+              </li>
+            </ul>
+          </Section>
+
+          <Section title="6. Cookies">
+            <p>We use cookies and similar technologies to enhance your experience. Types of cookies we use:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <strong className="text-foreground">Essential cookies:</strong> Required for the
+                website to function properly
+              </li>
+              <li>
+                <strong className="text-foreground">Analytics cookies:</strong> Help us understand
+                how visitors interact with our site
+              </li>
+              <li>
+                <strong className="text-foreground">Preference cookies:</strong> Remember your
+                settings and preferences
+              </li>
+            </ul>
+            <p className="mt-2">
+              You can manage cookie preferences through the cookie consent banner displayed when you
+              first visit our site, or through your browser settings.
             </p>
           </Section>
 
-          <Section title="6. Contact Us">
-            <p>For questions about this Privacy Policy:</p>
+          <Section title="7. Data Sharing and Disclosure">
+            <p>We do not sell personal data. We may share data with:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                Trusted service providers who assist in our operations (payment processors, hosting
+                providers)
+              </li>
+              <li>Government or law enforcement agencies when required by law</li>
+              <li>
+                Partner organizations providing direct services to residents (under strict data
+                protection agreements)
+              </li>
+            </ul>
+          </Section>
+
+          <Section title="8. Data Security">
             <p>
-              Eban Haven Privacy Team
+              We implement industry-standard security measures including encryption (TLS/HTTPS),
+              access controls, and regular security assessments. Sensitive resident data is subject to
+              additional safeguards including role-based access control and audit logging.
+            </p>
+          </Section>
+
+          <Section title="9. Data Retention">
+            <p>
+              We retain personal data only as long as necessary for the purposes described in this
+              policy or as required by law. Donor records are retained for the duration of the
+              relationship plus 7 years for tax compliance. Resident records are retained according to
+              Philippine social welfare regulations.
+            </p>
+          </Section>
+
+          <Section title="10. Your Rights (GDPR)">
+            <p>If you are located in the European Economic Area, you have the right to:</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>Access your personal data</li>
+              <li>Rectify inaccurate data</li>
+              <li>Erase your data (&quot;right to be forgotten&quot;)</li>
+              <li>Restrict or object to processing</li>
+              <li>Data portability</li>
+              <li>Withdraw consent at any time</li>
+              <li>Lodge a complaint with a supervisory authority</li>
+            </ul>
+            <p className="mt-2">
+              To exercise these rights, contact us at {PUBLIC_CONTACT.privacyEmail}.
+            </p>
+          </Section>
+
+          <Section title="11. Children&apos;s Privacy">
+            <p>
+              Our public website is not directed at children under 13. We do not knowingly collect
+              personal data from children through our website. Resident data for minors is collected
+              and processed exclusively through authorized staff under strict safeguards.
+            </p>
+          </Section>
+
+          <Section title="12. Changes to This Policy">
+            <p>
+              We may update this Privacy Policy from time to time. We will notify you of any material
+              changes by posting the new policy on this page and updating the &quot;Last updated&quot;
+              date.
+            </p>
+          </Section>
+
+          <Section title="13. Contact Us">
+            <p>For questions about this Privacy Policy or our data practices, please contact:</p>
+            <p>
+              {SITE_DISPLAY_NAME} Privacy Team
               <br />
-              Email: privacy@ebanhaven.org
+              Email: {PUBLIC_CONTACT.privacyEmail}
               <br />
-              Phone: +1 (555) HOPE-NOW
+              Phone: {PUBLIC_CONTACT.phone}
             </p>
           </Section>
         </motion.div>
