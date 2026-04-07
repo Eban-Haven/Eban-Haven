@@ -109,6 +109,7 @@ BEGIN
       ''
     );
 
+    -- provider_id MUST be the auth user id (UUID text), not the email — otherwise signInWithPassword fails.
     INSERT INTO auth.identities (
       id,
       user_id,
@@ -121,7 +122,7 @@ BEGIN
     ) VALUES (
       gen_random_uuid(),
       uid_admin,
-      'admin@ebanhaven.demo',
+      uid_admin::text,
       jsonb_build_object('sub', uid_admin::text, 'email', 'admin@ebanhaven.demo'),
       'email',
       now(),
@@ -144,7 +145,7 @@ BEGIN
     INSERT INTO auth.identities (
       id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), uid_donor, 'donor@ebanhaven.demo',
+      gen_random_uuid(), uid_donor, uid_donor::text,
       jsonb_build_object('sub', uid_donor::text, 'email', 'donor@ebanhaven.demo'),
       'email', now(), now(), now()
     );
@@ -164,7 +165,7 @@ BEGIN
     INSERT INTO auth.identities (
       id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), uid_sw, 'socialworker@ebanhaven.demo',
+      gen_random_uuid(), uid_sw, uid_sw::text,
       jsonb_build_object('sub', uid_sw::text, 'email', 'socialworker@ebanhaven.demo'),
       'email', now(), now(), now()
     );
@@ -184,7 +185,7 @@ BEGIN
     INSERT INTO auth.identities (
       id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
     ) VALUES (
-      gen_random_uuid(), uid_res, 'resident@ebanhaven.demo',
+      gen_random_uuid(), uid_res, uid_res::text,
       jsonb_build_object('sub', uid_res::text, 'email', 'resident@ebanhaven.demo'),
       'email', now(), now(), now()
     );
