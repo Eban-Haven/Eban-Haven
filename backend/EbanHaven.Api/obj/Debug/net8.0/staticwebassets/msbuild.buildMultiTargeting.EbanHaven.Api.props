@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/EbanHaven.Api.props" />
-</Project>
