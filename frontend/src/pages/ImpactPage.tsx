@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GraduationCap, Heart, Home, UserCheck, Users } from 'lucide-react'
-import { getImpactSnapshots, getImpactSummary, type PublicImpactSnapshot, type PublicImpactSummary } from '../api/impact'
+import { getImpactSummary, type PublicImpactSummary } from '../api/impact'
 import { SITE_DISPLAY_NAME } from '../site'
 
 const fade = {
@@ -35,16 +35,13 @@ const allocation = [
   },
 ] as const
 
-const moneyPhp = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'PHP' })
-
 const btnPrimary =
   'inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-8 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90'
 const btnOutline =
-  'inline-flex h-11 items-center justify-center rounded-lg border border-primary bg-transparent px-8 text-sm font-medium text-primary transition-colors hover:bg-primary/10'
+  'inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-primary bg-transparent px-8 text-sm font-medium text-primary transition-colors hover:bg-primary/10'
 
 function buildStats(summary: PublicImpactSummary | null) {
   const base = [
-    { icon: Users, color: 'text-primary' as const },
     { icon: Home, color: 'text-accent' as const },
     { icon: GraduationCap, color: 'text-primary' as const },
     { icon: Heart, color: 'text-accent' as const },
@@ -52,38 +49,34 @@ function buildStats(summary: PublicImpactSummary | null) {
     { icon: Users, color: 'text-accent' as const },
   ]
   const labels = [
-    'Girls currently in our care (active aggregate)',
     'Active safehouses',
     'School enrollment / progress (avg. %)',
     'Health improvement (avg. score)',
     'Successful family reintegration (rate)',
-    'Supporters worldwide',
+    'Community partners',
   ]
   if (!summary) {
     return base.map((b, i) => ({ ...b, value: '—', label: labels[i] ?? '' }))
   }
   return [
-    { ...base[0], value: String(summary.activeResidents), label: labels[0] },
-    { ...base[1], value: String(summary.safehouseCount), label: labels[1] },
-    { ...base[2], value: `${summary.avgEducationProgressPercent.toFixed(0)}%`, label: labels[2] },
-    { ...base[3], value: summary.avgHealthScore.toFixed(2), label: labels[3] },
-    { ...base[4], value: `${summary.reintegrationSuccessRatePercent.toFixed(0)}%`, label: labels[4] },
-    { ...base[5], value: String(summary.supporterCount), label: labels[5] },
+    { ...base[0], value: String(summary.safehouseCount), label: labels[0] },
+    { ...base[1], value: `${summary.avgEducationProgressPercent.toFixed(0)}%`, label: labels[1] },
+    { ...base[2], value: summary.avgHealthScore.toFixed(2), label: labels[2] },
+    { ...base[3], value: `${summary.reintegrationSuccessRatePercent.toFixed(0)}%`, label: labels[3] },
+    { ...base[4], value: String(summary.supporterCount), label: labels[4] },
   ]
 }
 
 export function ImpactPage() {
   const [summary, setSummary] = useState<PublicImpactSummary | null>(null)
-  const [snapshots, setSnapshots] = useState<PublicImpactSnapshot[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    void Promise.all([getImpactSummary(), getImpactSnapshots()])
-      .then(([s, sn]) => {
+    void getImpactSummary()
+      .then((s) => {
         if (!cancelled) {
           setSummary(s)
-          setSnapshots(sn.slice(0, 14))
           setLoadError(null)
         }
       })
@@ -178,6 +171,22 @@ export function ImpactPage() {
             donors and partners who show up. Live figures below reflect our current operational dataset.
           </p>
         </div>
+
+        {summary != null && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mx-auto mt-12 max-w-lg rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm"
+          >
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent">Total girls helped</p>
+            <p className="mt-3 font-heading text-5xl font-bold text-primary lg:text-6xl">{summary.activeResidents}</p>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Girls reached through safe care, education, and reintegration support in our programs.
+            </p>
+          </motion.div>
+        )}
+
         <div className="mx-auto mt-14 max-w-6xl px-6 lg:px-8">
           <p className="mb-6 text-center text-xs font-semibold uppercase tracking-widest text-accent">
             By the numbers
@@ -199,58 +208,6 @@ export function ImpactPage() {
                 <p className="mt-1 text-sm text-muted-foreground">{s.label}</p>
               </motion.div>
             ))}
-          </div>
-          {summary && (
-            <p className="mt-8 text-center text-sm text-muted-foreground">
-              Public monetary support (prior calendar month):{' '}
-              <span className="font-medium text-foreground">{moneyPhp.format(summary.donationsLastMonthPhp)}</span>
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section className="bg-muted/50 py-20 lg:py-28">
-        <div className="mx-auto max-w-4xl px-6 lg:px-8">
-          <div className="mb-12 text-center">
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent">Monthly updates</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">Impact snapshots</h2>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-              Real stories of progress and milestones your generosity makes possible.
-            </p>
-          </div>
-          <div className="space-y-6">
-            {snapshots.length === 0 && !loadError ? (
-              <p className="text-center text-sm text-muted-foreground">Loading snapshots…</p>
-            ) : (
-              snapshots.map((u, t) => (
-                <motion.article
-                  key={u.id}
-                  initial={{ opacity: 0, x: -12 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: t * 0.04 }}
-                  className="rounded-2xl border border-border bg-card p-6 lg:p-8"
-                >
-                  <span className="text-xs font-medium text-accent">
-                    {u.snapshotDate} {u.metrics.month ? `· ${u.metrics.month}` : ''}
-                  </span>
-                  <h3 className="mt-2 font-heading text-xl font-semibold text-foreground">{u.headline}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{u.summaryText}</p>
-                  {Object.keys(u.metrics).length > 0 && (
-                    <dl className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                      {Object.entries(u.metrics).map(([k, v]) =>
-                        v ? (
-                          <div key={k}>
-                            <dt className="font-medium capitalize text-foreground">{k.replace(/_/g, ' ')}</dt>
-                            <dd>{v}</dd>
-                          </div>
-                        ) : null,
-                      )}
-                    </dl>
-                  )}
-                </motion.article>
-              ))
-            )}
           </div>
         </div>
       </section>
@@ -278,7 +235,7 @@ export function ImpactPage() {
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mb-12 text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-accent">Transparency</p>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">Every peso counts</h2>
+            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">Every dollar counts</h2>
             <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground">
               We are committed to responsible stewardship. Here is how donations typically support our program areas.
             </p>

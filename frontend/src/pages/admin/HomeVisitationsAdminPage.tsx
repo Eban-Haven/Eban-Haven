@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   alertError,
@@ -17,6 +17,8 @@ import {
   tableWrap,
 } from './adminStyles'
 import { createHomeVisitation, getHomeVisitations, getResidents, type HomeVisitation, type ResidentSummary } from '../../api/admin'
+import { AdminListToolbar } from './AdminListToolbar'
+import { scrollToAddForm } from './scrollToAdd'
 
 const visitTypes = [
   'Initial Assessment',
@@ -37,6 +39,8 @@ export function HomeVisitationsAdminPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [visitTypeFilter, setVisitTypeFilter] = useState('')
 
   const [socialWorker, setSocialWorker] = useState('')
   const [visitType, setVisitType] = useState<string>('Routine Follow-Up')
@@ -48,6 +52,7 @@ export function HomeVisitationsAdminPage() {
   const [followUp, setFollowUp] = useState(false)
   const [followNotes, setFollowNotes] = useState('')
   const [resId, setResId] = useState(0)
+  const addFirstFieldRef = useRef<HTMLSelectElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,6 +106,7 @@ export function HomeVisitationsAdminPage() {
 
   const needle = q.trim().toLowerCase()
   const filtered = visits.filter((v) => {
+    if (visitTypeFilter && v.visitType !== visitTypeFilter) return false
     if (needle) {
       const hay = `${v.residentInternalCode} ${v.visitType} ${v.socialWorker} ${v.locationVisited ?? ''} ${v.observations ?? ''} ${v.visitOutcome ?? ''}`.toLowerCase()
       if (!hay.includes(needle)) return false
@@ -120,40 +126,62 @@ export function HomeVisitationsAdminPage() {
 
       {error && <div className={alertError}>{error}</div>}
 
-      <div className={`${card} flex flex-wrap items-end gap-3`}>
-        <label className={label}>
-          Filter by resident
-          <select
-            className={`${input} min-w-[12rem]`}
-            value={filterRes || ''}
-            onChange={(e) => setFilterRes(Number(e.target.value))}
-          >
-            <option value={0}>All residents</option>
-            {residents.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.internalCode}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={label}>
-          Search
-          <input className={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type, worker, notes…" />
-        </label>
-      </div>
+      <AdminListToolbar
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Visit type, worker, location, notes…"
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((o) => !o)}
+        onAddClick={() => {
+          setShowNew(true)
+          scrollToAddForm('admin-add-visitation', addFirstFieldRef.current)
+        }}
+        addLabel="Add visitation"
+      />
 
-      <div>
-        <button type="button" className={btnPrimary} onClick={() => setShowNew((s) => !s)}>
-          {showNew ? 'Close form' : 'New home visitation'}
-        </button>
-      </div>
+      {filterOpen && (
+        <div className={`${card} flex flex-wrap items-end gap-3`}>
+          <label className={label}>
+            Resident (loads list)
+            <select
+              className={`${input} min-w-[12rem]`}
+              value={filterRes || ''}
+              onChange={(e) => setFilterRes(Number(e.target.value))}
+            >
+              <option value={0}>All residents</option>
+              {residents.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.internalCode}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Visit type
+            <select className={input} value={visitTypeFilter} onChange={(e) => setVisitTypeFilter(e.target.value)}>
+              <option value="">All types</option>
+              {visitTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {showNew && (
-        <form onSubmit={onSubmit} className={cardForm}>
+        <form id="admin-add-visitation" onSubmit={onSubmit} className={`${cardForm} scroll-mt-28`}>
           <p className={sectionFormTitle}>Log visitation</p>
           <label className={label}>
             Resident
-            <select className={input} value={resId || ''} onChange={(e) => setResId(Number(e.target.value))} required>
+            <select
+              ref={addFirstFieldRef}
+              className={input}
+              value={resId || ''}
+              onChange={(e) => setResId(Number(e.target.value))}
+              required
+            >
               {residents.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.internalCode}

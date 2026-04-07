@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   alertError,
@@ -23,6 +23,8 @@ import {
   type Donation,
 } from '../../api/admin'
 import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
+import { AdminListToolbar } from './AdminListToolbar'
+import { scrollToAddForm } from './scrollToAdd'
 
 const moneyPhp = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'PHP' })
 
@@ -41,6 +43,9 @@ export function ContributionsAdminPage() {
   const [newAmt, setNewAmt] = useState('')
   const [newDate, setNewDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [saving, setSaving] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [typeFilter, setTypeFilter] = useState('')
+  const addFirstFieldRef = useRef<HTMLSelectElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -62,9 +67,10 @@ export function ContributionsAdminPage() {
   }, [load])
 
   const filtered = rows.filter((r) => {
-    const hay = `${r.supporterDisplayName} ${r.donationType} ${r.notes ?? ''}`.toLowerCase()
+    const hay = `${r.supporterDisplayName} ${r.donationType} ${r.notes ?? ''} ${r.campaignName ?? ''} ${r.id}`.toLowerCase()
     if (q && !hay.includes(q.toLowerCase())) return false
     if (supFilter > 0 && r.supporterId !== supFilter) return false
+    if (typeFilter && r.donationType !== typeFilter) return false
     return true
   })
 
@@ -120,6 +126,10 @@ export function ContributionsAdminPage() {
     }
   }
 
+  function openAddContribution() {
+    scrollToAddForm('admin-add-contribution', addFirstFieldRef.current)
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -130,28 +140,56 @@ export function ContributionsAdminPage() {
       </div>
       {error && <div className={alertError}>{error}</div>}
 
-      <div className={`${card} flex flex-wrap items-end gap-3`}>
-        <label className={label}>
-          Search
-          <input className={input} value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <label className={label}>
-          Donor
-          <select className={input} value={supFilter} onChange={(e) => setSupFilter(Number(e.target.value))}>
-            <option value={0}>All</option>
-            {supporters.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.displayName}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <AdminListToolbar
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Search donor, type, notes, campaign…"
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((o) => !o)}
+        onAddClick={openAddContribution}
+        addLabel="Add contribution"
+      />
 
-      <form onSubmit={onCreate} className={`${card} flex flex-wrap items-end gap-3`}>
+      {filterOpen && (
+        <div className={`${card} flex flex-wrap items-end gap-3`}>
+          <label className={label}>
+            Donor
+            <select className={input} value={supFilter} onChange={(e) => setSupFilter(Number(e.target.value))}>
+              <option value={0}>All donors</option>
+              {supporters.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Contribution type
+            <select className={input} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <option value="">All types</option>
+              <option value="Monetary">Monetary</option>
+              <option value="InKind">InKind</option>
+              <option value="Time">Time</option>
+              <option value="Skills">Skills</option>
+              <option value="SocialMedia">SocialMedia</option>
+            </select>
+          </label>
+        </div>
+      )}
+
+      <form
+        id="admin-add-contribution"
+        onSubmit={onCreate}
+        className={`${card} scroll-mt-28 flex flex-wrap items-end gap-3`}
+      >
         <label className={label}>
           Supporter
-          <select className={input} value={newSup} onChange={(e) => setNewSup(Number(e.target.value))}>
+          <select
+            ref={addFirstFieldRef}
+            className={input}
+            value={newSup}
+            onChange={(e) => setNewSup(Number(e.target.value))}
+          >
             {supporters.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.displayName}

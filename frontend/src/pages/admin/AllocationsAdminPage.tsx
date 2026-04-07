@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   alertError,
@@ -23,6 +23,8 @@ import {
   type DonationAllocation,
 } from '../../api/admin'
 import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
+import { AdminListToolbar } from './AdminListToolbar'
+import { scrollToAddForm } from './scrollToAdd'
 
 const moneyPhp = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'PHP' })
 
@@ -40,6 +42,11 @@ export function AllocationsAdminPage() {
   const [prog, setProg] = useState('Education')
   const [amt, setAmt] = useState('')
   const [saving, setSaving] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterDonId, setFilterDonId] = useState(0)
+  const [filterShId, setFilterShId] = useState(0)
+  const [filterProgram, setFilterProgram] = useState('')
+  const addFirstFieldRef = useRef<HTMLSelectElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,8 +68,12 @@ export function AllocationsAdminPage() {
   }, [load])
 
   const filtered = rows.filter((r) => {
-    const hay = `${r.safehouseName ?? ''} ${r.programArea} ${r.notes ?? ''}`.toLowerCase()
-    return !q || hay.includes(q.toLowerCase())
+    const hay = `${r.safehouseName ?? ''} ${r.programArea} ${r.notes ?? ''} ${r.donationId} ${r.safehouseId}`.toLowerCase()
+    if (q && !hay.includes(q.toLowerCase())) return false
+    if (filterDonId > 0 && r.donationId !== filterDonId) return false
+    if (filterShId > 0 && r.safehouseId !== filterShId) return false
+    if (filterProgram.trim() && !r.programArea.toLowerCase().includes(filterProgram.trim().toLowerCase())) return false
+    return true
   })
 
   async function onCreate(e: FormEvent) {
@@ -119,6 +130,10 @@ export function AllocationsAdminPage() {
     }
   }
 
+  function openAddAllocation() {
+    scrollToAddForm('admin-add-allocation', sbData ? addFirstFieldRef.current : null)
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -129,18 +144,67 @@ export function AllocationsAdminPage() {
       </div>
       {error && <div className={alertError}>{error}</div>}
 
-      <div className={`${card} flex flex-wrap items-end gap-3`}>
-        <label className={label}>
-          Search
-          <input className={input} value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-      </div>
+      <AdminListToolbar
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Search program, safehouse, donation id…"
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((o) => !o)}
+        onAddClick={openAddAllocation}
+        addLabel="Add allocation"
+      />
 
-      {sbData && (
-        <form onSubmit={onCreate} className={`${card} flex flex-wrap items-end gap-3`}>
+      {filterOpen && (
+        <div className={`${card} flex flex-wrap items-end gap-3`}>
+          <label className={label}>
+            Donation
+            <select className={input} value={filterDonId} onChange={(e) => setFilterDonId(Number(e.target.value))}>
+              <option value={0}>All donations</option>
+              {donations.map((d) => (
+                <option key={d.id} value={d.id}>
+                  #{d.id} — {d.supporterDisplayName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Safehouse id
+            <input
+              type="number"
+              className={input}
+              value={filterShId || ''}
+              onChange={(e) => setFilterShId(Number(e.target.value) || 0)}
+              placeholder="Any"
+            />
+          </label>
+          <label className={label}>
+            Program contains
+            <input
+              className={input}
+              value={filterProgram}
+              onChange={(e) => setFilterProgram(e.target.value)}
+              placeholder="e.g. Education"
+            />
+          </label>
+        </div>
+      )}
+
+      <div id="admin-add-allocation" className={`${card} scroll-mt-28 space-y-3`}>
+        {!sbData ? (
+          <p className="text-sm text-muted-foreground">
+            Adding allocations requires Supabase program data. Set <code className="rounded bg-muted px-1">VITE_USE_SUPABASE_DATA=true</code> and
+            apply lighthouse migrations, then reload this page.
+          </p>
+        ) : (
+          <form onSubmit={onCreate} className="flex flex-wrap items-end gap-3">
           <label className={label}>
             Donation id
-            <select className={input} value={donId} onChange={(e) => setDonId(Number(e.target.value))}>
+            <select
+              ref={addFirstFieldRef}
+              className={input}
+              value={donId}
+              onChange={(e) => setDonId(Number(e.target.value))}
+            >
               {donations.map((d) => (
                 <option key={d.id} value={d.id}>
                   #{d.id} — {d.supporterDisplayName}
@@ -163,8 +227,9 @@ export function AllocationsAdminPage() {
           <button type="submit" disabled={saving} className={btnPrimary}>
             Add allocation
           </button>
-        </form>
-      )}
+          </form>
+        )}
+      </div>
 
       <div className={tableWrap}>
         <table className="w-full text-left text-sm">

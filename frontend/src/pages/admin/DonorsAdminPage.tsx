@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   alertError,
@@ -24,6 +24,8 @@ import {
   type Supporter,
 } from '../../api/admin'
 import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
+import { AdminListToolbar } from './AdminListToolbar'
+import { scrollToAddForm } from './scrollToAdd'
 
 const supporterTypes = [
   'MonetaryDonor',
@@ -51,6 +53,8 @@ export function DonorsAdminPage() {
     acquisitionChannel: 'Website',
   })
   const [saving, setSaving] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const addFirstFieldRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -70,7 +74,7 @@ export function DonorsAdminPage() {
   }, [load])
 
   const filtered = rows.filter((s) => {
-    const hay = `${s.displayName} ${s.email ?? ''} ${s.supporterType} ${s.region ?? ''}`.toLowerCase()
+    const hay = `${s.displayName} ${s.email ?? ''} ${s.supporterType} ${s.region ?? ''} ${s.phone ?? ''} ${s.country ?? ''} ${s.status} ${s.organizationName ?? ''}`.toLowerCase()
     if (q && !hay.includes(q.toLowerCase())) return false
     if (typeFilter && s.supporterType !== typeFilter) return false
     return true
@@ -139,6 +143,10 @@ export function DonorsAdminPage() {
     }
   }
 
+  function openAddDonor() {
+    scrollToAddForm('admin-add-donor', addFirstFieldRef.current)
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -151,26 +159,38 @@ export function DonorsAdminPage() {
 
       {error && <div className={alertError}>{error}</div>}
 
-      <div className={`${card} flex flex-wrap items-end gap-3`}>
-        <label className={label}>
-          Search
-          <input className={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, email, type…" />
-        </label>
-        <label className={label}>
-          Supporter type
-          <select className={input} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="">All</option>
-            {supporterTypes.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <AdminListToolbar
+        searchValue={q}
+        onSearchChange={setQ}
+        searchPlaceholder="Search name, email, type, region…"
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((o) => !o)}
+        onAddClick={openAddDonor}
+        addLabel="Add donor"
+      />
 
-      <form onSubmit={onCreate} className={`${card} grid gap-3 md:grid-cols-2`}>
-        <p className={`${sectionFormTitle} md:col-span-2`}>Add supporter</p>
+      {filterOpen && (
+        <div className={`${card} flex flex-wrap items-end gap-3`}>
+          <label className={label}>
+            Supporter type
+            <select className={input} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+              <option value="">All types</option>
+              {supporterTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
+      <form
+        id="admin-add-donor"
+        onSubmit={onCreate}
+        className={`${card} scroll-mt-28 grid gap-3 md:grid-cols-2`}
+      >
+        <p className={`${sectionFormTitle} md:col-span-2`}>Add donor</p>
         <label className={label}>
           Type
           <select
@@ -188,6 +208,7 @@ export function DonorsAdminPage() {
         <label className={label}>
           Display name *
           <input
+            ref={addFirstFieldRef}
             className={input}
             value={form.displayName}
             onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
@@ -237,7 +258,7 @@ export function DonorsAdminPage() {
         </label>
         <div className="md:col-span-2">
           <button type="submit" disabled={saving} className={btnPrimary}>
-            Add supporter
+            Add donor
           </button>
         </div>
       </form>

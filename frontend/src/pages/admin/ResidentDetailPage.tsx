@@ -224,7 +224,9 @@ export function ResidentDetailPage() {
       ) : tab === 'plans' ? (
         <div className="space-y-3">
           {plans.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No intervention plans. (Create via data import or future API.)</p>
+            <p className="text-sm text-muted-foreground">
+              No intervention plans yet. Add one from <strong>Admin → Case conferences</strong> (Supabase data mode), or import data.
+            </p>
           ) : (
             plans.map((p) => (
               <div key={p.id} className={card}>

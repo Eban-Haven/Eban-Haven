@@ -766,6 +766,50 @@ export async function getInterventionPlans(residentId?: number): Promise<T.Inter
     )
 }
 
+export async function createInterventionPlan(body: {
+  residentId: number
+  planCategory: string
+  planDescription: string
+  servicesProvided?: string
+  targetValue?: number | null
+  targetDate?: string | null
+  status: string
+  caseConferenceDate?: string | null
+}): Promise<T.InterventionPlan> {
+  const residents = await loadTable('lighthouse_residents', 'resident_id')
+  if (!residents.some((x) => gi(x, 'resident_id') === body.residentId)) {
+    throw new Error('Unknown resident.')
+  }
+  const next = await nextPk('lighthouse_intervention_plans', 'plan_id')
+  const now = new Date()
+  const nowStr = now.toISOString().slice(0, 19).replace('T', ' ')
+  const targetDateStr = body.targetDate?.trim() ? body.targetDate.trim().slice(0, 10) : ''
+  const confStr = body.caseConferenceDate?.trim() ? body.caseConferenceDate.trim().slice(0, 10) : ''
+  const row: Row = {
+    plan_id: String(next),
+    resident_id: String(body.residentId),
+    plan_category: body.planCategory.trim(),
+    plan_description: body.planDescription.trim(),
+    services_provided: body.servicesProvided?.trim() ?? '',
+    target_value:
+      body.targetValue != null && Number.isFinite(body.targetValue) ? String(body.targetValue) : '',
+    target_date: targetDateStr,
+    status: (body.status.trim() || 'In Progress').slice(0, 120),
+    case_conference_date: confStr,
+    created_at: nowStr,
+    updated_at: nowStr,
+  }
+  const { error } = await getSupabase().from('lighthouse_intervention_plans').insert({
+    plan_id: next,
+    data: row,
+  })
+  if (error) throw error
+  const list = await getInterventionPlans()
+  const created = list.find((p) => p.id === next)
+  if (!created) throw new Error('Plan was created but could not be reloaded.')
+  return created
+}
+
 export async function getReportsSummary(): Promise<T.ReportsSummary> {
   const [
     residents,
