@@ -13,7 +13,7 @@ const fadeUp = {
 const fallbackStats = [
   { value: '—', label: 'Total girls helped' },
   { value: '—', label: 'Safe homes' },
-  { value: '—', label: 'Education progress (avg.)' },
+  { value: '—', label: 'Average Education progress' },
   { value: '—', label: 'Community partners' },
 ] as const
 
@@ -120,7 +120,7 @@ export function HomePage() {
               className="font-heading text-4xl font-bold leading-tight text-white md:text-5xl lg:text-6xl"
             >
               Every girl deserves
-              <span className="block text-accent">EDIT THIS LATER!! a safe haven</span>
+              <span className="block text-accent">a safe haven</span>
             </motion.h1>
             <motion.p
               variants={fadeUp}
@@ -319,19 +319,6 @@ export function HomePage() {
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.98 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="overflow-hidden rounded-2xl border border-primary-foreground/20 shadow-xl"
-            >
-              <img
-                src={IMAGES.joinUs}
-                alt="Community and hope — supporters standing with girls on the path to healing"
-                className="aspect-[4/3] h-full w-full object-cover"
-              />
             </motion.div>
           </div>
         </div>
