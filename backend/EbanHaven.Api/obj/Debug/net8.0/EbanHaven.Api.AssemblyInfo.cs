@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EbanHaven.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c9ed383bd8d4f40db3dd8b9da0754940cbddd7a7")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9ee04586b5a1200b4d169123e6696e0c3e330e95")]
 [assembly: System.Reflection.AssemblyProductAttribute("EbanHaven.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EbanHaven.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
