@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   alertError,
@@ -18,6 +18,8 @@ import {
   type ProcessRecording,
   type ResidentSummary,
 } from '../../api/admin'
+import { AdminListToolbar } from './AdminListToolbar'
+import { scrollToAddForm } from './scrollToAdd'
 
 const sessionTypes = ['Individual', 'Group'] as const
 
@@ -30,8 +32,11 @@ export function ProcessRecordingsPage() {
   const [filterResidentId, setFilterResidentId] = useState<number>(0)
   const [search, setSearch] = useState('')
   const [showNew, setShowNew] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('')
   const [formResidentId, setFormResidentId] = useState<number>(0)
   const [saving, setSaving] = useState(false)
+  const addFirstFieldRef = useRef<HTMLSelectElement>(null)
 
   const [socialWorker, setSocialWorker] = useState('')
   const [sessionType, setSessionType] = useState<string>('Individual')
@@ -112,6 +117,7 @@ export function ProcessRecordingsPage() {
   const needle = search.trim().toLowerCase()
   const filtered = [...rows]
     .filter((r) => {
+      if (sessionTypeFilter && r.sessionType !== sessionTypeFilter) return false
       if (!needle) return true
       const hay = `${r.residentInternalCode} ${r.sessionType} ${r.socialWorker} ${r.sessionNarrative} ${r.interventionsApplied ?? ''} ${r.followUpActions ?? ''}`.toLowerCase()
       return hay.includes(needle)
@@ -130,45 +136,57 @@ export function ProcessRecordingsPage() {
 
       {error && <div className={alertError}>{error}</div>}
 
-      <div className={`${card} flex flex-wrap items-end gap-3`}>
-        <label className={label}>
-          Filter by resident
-          <select
-            className={`${input} min-w-[12rem]`}
-            value={filterResidentId || ''}
-            onChange={(e) => setFilterResidentId(Number(e.target.value))}
-          >
-            <option value={0}>All</option>
-            {residents.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.internalCode} — {r.caseStatus}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={label}>
-          Search
-          <input
-            className={input}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Worker, narrative, type…"
-          />
-        </label>
-      </div>
+      <AdminListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Worker, narrative, session type…"
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((o) => !o)}
+        onAddClick={() => {
+          setShowNew(true)
+          scrollToAddForm('admin-add-process', addFirstFieldRef.current)
+        }}
+        addLabel="Add recording"
+      />
 
-      <div>
-        <button type="button" className={btnPrimary} onClick={() => setShowNew((s) => !s)}>
-          {showNew ? 'Close new recording' : 'New process recording'}
-        </button>
-      </div>
+      {filterOpen && (
+        <div className={`${card} flex flex-wrap items-end gap-3`}>
+          <label className={label}>
+            Resident (loads list from server)
+            <select
+              className={`${input} min-w-[12rem]`}
+              value={filterResidentId || ''}
+              onChange={(e) => setFilterResidentId(Number(e.target.value))}
+            >
+              <option value={0}>All residents</option>
+              {residents.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.internalCode} — {r.caseStatus}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Session type
+            <select className={input} value={sessionTypeFilter} onChange={(e) => setSessionTypeFilter(e.target.value)}>
+              <option value="">All</option>
+              {sessionTypes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
 
       {showNew && (
-        <form onSubmit={onSubmit} className={cardForm}>
+        <form id="admin-add-process" onSubmit={onSubmit} className={`${cardForm} scroll-mt-28`}>
           <p className={sectionFormTitle}>New process recording</p>
           <label className={label}>
             Resident
             <select
+              ref={addFirstFieldRef}
               className={input}
               value={formResidentId || ''}
               onChange={(e) => setFormResidentId(Number(e.target.value))}

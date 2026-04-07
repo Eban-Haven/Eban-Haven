@@ -11,10 +11,10 @@ const fadeUp = {
 }
 
 const fallbackStats = [
-  { value: '—', label: 'Girls served (live data on Impact)' },
+  { value: '—', label: 'Total girls helped' },
   { value: '—', label: 'Safe homes' },
   { value: '—', label: 'Education progress (avg.)' },
-  { value: '—', label: 'Supporters' },
+  { value: '—', label: 'Community partners' },
 ] as const
 
 const programs = [
@@ -65,10 +65,10 @@ const btnOutlineLight =
 
 function statsFromImpact(i: PublicImpactSummary) {
   return [
-    { value: String(i.activeResidents), label: 'Residents supported (active aggregate)' },
+    { value: String(i.activeResidents), label: 'Total girls helped' },
     { value: String(i.safehouseCount), label: 'Active safehouses' },
     { value: `${i.avgEducationProgressPercent.toFixed(0)}%`, label: 'Avg. education progress' },
-    { value: String(i.supporterCount), label: 'Supporters in network' },
+    { value: String(i.supporterCount), label: 'Community partners' },
   ] as const
 }
 
@@ -221,7 +221,7 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-border bg-muted/40 py-20 lg:py-28">
+      <section className="bg-background py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto mb-10 max-w-3xl text-center">
             <span className="text-xs font-semibold uppercase tracking-widest text-accent">Ghana focus</span>
@@ -297,27 +297,43 @@ export function HomePage() {
       </section>
 
       <section className="bg-primary py-20 lg:py-28">
-        <div className="mx-auto max-w-4xl px-6 text-center lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-100px' }}
-            variants={fadeUp}
-          >
-            <h2 className="font-heading text-3xl font-bold text-primary-foreground lg:text-4xl">
-              Join us in making a difference
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80">
-              Your support helps us provide safe homes, education, counseling, and a path to healing
-              for girls in need.
-            </p>
-            <div className="mt-8">
-              <Link to="/impact" className={btnPrimary}>
-                Learn How You Can Help
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </motion.div>
+        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+          <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: '-100px' }}
+              variants={fadeUp}
+              className="text-center lg:text-left"
+            >
+              <h2 className="font-heading text-3xl font-bold text-primary-foreground lg:text-4xl">
+                Join us in making a difference
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-primary-foreground/80 lg:mx-0">
+                Your support helps us provide safe homes, education, counseling, and a path to healing
+                for girls in need.
+              </p>
+              <div className="mt-8 flex justify-center lg:justify-start">
+                <Link to="/impact" className={btnPrimary}>
+                  Learn How You Can Help
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+              className="overflow-hidden rounded-2xl border border-primary-foreground/20 shadow-xl"
+            >
+              <img
+                src={IMAGES.joinUs}
+                alt="Community and hope — supporters standing with girls on the path to healing"
+                className="aspect-[4/3] h-full w-full object-cover"
+              />
+            </motion.div>
+          </div>
         </div>
       </section>
     </div>

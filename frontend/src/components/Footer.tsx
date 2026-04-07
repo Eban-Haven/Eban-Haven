@@ -29,6 +29,7 @@ function IconLinkedin({ className }: { className?: string }) {
 const links = [
   { to: '/', label: 'Home' },
   { to: '/impact', label: 'Our Impact' },
+  { to: '/privacy', label: 'Privacy Policy' },
   { to: '/accessibility', label: 'Accessibility' },
 ] as const
 

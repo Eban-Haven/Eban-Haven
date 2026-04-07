@@ -5,6 +5,9 @@ export const IMAGES = {
   hero: 'https://media.base44.com/images/public/69d42d81e80694d948166a17/f70d70bda_generated_923f61bf.png',
   mission:
     'https://media.base44.com/images/public/69d42d81e80694d948166a17/90c218973_generated_9e96d4b1.png',
+  /** CTA / join section (reuse or swap for a campaign photo) */
+  joinUs:
+    'https://media.base44.com/images/public/69d42d81e80694d948166a17/90c218973_generated_9e96d4b1.png',
 } as const
 
 /** Display name in nav, footer, and body copy */
@@ -26,10 +29,10 @@ export const PUBLIC_CONTACT = {
   addressLine: 'Ghana',
 } as const
 
-/** Footer / share links (update with real URLs when available) */
+/** Footer / share — set to your live profiles */
 export const SOCIAL_LINKS = {
-  facebook: 'https://www.facebook.com/',
-  instagram: 'https://www.instagram.com/',
-  linkedin: 'https://www.linkedin.com/',
-  x: 'https://x.com/',
+  facebook: 'https://www.facebook.com/ebanhaven',
+  instagram: 'https://www.instagram.com/ebanhaven',
+  linkedin: 'https://www.linkedin.com/company/eban-haven',
+  x: 'https://x.com/ebanhaven',
 } as const

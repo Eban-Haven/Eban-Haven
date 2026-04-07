@@ -1,21 +1,38 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Heart, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import { login } from '../api/auth'
 import { registerDonorAccount } from '../api/registration'
 import { SITE_DISPLAY_NAME } from '../site'
 
-const supporterTypes = [
-  'MonetaryDonor',
-  'Volunteer',
-  'InKindDonor',
-  'SkillsContributor',
-  'SocialMediaAdvocate',
-  'PartnerOrganization',
+const supporterTypeOptions = [
+  { value: 'MonetaryDonor', label: 'Monetary donor' },
+  { value: 'Volunteer', label: 'Volunteer' },
+  { value: 'InKindDonor', label: 'In-kind donor' },
+  { value: 'SkillsContributor', label: 'Skills contributor' },
+  { value: 'SocialMediaAdvocate', label: 'Social media advocate' },
+  { value: 'PartnerOrganization', label: 'Partner organization' },
 ] as const
 
-const relTypes = ['Local', 'International', 'Diaspora', 'Corporate', ''] as const
+const relationshipOptions = [
+  { value: 'Local', label: 'Local supporter' },
+  { value: 'International', label: 'International supporter' },
+  { value: 'Diaspora', label: 'Diaspora' },
+  { value: 'Corporate', label: 'Corporate / workplace' },
+] as const
+
+const acquisitionChannels = [
+  'Website',
+  'Social media',
+  'Community event',
+  'Referral or word of mouth',
+  'Partner organization',
+  'Email campaign',
+  'Other',
+] as const
+
+type RelationshipValue = (typeof relationshipOptions)[number]['value']
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -38,7 +55,7 @@ export function LoginPage() {
   const [rOrg, setROrg] = useState('')
   const [rFirst, setRFirst] = useState('')
   const [rLast, setRLast] = useState('')
-  const [rRel, setRRel] = useState('Local')
+  const [rRel, setRRel] = useState<RelationshipValue>('Local')
   const [rRegion, setRRegion] = useState('')
   const [rCountry, setRCountry] = useState('Ghana')
   const [rPhone, setRPhone] = useState('')
@@ -109,7 +126,7 @@ export function LoginPage() {
 
   return (
     <div className="min-h-[calc(100vh-5rem)] bg-muted/30 py-16 lg:py-24">
-      <div className="mx-auto max-w-md px-6">
+      <div className={`mx-auto px-6 ${tab === 'register' ? 'max-w-4xl' : 'max-w-md'}`}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -151,7 +168,7 @@ export function LoginPage() {
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {tab === 'login'
-                ? `Access your ${SITE_DISPLAY_NAME} portal (staff or donor).`
+                ? `Access your ${SITE_DISPLAY_NAME} portal.`
                 : 'Register as a supporter with the details we use in our donor records.'}
               {tab === 'login' && (
                 <span className="mt-2 block">Use your staff username and password.</span>
@@ -218,13 +235,13 @@ export function LoginPage() {
               </button>
             </form>
           ) : (
-            <form onSubmit={onRegister} className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+            <form onSubmit={onRegister} className="space-y-4">
               {error && (
                 <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <label className="text-sm">
                   <span className="text-muted-foreground">Email *</span>
                   <input
@@ -245,39 +262,37 @@ export function LoginPage() {
                     onChange={(e) => setRPassword(e.target.value)}
                   />
                 </label>
-              </div>
-              <label className="text-sm">
-                <span className="text-muted-foreground">Supporter type *</span>
-                <select
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={rSupporterType}
-                  onChange={(e) => setRSupporterType(e.target.value)}
-                >
-                  {supporterTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                <span className="text-muted-foreground">Display name *</span>
-                <input
-                  required
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={rDisplayName}
-                  onChange={(e) => setRDisplayName(e.target.value)}
-                />
-              </label>
-              <label className="text-sm">
-                <span className="text-muted-foreground">Organization name</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={rOrg}
-                  onChange={(e) => setROrg(e.target.value)}
-                />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm">
+                  <span className="text-muted-foreground">Supporter type *</span>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={rSupporterType}
+                    onChange={(e) => setRSupporterType(e.target.value)}
+                  >
+                    {supporterTypeOptions.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-sm lg:col-span-2">
+                  <span className="text-muted-foreground">Display name *</span>
+                  <input
+                    required
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={rDisplayName}
+                    onChange={(e) => setRDisplayName(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm lg:col-span-3">
+                  <span className="text-muted-foreground">Organization name</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={rOrg}
+                    onChange={(e) => setROrg(e.target.value)}
+                  />
+                </label>
                 <label className="text-sm">
                   <span className="text-muted-foreground">First name</span>
                   <input
@@ -294,22 +309,20 @@ export function LoginPage() {
                     onChange={(e) => setRLast(e.target.value)}
                   />
                 </label>
-              </div>
-              <label className="text-sm">
-                <span className="text-muted-foreground">Relationship type</span>
-                <select
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={rRel}
-                  onChange={(e) => setRRel(e.target.value)}
-                >
-                  {relTypes.filter(Boolean).map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-sm">
+                  <span className="text-muted-foreground">Relationship to our work</span>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={rRel}
+                    onChange={(e) => setRRel(e.target.value as RelationshipValue)}
+                  >
+                    {relationshipOptions.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label className="text-sm">
                   <span className="text-muted-foreground">Region</span>
                   <input
@@ -326,39 +339,39 @@ export function LoginPage() {
                     onChange={(e) => setRCountry(e.target.value)}
                   />
                 </label>
+                <label className="text-sm">
+                  <span className="text-muted-foreground">Phone</span>
+                  <input
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={rPhone}
+                    onChange={(e) => setRPhone(e.target.value)}
+                  />
+                </label>
+                <label className="text-sm">
+                  <span className="text-muted-foreground">How did you hear about us?</span>
+                  <select
+                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    value={rChannel}
+                    onChange={(e) => setRChannel(e.target.value)}
+                  >
+                    {acquisitionChannels.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-              <label className="text-sm">
-                <span className="text-muted-foreground">Phone</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={rPhone}
-                  onChange={(e) => setRPhone(e.target.value)}
-                />
-              </label>
-              <label className="text-sm">
-                <span className="text-muted-foreground">Acquisition channel</span>
-                <input
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                  value={rChannel}
-                  onChange={(e) => setRChannel(e.target.value)}
-                />
-              </label>
               <p className="text-xs text-muted-foreground">Status defaults to Active for new donor accounts.</p>
               <button
                 type="submit"
                 disabled={submitting}
                 className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground disabled:opacity-50"
               >
-                {submitting ? 'Creating account…' : 'Register & sign in'}
+                {submitting ? 'Creating account…' : 'Create account'}
               </button>
             </form>
           )}
-
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            <Link to="/" className="inline-flex items-center gap-1 text-primary hover:underline">
-              <Heart className="h-3.5 w-3.5" /> Back to public site
-            </Link>
-          </p>
         </motion.div>
       </div>
     </div>

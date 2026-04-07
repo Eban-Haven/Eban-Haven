@@ -92,6 +92,10 @@ export async function getInterventionPlans(residentId?: number) {
     : rest.getInterventionPlans(residentId)
 }
 
+export async function createInterventionPlan(body: Parameters<typeof sb.createInterventionPlan>[0]) {
+  return useSupabaseForLighthouseData() ? sb.createInterventionPlan(body) : sbDataOnly()
+}
+
 export async function getReportsSummary() {
   return useSupabaseForLighthouseData() ? sb.getReportsSummary() : rest.getReportsSummary()
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import {
   alertError,
@@ -16,6 +16,8 @@ import {
   tableWrap,
 } from './adminStyles'
 import { createResident, getResidents, getSafehouses, type ResidentSummary, type SafehouseOption } from '../../api/admin'
+import { AdminListToolbar } from './AdminListToolbar'
+import { scrollToAddForm } from './scrollToAdd'
 
 const statusOptions = ['Active', 'Closed', 'Transferred', ''] as const
 
@@ -34,6 +36,13 @@ export function ResidentsPage() {
   const [newStatus, setNewStatus] = useState('Active')
   const [newCat, setNewCat] = useState('')
   const [saving, setSaving] = useState(false)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const addFirstFieldRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearchApplied(search.trim()), 400)
+    return () => window.clearTimeout(t)
+  }, [search])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -94,68 +103,75 @@ export function ResidentsPage() {
 
       {error && <div className={alertError}>{error}</div>}
 
-      <div className={`${card} flex flex-wrap items-end gap-3`}>
-        <label className={label}>
-          Case status
-          <select
-            className={`${input} w-40`}
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">All</option>
-            {statusOptions.filter(Boolean).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={label}>
-          Safehouse
-          <select
-            className={`${input} min-w-[10rem]`}
-            value={filterSh === '' ? '' : String(filterSh)}
-            onChange={(e) => setFilterSh(e.target.value ? Number(e.target.value) : '')}
-          >
-            <option value="">All</option>
-            {safehouses.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.code} — {s.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={label}>
-          Category contains
-          <input
-            className={`${input} w-44`}
-            value={filterCat}
-            onChange={(e) => setFilterCat(e.target.value)}
-            placeholder="e.g. Trafficked"
-          />
-        </label>
-        <label className={label}>
-          Search
-          <input
-            className={`${input} w-48`}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Code, SW, control no…"
-          />
-        </label>
-        <button type="button" className={btnPrimary} onClick={() => setSearchApplied(search)}>
-          Apply filters
-        </button>
-      </div>
+      <AdminListToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Code, control no., social worker, category…"
+        filterOpen={filterOpen}
+        onFilterToggle={() => setFilterOpen((o) => !o)}
+        onAddClick={() => scrollToAddForm('admin-add-resident', addFirstFieldRef.current)}
+        addLabel="Add resident"
+      />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Add resident</h3>
-      </div>
-      <form onSubmit={onCreate} className={`${card} grid max-w-xl gap-3 sm:grid-cols-2`}>
+      {filterOpen && (
+        <div className={`${card} flex flex-wrap items-end gap-3`}>
+          <label className={label}>
+            Case status
+            <select
+              className={`${input} w-40`}
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">All</option>
+              {statusOptions.filter(Boolean).map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Safehouse
+            <select
+              className={`${input} min-w-[10rem]`}
+              value={filterSh === '' ? '' : String(filterSh)}
+              onChange={(e) => setFilterSh(e.target.value ? Number(e.target.value) : '')}
+            >
+              <option value="">All</option>
+              {safehouses.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.code} — {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Category contains
+            <input
+              className={`${input} min-w-[12rem]`}
+              value={filterCat}
+              onChange={(e) => setFilterCat(e.target.value)}
+              placeholder="e.g. Trafficked"
+            />
+          </label>
+        </div>
+      )}
+
+      <form
+        id="admin-add-resident"
+        onSubmit={onCreate}
+        className={`${card} scroll-mt-28 grid max-w-xl gap-3 sm:grid-cols-2`}
+      >
         <p className={`${sectionFormTitle} sm:col-span-2`}>Minimal intake (edit full profile on the resident page)</p>
         <label className={`${label} sm:col-span-2`}>
           Internal code *
-          <input className={input} value={newCode} onChange={(e) => setNewCode(e.target.value)} required />
+          <input
+            ref={addFirstFieldRef}
+            className={input}
+            value={newCode}
+            onChange={(e) => setNewCode(e.target.value)}
+            required
+          />
         </label>
         <label className={label}>
           Status
