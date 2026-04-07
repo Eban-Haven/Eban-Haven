@@ -1,5 +1,3 @@
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
-
 /** Base URL for the ASP.NET API (no trailing slash). Empty = same origin. */
 export function apiBaseUrl(): string {
   return (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
@@ -12,23 +10,35 @@ function resolveUrl(input: string): string {
   return `${base}${input.startsWith('/') ? '' : '/'}${input}`
 }
 
-/** All API calls: cookies for legacy staff login; Bearer when Supabase session exists. */
+const TOKEN_KEY = 'haven_staff_token'
+
+export function getStaffToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function setStaffToken(token: string | null) {
+  try {
+    if (!token) localStorage.removeItem(TOKEN_KEY)
+    else localStorage.setItem(TOKEN_KEY, token)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** All API calls: Bearer token (no cookies). */
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers)
   if (init?.body != null && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  if (isSupabaseConfigured()) {
-    try {
-      const { data: { session } } = await getSupabase().auth.getSession()
-      if (session?.access_token) headers.set('Authorization', `Bearer ${session.access_token}`)
-    } catch {
-      /* Supabase not initialized */
-    }
-  }
+  const token = getStaffToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
   return fetch(resolveUrl(input), {
     ...init,
-    credentials: 'include',
     headers,
   })
 }

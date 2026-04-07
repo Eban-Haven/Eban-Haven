@@ -3,9 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Heart, Lock } from 'lucide-react'
 import { login } from '../api/auth'
-import { fetchUserProfile, isStaffRole } from '../api/profile'
 import { registerDonorAccount } from '../api/registration'
-import { isSupabaseConfigured } from '../lib/supabase'
 import { SITE_DISPLAY_NAME } from '../site'
 
 const supporterTypes = [
@@ -47,21 +45,6 @@ export function LoginPage() {
   const [rChannel, setRChannel] = useState('Website')
 
   async function postLoginRedirect() {
-    if (isSupabaseConfigured()) {
-      const p = await fetchUserProfile()
-      if (p?.role === 'donor') {
-        navigate('/donor-dashboard', { replace: true })
-        return
-      }
-      if (p?.role === 'resident') {
-        navigate('/', { replace: true })
-        return
-      }
-      if (p && isStaffRole(p.role)) {
-        navigate(from.startsWith('/login') ? '/admin' : from, { replace: true })
-        return
-      }
-    }
     navigate(from.startsWith('/login') ? '/admin' : from, { replace: true })
   }
 
@@ -69,7 +52,7 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     const fe: { user?: string; pass?: string } = {}
-    if (!username.trim()) fe.user = isSupabaseConfigured() ? 'Email is required.' : 'Username is required.'
+    if (!username.trim()) fe.user = 'Username is required.'
     if (!password) fe.pass = 'Password is required.'
     setFieldErrors(fe)
     if (Object.keys(fe).length > 0) return
@@ -88,10 +71,6 @@ export function LoginPage() {
   async function onRegister(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!isSupabaseConfigured()) {
-      setError('Registration requires Supabase (configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).')
-      return
-    }
     if (!rEmail.trim() || !rPassword || !rDisplayName.trim()) {
       setError('Email, password, and display name are required.')
       return
@@ -113,8 +92,9 @@ export function LoginPage() {
         acquisitionChannel: rChannel,
       })
       try {
-        await login(rEmail.trim(), rPassword, false)
-        navigate('/donor-dashboard', { replace: true })
+        setError('Supporter created. Staff login is separate; please sign in with your staff username/password.')
+        setTab('login')
+        setUsername(rEmail.trim())
       } catch {
         setError('Account created. If email confirmation is required, verify your inbox and then sign in.')
         setTab('login')
@@ -173,8 +153,8 @@ export function LoginPage() {
               {tab === 'login'
                 ? `Access your ${SITE_DISPLAY_NAME} portal (staff or donor).`
                 : 'Register as a supporter with the details we use in our donor records.'}
-              {isSupabaseConfigured() && tab === 'login' && (
-                <span className="mt-2 block">Use your Supabase account email and password.</span>
+              {tab === 'login' && (
+                <span className="mt-2 block">Use your staff username and password.</span>
               )}
             </p>
           </div>
@@ -191,13 +171,13 @@ export function LoginPage() {
               )}
               <div>
                 <label htmlFor="staff-user" className="text-sm font-medium text-foreground">
-                  {isSupabaseConfigured() ? 'Email' : 'Username'}
+                  Username
                 </label>
                 <input
                   id="staff-user"
                   name="username"
-                  autoComplete={isSupabaseConfigured() ? 'email' : 'username'}
-                  type={isSupabaseConfigured() ? 'email' : 'text'}
+                  autoComplete="username"
+                  type="text"
                   className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}

@@ -1,5 +1,4 @@
 using System.Text;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -9,77 +8,37 @@ internal static class AuthenticationSetup
 {
     public static void AddHavenAuthentication(this IServiceCollection services, IConfiguration config)
     {
-        var jwtSecret = config["Supabase:JwtSecret"];
-        var supabaseUrl = (config["Supabase:Url"] ?? "").TrimEnd('/');
+        var jwtSecret = config["Auth:JwtSecret"];
+        var issuer = config["Auth:Issuer"] ?? "EbanHaven.Api";
 
-        if (!string.IsNullOrWhiteSpace(jwtSecret))
-        {
-            services
-                .AddAuthentication(o =>
+        if (string.IsNullOrWhiteSpace(jwtSecret))
+            throw new InvalidOperationException("Missing Auth:JwtSecret configuration.");
+
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(o =>
+            {
+                o.TokenValidationParameters = new TokenValidationParameters
                 {
-                    o.DefaultScheme = "Hybrid";
-                    o.DefaultChallengeScheme = "Hybrid";
-                })
-                .AddPolicyScheme("Hybrid", "Hybrid auth", o =>
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                    ValidateIssuer = true,
+                    ValidIssuer = issuer,
+                    ValidateAudience = false,
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.FromMinutes(2),
+                };
+                o.Events = new JwtBearerEvents
                 {
-                    o.ForwardDefaultSelector = ctx =>
+                    OnChallenge = context =>
                     {
-                        var auth = ctx.Request.Headers.Authorization.ToString();
-                        if (!string.IsNullOrEmpty(auth) &&
-                            auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-                            return JwtBearerDefaults.AuthenticationScheme;
-                        return CookieAuthenticationDefaults.AuthenticationScheme;
-                    };
-                })
-                .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookie)
-                .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, o =>
-                {
-                    var hasIssuer = !string.IsNullOrEmpty(supabaseUrl);
-                    o.TokenValidationParameters = new TokenValidationParameters
-                    {
-                        ValidateIssuerSigningKey = true,
-                        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
-                        ValidateIssuer = hasIssuer,
-                        ValidIssuer = hasIssuer ? $"{supabaseUrl}/auth/v1" : null,
-                        ValidateAudience = true,
-                        ValidAudience = "authenticated",
-                        ValidateLifetime = true,
-                        ClockSkew = TimeSpan.FromMinutes(2),
-                    };
-                    o.Events = new JwtBearerEvents
-                    {
-                        OnChallenge = context =>
-                        {
-                            context.HandleResponse();
-                            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                            return Task.CompletedTask;
-                        },
-                    };
-                });
-        }
-        else
-        {
-            services
-                .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-                .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, ConfigureCookie);
-        }
+                        context.HandleResponse();
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return Task.CompletedTask;
+                    },
+                };
+            });
 
         services.AddAuthorization();
-    }
-
-    private static void ConfigureCookie(CookieAuthenticationOptions options)
-    {
-        options.Cookie.Name = "haven_staff";
-        options.Cookie.HttpOnly = true;
-        // Required for cross-site cookie auth (Vercel frontend → Azure backend).
-        options.Cookie.SameSite = SameSiteMode.None;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.SlidingExpiration = true;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
-        options.Events.OnRedirectToLogin = context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return Task.CompletedTask;
-        };
     }
 }

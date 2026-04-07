@@ -5,6 +5,7 @@ namespace EbanHaven.Api.DataAccess;
 
 public sealed class HavenDbContext(DbContextOptions<HavenDbContext> options) : DbContext(options)
 {
+    public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<Resident> Residents => Set<Resident>();
     public DbSet<Supporter> Supporters => Set<Supporter>();
     public DbSet<Donation> Donations => Set<Donation>();
@@ -22,6 +23,7 @@ public sealed class HavenDbContext(DbContextOptions<HavenDbContext> options) : D
     {
         modelBuilder.HasDefaultSchema("public");
 
+        modelBuilder.Entity<Profile>().ToTable("profiles").HasKey(x => x.Id);
         modelBuilder.Entity<Resident>().ToTable("residents").HasKey(x => x.ResidentId);
         modelBuilder.Entity<Supporter>().ToTable("supporters").HasKey(x => x.SupporterId);
         modelBuilder.Entity<Donation>().ToTable("donations").HasKey(x => x.DonationId);

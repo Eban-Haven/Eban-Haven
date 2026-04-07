@@ -1,26 +1,25 @@
 {
   "format": 1,
   "restore": {
-    "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/EbanHaven.Api.csproj": {}
+    "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/EbanHaven.Api.csproj": {}
   },
   "projects": {
-    "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/EbanHaven.Api.csproj": {
+    "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/EbanHaven.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/EbanHaven.Api.csproj",
+        "projectUniqueName": "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/EbanHaven.Api.csproj",
         "projectName": "EbanHaven.Api",
-        "projectPath": "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/EbanHaven.Api.csproj",
-        "packagesPath": "/tmp/dotnet-home/.nuget/packages/",
-        "outputPath": "/Users/parisward/Documents/GitHub/testinggg/backend/EbanHaven.Api/obj/",
+        "projectPath": "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/EbanHaven.Api.csproj",
+        "packagesPath": "/var/folders/dv/s0rsxjqs12dg8hj5s7ss2jgc0000gn/T/cursor-sandbox-cache/f3c39bd8e96668d5e796b9a699d829f6/nuget",
+        "outputPath": "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/tmp/dotnet-home/.nuget/NuGet/NuGet.Config"
+          "/Users/ethan/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
-          "/opt/homebrew/Cellar/dotnet/10.0.105/libexec/library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -81,7 +80,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/opt/homebrew/Cellar/dotnet/10.0.105/libexec/sdk/10.0.105/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/10.0.101/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
