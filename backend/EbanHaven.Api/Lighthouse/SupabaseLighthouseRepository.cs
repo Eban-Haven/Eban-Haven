@@ -573,7 +573,10 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
 
         var supporters = db.Supporters.Count();
         var completed = db.Residents.Count(r => (r.ReintegrationStatus ?? "").ToLower() == "completed");
-        var denom = Math.Max(db.Residents.Count(r => !string.IsNullOrWhiteSpace(r.ReintegrationStatus)), 1);
+        // Avoid string.IsNullOrWhiteSpace here — EF Core cannot translate it to SQL for Npgsql (runtime 500).
+        var denom = Math.Max(
+            db.Residents.Count(r => r.ReintegrationStatus != null && r.ReintegrationStatus != ""),
+            1);
         var rate = 100.0 * completed / denom;
 
         return new PublicImpactSummaryDto(
