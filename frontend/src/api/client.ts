@@ -34,8 +34,8 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
 }
 
 export async function parseJson<T>(res: Response): Promise<T> {
+  const text = await res.text()
   if (!res.ok) {
-    const text = await res.text()
     let message = text || res.statusText
     try {
       const j = JSON.parse(text) as { error?: string }
@@ -45,5 +45,16 @@ export async function parseJson<T>(res: Response): Promise<T> {
     }
     throw new Error(message)
   }
-  return res.json() as Promise<T>
+  const trimmed = text.trimStart()
+  if (trimmed.startsWith('<!') || trimmed.toLowerCase().startsWith('<html')) {
+    throw new Error(
+      'Received HTML instead of JSON — there is no /api backend on this host. Either set VITE_USE_SUPABASE_DATA=true ' +
+        '(and redeploy) so admin data loads from Supabase, or deploy the .NET API and set VITE_API_BASE_URL to its URL.',
+    )
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new Error(text.slice(0, 160) || 'Invalid JSON response')
+  }
 }
