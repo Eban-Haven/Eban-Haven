@@ -539,7 +539,7 @@
     ]
   },
   "packageFolders": {
-    "/var/folders/dv/s0rsxjqs12dg8hj5s7ss2jgc0000gn/T/cursor-sandbox-cache/f3c39bd8e96668d5e796b9a699d829f6/nuget": {}
+    "/Users/ethan/.nuget/packages/": {}
   },
   "project": {
     "version": "1.0.0",
@@ -547,7 +547,7 @@
       "projectUniqueName": "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/EbanHaven.Api.csproj",
       "projectName": "EbanHaven.Api",
       "projectPath": "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/EbanHaven.Api.csproj",
-      "packagesPath": "/var/folders/dv/s0rsxjqs12dg8hj5s7ss2jgc0000gn/T/cursor-sandbox-cache/f3c39bd8e96668d5e796b9a699d829f6/nuget",
+      "packagesPath": "/Users/ethan/.nuget/packages/",
       "outputPath": "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven/backend/EbanHaven.Api/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
