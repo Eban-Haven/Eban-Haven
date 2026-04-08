@@ -137,24 +137,19 @@ export function AdminLayout() {
             sidebarCollapsed ? 'lg:justify-center lg:px-2' : 'justify-between'
           }`}
         >
+          {/* Logo — hidden on desktop when collapsed */}
           <Link
             to="/"
-            className={`flex min-w-0 items-center gap-2 font-heading font-semibold text-sidebar-primary-foreground ${
-              sidebarCollapsed ? 'lg:justify-center' : 'text-lg'
+            className={`flex min-w-0 items-center gap-2 font-heading font-semibold text-sidebar-primary-foreground text-lg ${
+              sidebarCollapsed ? 'lg:hidden' : ''
             }`}
             onClick={() => setSidebarOpen(false)}
             title={SITE_DISPLAY_NAME}
           >
             <span className="flex shrink-0 rounded-lg bg-white p-1 shadow-sm ring-1 ring-sidebar-border/40">
-              <SiteLogoMark
-                className={
-                  sidebarCollapsed
-                    ? 'h-7 w-7 max-h-7 max-w-[2rem] sm:h-8'
-                    : 'h-7 max-h-7 max-w-[8.5rem] sm:h-8 sm:max-h-8 sm:max-w-[9.5rem]'
-                }
-              />
+              <SiteLogoMark className="h-7 max-h-7 max-w-[8.5rem] sm:h-8 sm:max-h-8 sm:max-w-[9.5rem]" />
             </span>
-            {!sidebarCollapsed && <span className="truncate">{SITE_DISPLAY_NAME}</span>}
+            <span className="truncate">{SITE_DISPLAY_NAME}</span>
           </Link>
           <div className="flex items-center gap-1">
             <button
