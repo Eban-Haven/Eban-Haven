@@ -20,7 +20,6 @@ import {
   TrendingUp,
   UserCheck,
   Video,
-  Waypoints,
   X,
 } from 'lucide-react'
 import { logout } from '../api/auth'
@@ -76,12 +75,6 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/admin/marketing-analytics', label: 'Marketing Analytics', icon: LineChart },
       { to: '/admin/social-planner', label: 'Marketing Support', icon: Bot },
-    ],
-  },
-  {
-    title: 'Tools',
-    items: [
-      { to: '/admin/resident-pipeline', label: 'Resident Tools', icon: Waypoints },
     ],
   },
 ]
