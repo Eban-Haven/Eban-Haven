@@ -234,18 +234,27 @@ export async function createPlannedSocialPosts(body: {
   posts: Array<{
     title: string
     platform: string
+    contentType: string
     format: string
     imageIdea?: string
     caption: string
     hashtags?: string[]
     cta?: string
     suggestedTime?: string
+    scheduledForUtc?: string
     whyItFits?: string
     notes?: string
   }>
 }): Promise<T.PlannedSocialPost[]> {
+  const payload = {
+    sourcePrompt: body.sourcePrompt,
+    posts: body.posts.map((post) => ({
+      ...post,
+      scheduledForUtc: post.scheduledForUtc ? new Date(post.scheduledForUtc).toISOString() : undefined,
+    })),
+  }
   return parseJson<T.PlannedSocialPost[]>(
-    await apiFetch(`${base}/social-planner/posts/bulk`, { method: 'POST', body: JSON.stringify(body) }),
+    await apiFetch(`${base}/social-planner/posts/bulk`, { method: 'POST', body: JSON.stringify(payload) }),
   )
 }
 

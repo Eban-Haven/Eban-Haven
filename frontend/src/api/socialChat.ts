@@ -8,6 +8,7 @@ export type SocialChatMessage = {
 export type SocialChatSuggestion = {
   title: string
   platform: string
+  contentType: string
   format: string
   imageIdea: string
   caption: string

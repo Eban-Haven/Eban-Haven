@@ -25,12 +25,14 @@ public sealed class SocialPlannerController(IPlannedSocialPostStore store) : Con
             request.Posts.Select(post => new CreatePlannedSocialPostCommand(
                 Title: post.Title,
                 Platform: post.Platform,
+                ContentType: post.ContentType,
                 Format: post.Format,
                 ImageIdea: post.ImageIdea,
                 Caption: post.Caption,
                 Hashtags: post.Hashtags,
                 Cta: post.Cta,
                 SuggestedTime: post.SuggestedTime,
+                ScheduledForUtc: post.ScheduledForUtc,
                 WhyItFits: post.WhyItFits,
                 Notes: post.Notes,
                 SourcePrompt: request.SourcePrompt))
@@ -66,12 +68,14 @@ public sealed class SocialPlannerController(IPlannedSocialPostStore store) : Con
     public sealed record CreatePlannedSocialPostItem(
         string Title,
         string Platform,
+        string ContentType,
         string Format,
         string? ImageIdea,
         string Caption,
         IReadOnlyList<string>? Hashtags,
         string? Cta,
         string? SuggestedTime,
+        DateTimeOffset? ScheduledForUtc,
         string? WhyItFits,
         string? Notes);
 

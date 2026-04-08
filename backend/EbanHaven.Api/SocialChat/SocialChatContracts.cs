@@ -24,6 +24,7 @@ public sealed record SocialChatStructuredReply(
 public sealed record SocialChatSuggestion(
     string Title,
     string Platform,
+    string ContentType,
     string Format,
     string ImageIdea,
     string Caption,

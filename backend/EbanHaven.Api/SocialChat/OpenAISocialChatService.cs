@@ -99,6 +99,7 @@ public sealed class OpenAISocialChatService(
               "postIdeas": [{
                 "title": "",
                 "platform": "",
+                "contentType": "",
                 "format": "",
                 "imageIdea": "",
                 "caption": "",

@@ -240,16 +240,22 @@ export type PlannedSocialPost = {
   id: number
   title: string
   platform: string
+  contentType: string
   format: string
   imageIdea: string | null
   caption: string
   hashtags: string[]
   cta: string | null
   suggestedTime: string | null
+  scheduledForUtc: string | null
   whyItFits: string | null
   notes: string | null
   sourcePrompt: string | null
   status: string
+  facebookPageId: string | null
+  facebookPostId: string | null
+  facebookMediaUrl: string | null
+  schedulingError: string | null
   createdAtUtc: string
   updatedAtUtc: string
 }
