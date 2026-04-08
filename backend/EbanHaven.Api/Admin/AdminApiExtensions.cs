@@ -8,9 +8,10 @@ public static class AdminApiExtensions
 {
     public static void MapAdminApi(this WebApplication app)
     {
-        var admin = app.MapGroup("/api/admin").RequireAuthorization();
+        app.MapGet("/api/admin/dashboard", (ILighthouseRepository repo) => Results.Ok(repo.GetAdminDashboard()))
+            .AllowAnonymous();
 
-        admin.MapGet("/dashboard", (ILighthouseRepository repo) => Results.Ok(repo.GetAdminDashboard()));
+        var admin = app.MapGroup("/api/admin").RequireAuthorization();
 
         admin.MapGet("/safehouses", (ILighthouseRepository repo) => Results.Ok(repo.ListSafehousesOptions()));
 

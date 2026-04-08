@@ -2,7 +2,6 @@ import { Routes, Route } from 'react-router-dom'
 import { PublicLayout } from './layouts/PublicLayout'
 import { AdminLayout } from './layouts/AdminLayout'
 import { RequireAdmin } from './components/RequireAdmin'
-import { RequireStaff } from './components/RequireStaff'
 import { RequireAuth } from './components/RequireAuth'
 import { HomePage } from './pages/HomePage'
 import { ImpactPage } from './pages/ImpactPage'
@@ -44,14 +43,7 @@ export default function App() {
           }
         />
       </Route>
-      <Route
-        path="/admin"
-        element={
-          <RequireStaff>
-            <AdminLayout />
-          </RequireStaff>
-        }
-      >
+      <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<AdminDashboardPage />} />
         <Route path="social-worker-dashboard" element={<SocialWorkerDashboardPage />} />
         <Route path="donor-dashboard" element={<DonorDashboardPage />} />

@@ -12,6 +12,7 @@ namespace EbanHaven.Api.Controllers;
 public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
 {
     [HttpGet("dashboard")]
+    [AllowAnonymous]
     public IActionResult Dashboard() => Ok(repo.GetAdminDashboard());
 
     [HttpGet("safehouses")]

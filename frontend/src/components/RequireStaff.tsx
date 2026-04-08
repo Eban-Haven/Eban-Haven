@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { getMe } from '../api/auth'
 
 type Gate = 'loading' | 'in' | 'out' | 'donor' | 'resident'
@@ -40,4 +40,13 @@ export function RequireStaff({ children }: { children: React.ReactNode }) {
     return <Navigate to="/" replace />
   }
   return <>{children}</>
+}
+
+/** Nested admin routes: staff session required; use for `/admin/*` children (not the dashboard index). */
+export function RequireStaffOutlet() {
+  return (
+    <RequireStaff>
+      <Outlet />
+    </RequireStaff>
+  )
 }
