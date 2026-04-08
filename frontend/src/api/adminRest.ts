@@ -70,6 +70,22 @@ export async function getAllocations(params?: {
   return parseJson<T.DonationAllocation[]>(await apiFetch(`${base}/donation-allocations${q}`))
 }
 
+export async function getDonorEmailProfile(supporterId: number): Promise<T.DonorEmailProfile> {
+  return parseJson<T.DonorEmailProfile>(await apiFetch(`${base}/email-hub/supporters/${supporterId}`))
+}
+
+export async function generateDonorEmail(
+  supporterId: number,
+  body: { goal?: string; tone?: string; preferAi?: boolean },
+): Promise<T.GeneratedDonorEmail> {
+  return parseJson<T.GeneratedDonorEmail>(
+    await apiFetch(`${base}/email-hub/supporters/${supporterId}/compose`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
 export async function getResidents(params: {
   status?: string
   safehouseId?: number

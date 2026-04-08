@@ -13,6 +13,8 @@ export {
   deleteDonation,
   patchDonationFields,
   getAllocations,
+  getDonorEmailProfile,
+  generateDonorEmail,
   createAllocation,
   patchAllocationFields,
   deleteAllocation,

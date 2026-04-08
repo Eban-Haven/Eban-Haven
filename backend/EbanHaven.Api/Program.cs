@@ -50,6 +50,7 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<ISocialChatContextService, SocialChatContextService>();
 builder.Services.AddScoped<ISocialChatService, OpenAISocialChatService>();
 builder.Services.AddScoped<IMetaSchedulingService, MetaSchedulingService>();
+builder.Services.AddScoped<IDonorEmailComposer, DonorEmailComposer>();
 
 builder.Services.AddHttpClient("MlService", client =>
 {

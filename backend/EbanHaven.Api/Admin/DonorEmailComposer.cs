@@ -1,0 +1,277 @@
+using System.Text;
+using System.Text.Json;
+using EbanHaven.Api.Configuration;
+using EbanHaven.Api.Lighthouse;
+using Microsoft.Extensions.Options;
+using OpenAI.Chat;
+
+namespace EbanHaven.Api.Admin;
+
+public interface IDonorEmailComposer
+{
+    Task<GeneratedDonorEmailDto> ComposeAsync(
+        DonorEmailProfileDto profile,
+        GenerateDonorEmailRequest request,
+        CancellationToken cancellationToken);
+}
+
+public sealed class DonorEmailComposer(
+    IOptions<OpenAIOptions> options,
+    ILogger<DonorEmailComposer> logger) : IDonorEmailComposer
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = true
+    };
+
+    private readonly OpenAIOptions _options = options.Value;
+
+    public async Task<GeneratedDonorEmailDto> ComposeAsync(
+        DonorEmailProfileDto profile,
+        GenerateDonorEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.PreferAi && !string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            try
+            {
+                var aiResult = await ComposeWithAiAsync(profile, request, cancellationToken);
+                if (aiResult is not null)
+                    return aiResult with { UsedAi = true, Strategy = "AI-generated from donor history" };
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Falling back to template donor email generation for supporter {SupporterId}.", profile.Supporter.Id);
+            }
+        }
+
+        return BuildTemplate(profile, request);
+    }
+
+    private async Task<GeneratedDonorEmailDto?> ComposeWithAiAsync(
+        DonorEmailProfileDto profile,
+        GenerateDonorEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var client = new ChatClient(_options.Model, _options.ApiKey);
+        var completion = await client.CompleteChatAsync(
+            [
+                new SystemChatMessage(BuildSystemPrompt()),
+                new UserChatMessage(BuildUserPrompt(profile, request))
+            ],
+            cancellationToken: cancellationToken);
+
+        var rawText = string.Join(
+            "\n",
+            completion.Value.Content
+                .Select(static item => item.Text)
+                .Where(static text => !string.IsNullOrWhiteSpace(text)));
+
+        var json = ExtractJson(rawText);
+        var parsed = JsonSerializer.Deserialize<DonorEmailModelReply>(json, JsonOptions);
+        if (parsed is null || string.IsNullOrWhiteSpace(parsed.Subject) || string.IsNullOrWhiteSpace(parsed.Body))
+            return null;
+
+        return new GeneratedDonorEmailDto(
+            parsed.Subject.Trim(),
+            parsed.Preview?.Trim() ?? string.Empty,
+            parsed.Body.Trim(),
+            UsedAi: true,
+            Strategy: "AI-generated from donor history");
+    }
+
+    private static string BuildSystemPrompt()
+    {
+        return """
+            You write stewardship emails for a nonprofit administrator.
+            Use only the donor facts provided. Do not invent gifts, campaigns, impact claims, family details, or promises.
+            Keep the message personal, warm, concise, and ready to send.
+            Mention concrete giving history only when supported by the provided data.
+            If a value is missing, work around it naturally instead of guessing.
+            Avoid manipulative guilt language.
+
+            Return valid JSON only:
+            {
+              "subject": "",
+              "preview": "",
+              "body": ""
+            }
+            """;
+    }
+
+    private static string BuildUserPrompt(DonorEmailProfileDto profile, GenerateDonorEmailRequest request)
+    {
+        var payload = new
+        {
+            goal = string.IsNullOrWhiteSpace(request.Goal) ? "Thank the donor and encourage their next step." : request.Goal.Trim(),
+            tone = string.IsNullOrWhiteSpace(request.Tone) ? "Warm" : request.Tone.Trim(),
+            donor = profile
+        };
+
+        return JsonSerializer.Serialize(payload, JsonOptions);
+    }
+
+    private static string ExtractJson(string rawText)
+    {
+        var trimmed = rawText.Trim();
+        if (trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            var lines = trimmed.Split('\n').ToList();
+            if (lines.Count >= 2)
+            {
+                lines.RemoveAt(0);
+                if (lines.Count > 0 && lines[^1].Trim() == "```")
+                    lines.RemoveAt(lines.Count - 1);
+                trimmed = string.Join('\n', lines).Trim();
+            }
+        }
+
+        var start = trimmed.IndexOf('{');
+        var end = trimmed.LastIndexOf('}');
+        if (start >= 0 && end > start)
+            return trimmed[start..(end + 1)];
+
+        return trimmed;
+    }
+
+    private static GeneratedDonorEmailDto BuildTemplate(DonorEmailProfileDto profile, GenerateDonorEmailRequest request)
+    {
+        var donorName = FirstNameOrDisplayName(profile.Supporter);
+        var goal = string.IsNullOrWhiteSpace(request.Goal) ? "Thank the donor and encourage their next step." : request.Goal.Trim();
+        var tone = string.IsNullOrWhiteSpace(request.Tone) ? "Warm" : request.Tone.Trim();
+        var subject = BuildSubject(profile, goal);
+        var preview = BuildPreview(profile);
+
+        var body = new StringBuilder();
+        body.AppendLine($"Hi {donorName},");
+        body.AppendLine();
+        body.AppendLine(BuildOpening(profile, goal, tone));
+        body.AppendLine();
+        body.AppendLine(BuildHistoryParagraph(profile));
+        body.AppendLine();
+        body.AppendLine(BuildNextStepParagraph(profile, goal));
+        body.AppendLine();
+        body.AppendLine("With gratitude,");
+        body.AppendLine("[Your Name]");
+        body.AppendLine("[Organization Name]");
+
+        return new GeneratedDonorEmailDto(
+            subject,
+            preview,
+            body.ToString().Trim(),
+            UsedAi: false,
+            Strategy: "Template generated from donor history");
+    }
+
+    private static string BuildSubject(DonorEmailProfileDto profile, string goal)
+    {
+        var name = FirstNameOrDisplayName(profile.Supporter);
+        if (goal.Contains("re-engage", StringComparison.OrdinalIgnoreCase) || goal.Contains("return", StringComparison.OrdinalIgnoreCase))
+            return $"{name}, we would love to reconnect";
+        if (goal.Contains("monthly", StringComparison.OrdinalIgnoreCase) || goal.Contains("recurring", StringComparison.OrdinalIgnoreCase))
+            return $"{name}, thank you for standing with us";
+        return $"Thank you, {name}";
+    }
+
+    private static string BuildPreview(DonorEmailProfileDto profile)
+    {
+        if (profile.MostRecentDonationDate is not null)
+            return $"A personal note inspired by your support through {profile.MostRecentDonationDate.Value:MMMM yyyy}.";
+
+        return "A personal thank-you and next-step note for this donor relationship.";
+    }
+
+    private static string BuildOpening(DonorEmailProfileDto profile, string goal, string tone)
+    {
+        var summary = profile.RelationshipSummary;
+        if (goal.Contains("re-engage", StringComparison.OrdinalIgnoreCase))
+            return $"I wanted to reach out with a quick note of thanks and to reconnect. {summary}";
+
+        if (tone.Contains("direct", StringComparison.OrdinalIgnoreCase))
+            return $"Thank you for your support. {summary}";
+
+        return $"I wanted to send a personal note of thanks. {summary}";
+    }
+
+    private static string BuildHistoryParagraph(DonorEmailProfileDto profile)
+    {
+        var details = new List<string>();
+
+        if (profile.DonationCount > 0)
+            details.Add($"{profile.DonationCount} recorded gift{(profile.DonationCount == 1 ? string.Empty : "s")}");
+
+        if (profile.LifetimeMonetaryTotal > 0)
+            details.Add($"lifetime monetary giving of {FormatMoney(profile.LifetimeMonetaryTotal, profile.PreferredCurrencyCode)}");
+
+        if (profile.ProgramAreas.Count > 0)
+            details.Add($"recent support connected to {JoinHuman(profile.ProgramAreas.Take(3))}");
+
+        if (details.Count == 0)
+            return "Your presence in our community matters, and we are grateful to have you in this work with us.";
+
+        return $"We are grateful for {JoinHuman(details)}. Every act of support helps us keep showing up with care and consistency.";
+    }
+
+    private static string BuildNextStepParagraph(DonorEmailProfileDto profile, string goal)
+    {
+        if (goal.Contains("monthly", StringComparison.OrdinalIgnoreCase) || goal.Contains("recurring", StringComparison.OrdinalIgnoreCase))
+            return "If you are open to it, a recurring gift would help us plan ahead and respond more steadily to needs as they arise.";
+
+        if (goal.Contains("update", StringComparison.OrdinalIgnoreCase) || goal.Contains("impact", StringComparison.OrdinalIgnoreCase))
+            return "If helpful, I would be glad to share a short update on how current support is being directed and where needs are growing right now.";
+
+        if (goal.Contains("re-engage", StringComparison.OrdinalIgnoreCase))
+            return "If you would like to reconnect, we would be grateful to have you involved again in whatever way feels right to you.";
+
+        if (profile.ProgramAreas.Count > 0)
+            return $"If you would like, I can also share more about current needs in {JoinHuman(profile.ProgramAreas.Take(2))}.";
+
+        return "If you would like, I can share a quick update on current needs and where support is making a difference right now.";
+    }
+
+    private static string FirstNameOrDisplayName(SupporterDto supporter)
+    {
+        if (!string.IsNullOrWhiteSpace(supporter.FirstName))
+            return supporter.FirstName.Trim();
+        if (!string.IsNullOrWhiteSpace(supporter.DisplayName))
+            return supporter.DisplayName.Trim();
+        return "there";
+    }
+
+    private static string FormatMoney(decimal amount, string currencyCode)
+    {
+        if (currencyCode.Equals("PHP", StringComparison.OrdinalIgnoreCase))
+            return $"PHP {amount:N2}";
+        if (currencyCode.Equals("USD", StringComparison.OrdinalIgnoreCase))
+            return $"USD {amount:N2}";
+
+        try
+        {
+            return $"{currencyCode} {amount:N2}";
+        }
+        catch
+        {
+            return $"{amount:0.##} {currencyCode}";
+        }
+    }
+
+    private static string JoinHuman(IEnumerable<string> items)
+    {
+        var parts = items.Where(static item => !string.IsNullOrWhiteSpace(item)).Select(static item => item.Trim()).Distinct().ToArray();
+        return parts.Length switch
+        {
+            0 => string.Empty,
+            1 => parts[0],
+            2 => $"{parts[0]} and {parts[1]}",
+            _ => $"{string.Join(", ", parts[..^1])}, and {parts[^1]}"
+        };
+    }
+
+    private sealed class DonorEmailModelReply
+    {
+        public string? Subject { get; init; }
+        public string? Preview { get; init; }
+        public string? Body { get; init; }
+    }
+}

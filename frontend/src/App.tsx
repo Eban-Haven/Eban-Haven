@@ -24,6 +24,7 @@ import { CaseConferencesAdminPage } from './pages/admin/databases/CaseConference
 import { ReportsPage } from './pages/admin/dashboards/ReportsPage'
 import { SocialPlannerPage } from './pages/admin/tools/SocialPlannerPage'
 import { SocialWorkerDashboardPage } from './pages/admin/dashboards/SocialWorkerDashboardPage'
+import { EmailHubPage } from './pages/admin/tools/EmailHubPage'
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="donors" element={<DonorsAdminPage />} />
         <Route path="donors/:id" element={<DonorDetailPage />} />
         <Route path="donor-pipeline" element={<DonorPipelinePage />} />
+        <Route path="email-hub" element={<EmailHubPage />} />
         <Route path="contributions" element={<ContributionsAdminPage />} />
         <Route path="allocations" element={<AllocationsAdminPage />} />
         <Route path="residents" element={<ResidentsPage />} />
