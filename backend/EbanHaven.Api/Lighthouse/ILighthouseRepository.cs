@@ -49,11 +49,11 @@ public interface ILighthouseRepository
     bool DeleteProcessRecording(int id);
     bool DeleteHomeVisitation(int id);
     IReadOnlyList<EducationRecordDto> ListEducationRecords(int? residentId);
-    EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent);
-    EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate);
+    EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent, string? extendedJson = null);
+    EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate, string? extendedJson = null);
     IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId);
-    HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore);
-    HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate);
+    HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore, string? extendedJson = null);
+    HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate, string? extendedJson = null);
 
     IReadOnlyList<IncidentReportDto> ListIncidentReports(int? residentId);
     IncidentReportDto CreateIncidentReport(int residentId, int? safehouseId, DateOnly incidentDate, string incidentType,

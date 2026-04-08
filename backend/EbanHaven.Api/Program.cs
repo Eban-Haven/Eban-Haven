@@ -23,6 +23,7 @@ if (!string.IsNullOrWhiteSpace(conn))
 {
     builder.Services.AddDbContext<HavenDbContext>(o => o.UseNpgsql(conn));
     builder.Services.AddScoped<ILighthouseRepository, SupabaseLighthouseRepository>();
+    builder.Services.AddScoped<IPlannedSocialPostStore, DbPlannedSocialPostStore>();
 }
 else
 {
@@ -30,6 +31,7 @@ else
     builder.Services.AddSingleton<LighthouseDataStore>();
     builder.Services.AddSingleton<LighthouseDataStoreAdapter>();
     builder.Services.AddSingleton<ILighthouseRepository>(sp => sp.GetRequiredService<LighthouseDataStoreAdapter>());
+    builder.Services.AddSingleton<IPlannedSocialPostStore, InMemoryPlannedSocialPostStore>();
 }
 
 builder.Services.AddHavenAuthentication(builder.Configuration);

@@ -7,11 +7,15 @@ export type SocialChatMessage = {
 
 export type SocialChatSuggestion = {
   title: string
+  platform: string
   format: string
+  imageIdea: string
   caption: string
+  hashtags: string[]
   cta: string
   bestTime: string
   whyItFits: string
+  notes: string
 }
 
 export type RecommendationItem = {
@@ -25,6 +29,8 @@ export type ConfidenceNote = {
 }
 
 export type SocialChatStructuredReply = {
+  clarifyingQuestions: string[]
+  planningSummary: string
   postIdeas: SocialChatSuggestion[]
   captions: string[]
   timingRecommendations: RecommendationItem[]

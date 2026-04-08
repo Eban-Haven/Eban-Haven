@@ -12,6 +12,8 @@ public sealed record SocialChatResponse(
     DateTimeOffset GeneratedAtUtc);
 
 public sealed record SocialChatStructuredReply(
+    IReadOnlyList<string> ClarifyingQuestions,
+    string PlanningSummary,
     IReadOnlyList<SocialChatSuggestion> PostIdeas,
     IReadOnlyList<string> Captions,
     IReadOnlyList<RecommendationItem> TimingRecommendations,
@@ -21,11 +23,15 @@ public sealed record SocialChatStructuredReply(
 
 public sealed record SocialChatSuggestion(
     string Title,
+    string Platform,
     string Format,
+    string ImageIdea,
     string Caption,
+    IReadOnlyList<string> Hashtags,
     string Cta,
     string BestTime,
-    string WhyItFits);
+    string WhyItFits,
+    string Notes);
 
 public sealed record RecommendationItem(string Recommendation, string Rationale);
 

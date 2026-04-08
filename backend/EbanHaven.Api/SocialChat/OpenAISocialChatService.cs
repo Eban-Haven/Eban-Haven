@@ -87,10 +87,27 @@ public sealed class OpenAISocialChatService(
             Prefer respectful, empowerment-centered language over sensational or pity-driven language.
             Clearly separate strong evidence from limited evidence, assumptions, and hypotheses.
             If evidence is weak or missing, say so plainly.
+            Keep the interaction efficient. Ask at most 3 clarifying questions at a time, and only ask them if the missing details materially change the post plan.
+            If the user already gave enough information to draft posts, do not ask more questions.
+            When useful, make reasonable assumptions and state them briefly in the planning summary.
+            Default to practical nonprofit channels like Facebook and Instagram unless the user specifies otherwise.
 
             Return valid JSON only with this shape:
             {
-              "postIdeas": [{ "title": "", "format": "", "caption": "", "cta": "", "bestTime": "", "whyItFits": "" }],
+              "clarifyingQuestions": [""],
+              "planningSummary": "",
+              "postIdeas": [{
+                "title": "",
+                "platform": "",
+                "format": "",
+                "imageIdea": "",
+                "caption": "",
+                "hashtags": [""],
+                "cta": "",
+                "bestTime": "",
+                "whyItFits": "",
+                "notes": ""
+              }],
               "captions": [""],
               "timingRecommendations": [{ "recommendation": "", "rationale": "" }],
               "ctaRecommendations": [{ "recommendation": "", "rationale": "" }],
@@ -125,6 +142,8 @@ public sealed class OpenAISocialChatService(
                 throw new JsonException("Model reply was empty.");
 
             return new SocialChatStructuredReply(
+                ClarifyingQuestions: parsed.ClarifyingQuestions ?? [],
+                PlanningSummary: parsed.PlanningSummary?.Trim() ?? string.Empty,
                 PostIdeas: parsed.PostIdeas ?? [],
                 Captions: parsed.Captions ?? [],
                 TimingRecommendations: parsed.TimingRecommendations ?? [],
@@ -136,6 +155,8 @@ public sealed class OpenAISocialChatService(
         {
             logger.LogWarning(ex, "Falling back to plain-text social chat parsing.");
             return new SocialChatStructuredReply(
+                ClarifyingQuestions: [],
+                PlanningSummary: string.Empty,
                 PostIdeas: [],
                 Captions: [],
                 TimingRecommendations: [],
@@ -177,8 +198,24 @@ public sealed class OpenAISocialChatService(
     {
         var sb = new StringBuilder();
 
+        if (!string.IsNullOrWhiteSpace(structured.PlanningSummary))
+        {
+            sb.AppendLine(structured.PlanningSummary.Trim());
+        }
+
+        if (structured.ClarifyingQuestions.Count > 0)
+        {
+            if (sb.Length > 0)
+                sb.AppendLine();
+            sb.AppendLine("A few quick questions before I lock the plan:");
+            foreach (var question in structured.ClarifyingQuestions.Take(3))
+                sb.AppendLine($"- {question}");
+        }
+
         if (structured.PostIdeas.Count > 0)
         {
+            if (sb.Length > 0)
+                sb.AppendLine();
             sb.AppendLine("Here are a few social content directions to review:");
             foreach (var idea in structured.PostIdeas.Take(3))
                 sb.AppendLine($"- {idea.Title}: {idea.WhyItFits}");
@@ -201,6 +238,10 @@ public sealed class OpenAISocialChatService(
 
     private sealed class SocialChatModelReply
     {
+        public List<string>? ClarifyingQuestions { get; init; }
+
+        public string? PlanningSummary { get; init; }
+
         public List<SocialChatSuggestion>? PostIdeas { get; init; }
 
         public List<string>? Captions { get; init; }

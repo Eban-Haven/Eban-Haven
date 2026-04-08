@@ -136,6 +136,8 @@ export type EducationRecord = {
   residentId: number
   recordDate: string
   progressPercent: number | null
+  /** JSON string: program/course/attendance/completion metadata */
+  extendedJson?: string | null
 }
 
 export type HealthRecord = {
@@ -143,6 +145,8 @@ export type HealthRecord = {
   residentId: number
   recordDate: string
   healthScore: number | null
+  /** JSON string: vitals, sub-scores, checkup flags */
+  extendedJson?: string | null
 }
 
 export type ProcessRecording = {
@@ -230,6 +234,24 @@ export type ReportsSummary = {
     servicesProvided: { caringSessions: number; healingSessions: number; teachingSessions: number }
     programOutcomeHighlights: string[]
   }
+}
+
+export type PlannedSocialPost = {
+  id: number
+  title: string
+  platform: string
+  format: string
+  imageIdea: string | null
+  caption: string
+  hashtags: string[]
+  cta: string | null
+  suggestedTime: string | null
+  whyItFits: string | null
+  notes: string | null
+  sourcePrompt: string | null
+  status: string
+  createdAtUtc: string
+  updatedAtUtc: string
 }
 
 export type SafehousePerformance = {

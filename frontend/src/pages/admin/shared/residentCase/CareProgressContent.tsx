@@ -20,7 +20,12 @@ import { AdminDeleteModal } from '../adminDataTable/AdminDeleteModal'
 import { BooleanBadge, CategoryBadge, VisitOutcomeBadge } from '../adminDataTable/AdminBadges'
 import { formatAdminDate, inDateRange } from '../adminDataTable/adminFormatters'
 import {
+  ATTENDANCE_STATUSES,
+  COMPLETION_STATUSES,
   COOPERATION_LEVELS,
+  EDU_COURSES,
+  EDU_LEVELS,
+  EDU_PROGRAMS,
   EMOTIONAL_STATES,
   SESSION_TYPES,
   VISIT_OUTCOMES,
@@ -81,16 +86,24 @@ export function CareProgressContent({
   return <HealthSection residentId={residentId} rows={health} onReload={onReload} openCreateSignal={createSignals?.health ?? 0} />
 }
 
-function CounselingSection({
+export function CounselingSection({
   residentId,
   rows,
   onReload,
   openCreateSignal,
+  initialOpenRecordingId,
+  onInitialOpenConsumed,
+  hideChrome,
 }: {
   residentId: number
   rows: ProcessRecording[]
   onReload: () => void
   openCreateSignal: number
+  /** Open this recording’s drawer once (e.g. from case timeline). */
+  initialOpenRecordingId?: number | null
+  onInitialOpenConsumed?: () => void
+  /** Hide list/filters — only drawers/modals (for overlay use). */
+  hideChrome?: boolean
 }) {
   const [q, setQ] = useState('')
   const [df, setDf] = useState('')
@@ -109,6 +122,17 @@ function CounselingSection({
       setEditing(false)
     }
   }, [openCreateSignal])
+
+  useEffect(() => {
+    if (initialOpenRecordingId == null) return
+    const r = rows.find((x) => x.id === initialOpenRecordingId)
+    if (r) {
+      setSel(r)
+      setCreateOpen(false)
+      setEditing(false)
+    }
+    onInitialOpenConsumed?.()
+  }, [initialOpenRecordingId, rows, onInitialOpenConsumed])
 
   const filtered = useMemo(() => {
     let list = [...rows].sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())
@@ -135,51 +159,55 @@ function CounselingSection({
   return (
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
-      <SectionHeader
-        title="Process recordings"
-        description="Each entry documents a dated interaction between a social worker and this resident, including observations, interventions, and follow-up actions. Open a row below for full notes and follow-up."
-        actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add recording</QuickActionButton>}
-      />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SearchField value={q} onChange={setQ} placeholder="Worker, type, emotional state…" />
-        <label className={label}>
-          From
-          <input type="date" className={input} value={df} onChange={(e) => setDf(e.target.value)} />
-        </label>
-        <label className={label}>
-          To
-          <input type="date" className={input} value={dt} onChange={(e) => setDt(e.target.value)} />
-        </label>
-      </div>
-      <div className="space-y-2">
-        {filtered.length === 0 ? (
-          <EmptyState
-            title="No process recordings yet"
-            hint="Each recording captures a dated worker–resident interaction: observations, interventions, and follow-up."
-            action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add recording</QuickActionButton>}
+      {!hideChrome ? (
+        <>
+          <SectionHeader
+            title="Process recordings"
+            description="Each entry documents a dated interaction between a social worker and this resident, including observations, interventions, and follow-up actions. Open a row below for full notes and follow-up."
+            actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add recording</QuickActionButton>}
           />
-        ) : (
-          filtered.map((r) => (
-            <RecordCardRow key={r.id} onClick={() => { setSel(r); setEditing(false); setCreateOpen(false) }}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-foreground">{formatAdminDate(r.sessionDate)}</span>
-                <CategoryBadge>{r.sessionType}</CategoryBadge>
-                {r.emotionalStateObserved ? <CategoryBadge>{r.emotionalStateObserved}</CategoryBadge> : null}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{r.socialWorker}</p>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                {r.sessionDurationMinutes != null ? <span>{r.sessionDurationMinutes} min</span> : null}
-                <BooleanBadge value={r.progressNoted} />
-                <span className="text-muted-foreground">Concerns</span>
-                <BooleanBadge value={r.concernsFlagged} trueVariant="danger" />
-              </div>
-            </RecordCardRow>
-          ))
-        )}
-      </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <SearchField value={q} onChange={setQ} placeholder="Worker, type, emotional state…" />
+            <label className={label}>
+              From
+              <input type="date" className={input} value={df} onChange={(e) => setDf(e.target.value)} />
+            </label>
+            <label className={label}>
+              To
+              <input type="date" className={input} value={dt} onChange={(e) => setDt(e.target.value)} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            {filtered.length === 0 ? (
+              <EmptyState
+                title="No process recordings yet"
+                hint="Each recording captures a dated worker–resident interaction: observations, interventions, and follow-up."
+                action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add recording</QuickActionButton>}
+              />
+            ) : (
+              filtered.map((r) => (
+                <RecordCardRow key={r.id} onClick={() => { setSel(r); setEditing(false); setCreateOpen(false) }}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">{formatAdminDate(r.sessionDate)}</span>
+                    <CategoryBadge>{r.sessionType}</CategoryBadge>
+                    {r.emotionalStateObserved ? <CategoryBadge>{r.emotionalStateObserved}</CategoryBadge> : null}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{r.socialWorker}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {r.sessionDurationMinutes != null ? <span>{r.sessionDurationMinutes} min</span> : null}
+                    <BooleanBadge value={r.progressNoted} />
+                    <span className="text-muted-foreground">Concerns</span>
+                    <BooleanBadge value={r.concernsFlagged} trueVariant="danger" />
+                  </div>
+                </RecordCardRow>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
 
       {(sel || createOpen) && (
-        <CounselingDrawer
+        <ProcessRecordingDrawer
           key={createOpen ? 'new' : String(sel?.id)}
           mode={createOpen ? 'create' : editing ? 'edit' : 'view'}
           residentId={residentId}
@@ -221,7 +249,7 @@ function CounselingSection({
   )
 }
 
-function CounselingDrawer({
+export function ProcessRecordingDrawer({
   mode,
   residentId,
   initial,
@@ -451,16 +479,22 @@ function CounselingDrawer({
   )
 }
 
-function VisitsSection({
+export function VisitsSection({
   residentId,
   rows,
   onReload,
   openCreateSignal,
+  initialOpenVisitId,
+  onInitialOpenConsumed,
+  hideChrome,
 }: {
   residentId: number
   rows: HomeVisitation[]
   onReload: () => void
   openCreateSignal: number
+  initialOpenVisitId?: number | null
+  onInitialOpenConsumed?: () => void
+  hideChrome?: boolean
 }) {
   const [q, setQ] = useState('')
   const [df, setDf] = useState('')
@@ -479,6 +513,17 @@ function VisitsSection({
       setEditing(false)
     }
   }, [openCreateSignal])
+
+  useEffect(() => {
+    if (initialOpenVisitId == null) return
+    const v = rows.find((x) => x.id === initialOpenVisitId)
+    if (v) {
+      setSel(v)
+      setCreateOpen(false)
+      setEditing(false)
+    }
+    onInitialOpenConsumed?.()
+  }, [initialOpenVisitId, rows, onInitialOpenConsumed])
 
   const filtered = useMemo(() => {
     let list = [...rows].sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime())
@@ -505,49 +550,53 @@ function VisitsSection({
   return (
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
-      <SectionHeader
-        title="Home visitations"
-        description="Family visits and follow-ups outside the safehouse."
-        actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add visit</QuickActionButton>}
-      />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SearchField value={q} onChange={setQ} />
-        <label className={label}>
-          From
-          <input type="date" className={input} value={df} onChange={(e) => setDf(e.target.value)} />
-        </label>
-        <label className={label}>
-          To
-          <input type="date" className={input} value={dt} onChange={(e) => setDt(e.target.value)} />
-        </label>
-      </div>
-      <div className="space-y-2">
-        {filtered.length === 0 ? (
-          <EmptyState
-            title="No home visitations recorded"
-            action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add visit</QuickActionButton>}
+      {!hideChrome ? (
+        <>
+          <SectionHeader
+            title="Home visitations"
+            description="Family visits and follow-ups outside the safehouse."
+            actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add visit</QuickActionButton>}
           />
-        ) : (
-          filtered.map((v) => (
-            <RecordCardRow key={v.id} onClick={() => { setSel(v); setEditing(false); setCreateOpen(false) }}>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{formatAdminDate(v.visitDate)}</span>
-                <CategoryBadge>{v.visitType}</CategoryBadge>
-                {v.familyCooperationLevel ? <CategoryBadge>{v.familyCooperationLevel}</CategoryBadge> : null}
-                {v.visitOutcome ? <VisitOutcomeBadge outcome={v.visitOutcome} /> : null}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{v.socialWorker}</p>
-              <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                <BooleanBadge value={v.safetyConcernsNoted} trueVariant="danger" /> safety concern
-                {v.followUpNeeded ? <BooleanBadge value={true} trueLabel="Follow-up needed" trueVariant="warning" /> : null}
-              </div>
-            </RecordCardRow>
-          ))
-        )}
-      </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <SearchField value={q} onChange={setQ} />
+            <label className={label}>
+              From
+              <input type="date" className={input} value={df} onChange={(e) => setDf(e.target.value)} />
+            </label>
+            <label className={label}>
+              To
+              <input type="date" className={input} value={dt} onChange={(e) => setDt(e.target.value)} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            {filtered.length === 0 ? (
+              <EmptyState
+                title="No home visitations recorded"
+                action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add visit</QuickActionButton>}
+              />
+            ) : (
+              filtered.map((v) => (
+                <RecordCardRow key={v.id} onClick={() => { setSel(v); setEditing(false); setCreateOpen(false) }}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{formatAdminDate(v.visitDate)}</span>
+                    <CategoryBadge>{v.visitType}</CategoryBadge>
+                    {v.familyCooperationLevel ? <CategoryBadge>{v.familyCooperationLevel}</CategoryBadge> : null}
+                    {v.visitOutcome ? <VisitOutcomeBadge outcome={v.visitOutcome} /> : null}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{v.socialWorker}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                    <BooleanBadge value={v.safetyConcernsNoted} trueVariant="danger" /> safety concern
+                    {v.followUpNeeded ? <BooleanBadge value={true} trueLabel="Follow-up needed" trueVariant="warning" /> : null}
+                  </div>
+                </RecordCardRow>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
 
       {(sel || createOpen) && (
-        <VisitDrawer
+        <HomeVisitDrawer
           key={createOpen ? 'new' : String(sel?.id)}
           mode={createOpen ? 'create' : editing ? 'edit' : 'view'}
           residentId={residentId}
@@ -589,7 +638,7 @@ function VisitsSection({
   )
 }
 
-function VisitDrawer({
+export function HomeVisitDrawer({
   mode,
   residentId,
   initial,
@@ -797,21 +846,62 @@ function VisitDrawer({
   )
 }
 
-function EducationSection({
+type EducationExtended = {
+  programName: string
+  courseName: string
+  educationLevel: string
+  attendanceStatus: string
+  attendanceRate: number | null
+  completionStatus: string
+  gpaLikeScore: number | null
+  notes: string
+}
+
+function emptyEducationExtended(): EducationExtended {
+  return {
+    programName: EDU_PROGRAMS[0] ?? '',
+    courseName: EDU_COURSES[0] ?? '',
+    educationLevel: EDU_LEVELS[0] ?? '',
+    attendanceStatus: ATTENDANCE_STATUSES[0] ?? '',
+    attendanceRate: null,
+    completionStatus: COMPLETION_STATUSES[0] ?? '',
+    gpaLikeScore: null,
+    notes: '',
+  }
+}
+
+function parseEducationExtended(json: string | null | undefined): EducationExtended {
+  if (!json?.trim()) return emptyEducationExtended()
+  try {
+    const o = JSON.parse(json) as Partial<EducationExtended>
+    return { ...emptyEducationExtended(), ...o }
+  } catch {
+    return emptyEducationExtended()
+  }
+}
+
+export function EducationSection({
   residentId,
   rows,
   onReload,
   openCreateSignal,
+  initialOpenRecordId,
+  onInitialOpenConsumed,
+  hideChrome,
 }: {
   residentId: number
   rows: EducationRecord[]
   onReload: () => void
   openCreateSignal: number
+  initialOpenRecordId?: number | null
+  onInitialOpenConsumed?: () => void
+  hideChrome?: boolean
 }) {
   const [sel, setSel] = useState<EducationRecord | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [progress, setProgress] = useState('')
+  const [ext, setExt] = useState<EducationExtended>(() => emptyEducationExtended())
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -821,8 +911,22 @@ function EducationSection({
       setSel(null)
       setRecordDate(new Date().toISOString().slice(0, 10))
       setProgress('')
+      setExt(emptyEducationExtended())
     }
   }, [openCreateSignal])
+
+  useEffect(() => {
+    if (initialOpenRecordId == null) return
+    const r = rows.find((x) => x.id === initialOpenRecordId)
+    if (r) {
+      setSel(r)
+      setCreateOpen(false)
+      setRecordDate(r.recordDate.slice(0, 10))
+      setProgress(r.progressPercent != null ? String(r.progressPercent) : '')
+      setExt(parseEducationExtended(r.extendedJson))
+    }
+    onInitialOpenConsumed?.()
+  }, [initialOpenRecordId, rows, onInitialOpenConsumed])
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime()),
@@ -837,12 +941,32 @@ function EducationSection({
       setErr('Progress must be between 0 and 100.')
       return
     }
+    const ar = ext.attendanceRate
+    if (ar != null && (ar < 0 || ar > 1)) {
+      setErr('Attendance rate must be between 0.0 and 1.0.')
+      return
+    }
+    const gpa = ext.gpaLikeScore
+    if (gpa != null && (gpa < 1 || gpa > 5)) {
+      setErr('GPA-style score must be between 1.0 and 5.0.')
+      return
+    }
+    const extendedJson = JSON.stringify(ext)
     setSaving(true)
     try {
       if (sel && !createOpen) {
-        await patchEducationRecord(sel.id, { record_date: recordDate, progress_percent: p != null ? String(p) : '' })
+        await patchEducationRecord(sel.id, {
+          recordDate,
+          progressPercent: p ?? null,
+          extendedJson,
+        })
       } else {
-        await createEducationRecord(residentId, { record_date: recordDate, progress_percent: p != null ? String(p) : '' })
+        await createEducationRecord({
+          residentId,
+          recordDate,
+          progressPercent: p ?? null,
+          extendedJson,
+        })
       }
       setSel(null)
       setCreateOpen(false)
@@ -854,56 +978,91 @@ function EducationSection({
     }
   }
 
+  function openRow(r: EducationRecord) {
+    setSel(r)
+    setCreateOpen(false)
+    setRecordDate(r.recordDate.slice(0, 10))
+    setProgress(r.progressPercent != null ? String(r.progressPercent) : '')
+    setExt(parseEducationExtended(r.extendedJson))
+  }
+
   return (
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
-      <SectionHeader
-        title="Education records"
-        description="The API currently stores record date and progress percent. Extended program metadata can be added when the schema expands."
-        actions={<QuickActionButton onClick={() => { setCreateOpen(true); setSel(null); setProgress(''); setRecordDate(new Date().toISOString().slice(0, 10)) }}>Add record</QuickActionButton>}
-      />
-      <div className="space-y-2">
-        {sorted.length === 0 ? (
-          <EmptyState
-            title="No education records"
-            action={
+      {!hideChrome ? (
+        <>
+          <SectionHeader
+            title="Education records"
+            description="Progress is stored in the database; program, attendance, and completion details are saved as structured JSON (run deployment/add-extended-json-to-education-health.sql if needed)."
+            actions={
               <QuickActionButton
                 onClick={() => {
                   setCreateOpen(true)
                   setSel(null)
                   setProgress('')
                   setRecordDate(new Date().toISOString().slice(0, 10))
+                  setExt(emptyEducationExtended())
                 }}
               >
                 Add record
               </QuickActionButton>
             }
           />
-        ) : (
-          sorted.map((r) => (
-            <RecordCardRow key={r.id} onClick={() => { setSel(r); setCreateOpen(false); setRecordDate(r.recordDate.slice(0, 10)); setProgress(r.progressPercent != null ? String(r.progressPercent) : '') }}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">{formatAdminDate(r.recordDate)}</span>
-                {r.progressPercent != null ? (
-                  <span className="text-sm tabular-nums text-muted-foreground">{r.progressPercent}%</span>
-                ) : (
-                  <span className="text-sm text-muted-foreground">—</span>
-                )}
-              </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary/80"
-                  style={{ width: `${Math.min(100, Math.max(0, r.progressPercent ?? 0))}%` }}
-                />
-              </div>
-            </RecordCardRow>
-          ))
-        )}
-      </div>
+          <div className="space-y-2">
+            {sorted.length === 0 ? (
+              <EmptyState
+                title="No education records"
+                action={
+                  <QuickActionButton
+                    onClick={() => {
+                      setCreateOpen(true)
+                      setSel(null)
+                      setProgress('')
+                      setRecordDate(new Date().toISOString().slice(0, 10))
+                      setExt(emptyEducationExtended())
+                    }}
+                  >
+                    Add record
+                  </QuickActionButton>
+                }
+              />
+            ) : (
+              sorted.map((r) => {
+                const x = parseEducationExtended(r.extendedJson)
+                return (
+                  <RecordCardRow key={r.id} onClick={() => openRow(r)}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium">{formatAdminDate(r.recordDate)}</span>
+                      {r.progressPercent != null ? (
+                        <span className="text-sm tabular-nums text-muted-foreground">{r.progressPercent}%</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {x.programName} · {x.courseName} · {x.attendanceStatus}
+                    </p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary/80"
+                        style={{ width: `${Math.min(100, Math.max(0, r.progressPercent ?? 0))}%` }}
+                      />
+                    </div>
+                  </RecordCardRow>
+                )
+              })
+            )}
+          </div>
+        </>
+      ) : null}
       {(createOpen || sel) && (
         <CaseDrawer
           title={createOpen ? 'New education record' : 'Education record'}
-          onClose={() => { setSel(null); setCreateOpen(false); setErr(null) }}
+          onClose={() => {
+            setSel(null)
+            setCreateOpen(false)
+            setErr(null)
+          }}
           footer={
             <form onSubmit={save} className="flex gap-2">
               <button type="submit" disabled={saving} className={btnPrimary}>
@@ -920,27 +1079,163 @@ function EducationSection({
             Progress (%)
             <input className={input} inputMode="decimal" value={progress} onChange={(e) => setProgress(e.target.value)} placeholder="0–100" />
           </label>
+          <label className={label}>
+            Program
+            <select className={input} value={ext.programName} onChange={(e) => setExt((o) => ({ ...o, programName: e.target.value }))}>
+              {EDU_PROGRAMS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Course
+            <select className={input} value={ext.courseName} onChange={(e) => setExt((o) => ({ ...o, courseName: e.target.value }))}>
+              {EDU_COURSES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Education level
+            <select className={input} value={ext.educationLevel} onChange={(e) => setExt((o) => ({ ...o, educationLevel: e.target.value }))}>
+              {EDU_LEVELS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Attendance status
+            <select
+              className={input}
+              value={ext.attendanceStatus}
+              onChange={(e) => setExt((o) => ({ ...o, attendanceStatus: e.target.value }))}
+            >
+              {ATTENDANCE_STATUSES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Attendance rate (0.0–1.0)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.attendanceRate != null ? String(ext.attendanceRate) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  attendanceRate: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+              placeholder="e.g. 0.92"
+            />
+          </label>
+          <label className={label}>
+            Completion status
+            <select
+              className={input}
+              value={ext.completionStatus}
+              onChange={(e) => setExt((o) => ({ ...o, completionStatus: e.target.value }))}
+            >
+              {COMPLETION_STATUSES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            GPA-style score (1.0–5.0)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.gpaLikeScore != null ? String(ext.gpaLikeScore) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  gpaLikeScore: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label className={label}>
+            Notes
+            <textarea className={input} rows={3} value={ext.notes} onChange={(e) => setExt((o) => ({ ...o, notes: e.target.value }))} />
+          </label>
         </CaseDrawer>
       )}
     </div>
   )
 }
 
-function HealthSection({
+type HealthExtended = {
+  weightKg: number | null
+  heightCm: number | null
+  bmi: number | null
+  nutritionScore: number | null
+  sleepScore: number | null
+  energyScore: number | null
+  medicalCheckupDone: boolean
+  dentalCheckupDone: boolean
+  psychologicalCheckupDone: boolean
+  medicalNotes: string
+}
+
+function emptyHealthExtended(): HealthExtended {
+  return {
+    weightKg: null,
+    heightCm: null,
+    bmi: null,
+    nutritionScore: null,
+    sleepScore: null,
+    energyScore: null,
+    medicalCheckupDone: false,
+    dentalCheckupDone: false,
+    psychologicalCheckupDone: false,
+    medicalNotes: '',
+  }
+}
+
+function parseHealthExtended(json: string | null | undefined): HealthExtended {
+  if (!json?.trim()) return emptyHealthExtended()
+  try {
+    const o = JSON.parse(json) as Partial<HealthExtended>
+    return { ...emptyHealthExtended(), ...o }
+  } catch {
+    return emptyHealthExtended()
+  }
+}
+
+export function HealthSection({
   residentId,
   rows,
   onReload,
   openCreateSignal,
+  initialOpenRecordId,
+  onInitialOpenConsumed,
+  hideChrome,
 }: {
   residentId: number
   rows: HealthRecord[]
   onReload: () => void
   openCreateSignal: number
+  initialOpenRecordId?: number | null
+  onInitialOpenConsumed?: () => void
+  hideChrome?: boolean
 }) {
   const [sel, setSel] = useState<HealthRecord | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [score, setScore] = useState('')
+  const [ext, setExt] = useState<HealthExtended>(() => emptyHealthExtended())
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -950,28 +1245,66 @@ function HealthSection({
       setSel(null)
       setRecordDate(new Date().toISOString().slice(0, 10))
       setScore('')
+      setExt(emptyHealthExtended())
     }
   }, [openCreateSignal])
+
+  useEffect(() => {
+    if (initialOpenRecordId == null) return
+    const r = rows.find((x) => x.id === initialOpenRecordId)
+    if (r) {
+      setSel(r)
+      setCreateOpen(false)
+      setRecordDate(r.recordDate.slice(0, 10))
+      setScore(r.healthScore != null ? String(r.healthScore) : '')
+      setExt(parseHealthExtended(r.extendedJson))
+    }
+    onInitialOpenConsumed?.()
+  }, [initialOpenRecordId, rows, onInitialOpenConsumed])
 
   const sorted = useMemo(
     () => [...rows].sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime()),
     [rows],
   )
 
+  function scoreInRange(v: number | null | undefined, lo: number, hi: number, label: string): string | null {
+    if (v == null || Number.isNaN(v)) return null
+    if (v < lo || v > hi) return `${label} must be between ${lo} and ${hi}.`
+    return null
+  }
+
   async function save(e: FormEvent) {
     e.preventDefault()
     setErr(null)
     const v = score.trim() ? parseFloat(score) : undefined
     if (score.trim() && (v == null || v < 1 || v > 5)) {
-      setErr('Health score is typically 1–5.')
+      setErr('General health score must be between 1 and 5.')
       return
     }
+    const msg =
+      scoreInRange(ext.nutritionScore, 1, 5, 'Nutrition score') ||
+      scoreInRange(ext.sleepScore, 1, 5, 'Sleep score') ||
+      scoreInRange(ext.energyScore, 1, 5, 'Energy score')
+    if (msg) {
+      setErr(msg)
+      return
+    }
+    const extendedJson = JSON.stringify(ext)
     setSaving(true)
     try {
       if (sel && !createOpen) {
-        await patchHealthRecord(sel.id, { record_date: recordDate, general_health_score: v != null ? String(v) : '' })
+        await patchHealthRecord(sel.id, {
+          recordDate,
+          healthScore: v ?? null,
+          extendedJson,
+        })
       } else {
-        await createHealthRecord(residentId, { record_date: recordDate, general_health_score: v != null ? String(v) : '' })
+        await createHealthRecord({
+          residentId,
+          recordDate,
+          healthScore: v ?? null,
+          extendedJson,
+        })
       }
       setSel(null)
       setCreateOpen(false)
@@ -983,46 +1316,83 @@ function HealthSection({
     }
   }
 
+  function openRow(r: HealthRecord) {
+    setSel(r)
+    setCreateOpen(false)
+    setRecordDate(r.recordDate.slice(0, 10))
+    setScore(r.healthScore != null ? String(r.healthScore) : '')
+    setExt(parseHealthExtended(r.extendedJson))
+  }
+
   return (
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
-      <SectionHeader
-        title="Health & wellbeing"
-        description="General wellbeing scores by date (stored fields only)."
-        actions={<QuickActionButton onClick={() => { setCreateOpen(true); setSel(null); setScore(''); setRecordDate(new Date().toISOString().slice(0, 10)) }}>Add record</QuickActionButton>}
-      />
-      <div className="space-y-2">
-        {sorted.length === 0 ? (
-          <EmptyState
-            title="No health records"
-            action={
+      {!hideChrome ? (
+        <>
+          <SectionHeader
+            title="Health & wellbeing"
+            description="General health score is stored in the database; vitals and checkup flags are saved as structured JSON (run deployment/add-extended-json-to-education-health.sql if needed)."
+            actions={
               <QuickActionButton
                 onClick={() => {
                   setCreateOpen(true)
                   setSel(null)
                   setScore('')
                   setRecordDate(new Date().toISOString().slice(0, 10))
+                  setExt(emptyHealthExtended())
                 }}
               >
                 Add record
               </QuickActionButton>
             }
           />
-        ) : (
-          sorted.map((r) => (
-            <RecordCardRow key={r.id} onClick={() => { setSel(r); setCreateOpen(false); setRecordDate(r.recordDate.slice(0, 10)); setScore(r.healthScore != null ? String(r.healthScore) : '') }}>
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{formatAdminDate(r.recordDate)}</span>
-                <span className="text-lg font-semibold tabular-nums text-foreground">{r.healthScore ?? '—'}</span>
-              </div>
-            </RecordCardRow>
-          ))
-        )}
-      </div>
+          <div className="space-y-2">
+            {sorted.length === 0 ? (
+              <EmptyState
+                title="No health records"
+                action={
+                  <QuickActionButton
+                    onClick={() => {
+                      setCreateOpen(true)
+                      setSel(null)
+                      setScore('')
+                      setRecordDate(new Date().toISOString().slice(0, 10))
+                      setExt(emptyHealthExtended())
+                    }}
+                  >
+                    Add record
+                  </QuickActionButton>
+                }
+              />
+            ) : (
+              sorted.map((r) => {
+                const x = parseHealthExtended(r.extendedJson)
+                return (
+                  <RecordCardRow key={r.id} onClick={() => openRow(r)}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{formatAdminDate(r.recordDate)}</span>
+                      <span className="text-lg font-semibold tabular-nums text-foreground">{r.healthScore ?? '—'}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {x.weightKg != null || x.heightCm != null
+                        ? `Wt ${x.weightKg ?? '—'} kg · Ht ${x.heightCm ?? '—'} cm`
+                        : 'Vitals on file when captured'}
+                    </p>
+                  </RecordCardRow>
+                )
+              })
+            )}
+          </div>
+        </>
+      ) : null}
       {(createOpen || sel) && (
         <CaseDrawer
           title={createOpen ? 'New health record' : 'Health record'}
-          onClose={() => { setSel(null); setCreateOpen(false); setErr(null) }}
+          onClose={() => {
+            setSel(null)
+            setCreateOpen(false)
+            setErr(null)
+          }}
           footer={
             <form onSubmit={save} className="flex gap-2">
               <button type="submit" disabled={saving} className={btnPrimary}>
@@ -1038,6 +1408,117 @@ function HealthSection({
           <label className={label}>
             General health score (1–5)
             <input className={input} inputMode="decimal" value={score} onChange={(e) => setScore(e.target.value)} />
+          </label>
+          <label className={label}>
+            Weight (kg)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.weightKg != null ? String(ext.weightKg) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  weightKg: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label className={label}>
+            Height (cm)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.heightCm != null ? String(ext.heightCm) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  heightCm: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label className={label}>
+            BMI (optional — auto from wt/ht if you clear this)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.bmi != null ? String(ext.bmi) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  bmi: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <button
+            type="button"
+            className="text-xs text-primary hover:underline"
+            onClick={() =>
+              setExt((o) => {
+                const w = o.weightKg
+                const h = o.heightCm
+                if (w == null || h == null || h <= 0) return o
+                const m = h / 100
+                const bmi = Math.round((w / (m * m)) * 10) / 10
+                return { ...o, bmi }
+              })
+            }
+          >
+            Derive BMI from weight & height
+          </button>
+          <label className={label}>
+            Nutrition score (1–5)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.nutritionScore != null ? String(ext.nutritionScore) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  nutritionScore: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label className={label}>
+            Sleep score (1–5)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.sleepScore != null ? String(ext.sleepScore) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  sleepScore: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label className={label}>
+            Energy score (1–5)
+            <input
+              className={input}
+              inputMode="decimal"
+              value={ext.energyScore != null ? String(ext.energyScore) : ''}
+              onChange={(e) =>
+                setExt((o) => ({
+                  ...o,
+                  energyScore: e.target.value.trim() === '' ? null : parseFloat(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <ToggleField labelText="Medical checkup done" value={ext.medicalCheckupDone} onChange={(v) => setExt((o) => ({ ...o, medicalCheckupDone: v }))} />
+          <ToggleField labelText="Dental checkup done" value={ext.dentalCheckupDone} onChange={(v) => setExt((o) => ({ ...o, dentalCheckupDone: v }))} />
+          <ToggleField
+            labelText="Psychological checkup done"
+            value={ext.psychologicalCheckupDone}
+            onChange={(v) => setExt((o) => ({ ...o, psychologicalCheckupDone: v }))}
+          />
+          <label className={label}>
+            Medical / clinical notes
+            <textarea className={input} rows={3} value={ext.medicalNotes} onChange={(e) => setExt((o) => ({ ...o, medicalNotes: e.target.value }))} />
           </label>
         </CaseDrawer>
       )}

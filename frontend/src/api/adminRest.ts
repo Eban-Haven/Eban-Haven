@@ -225,6 +225,45 @@ export async function getReportsSummary(): Promise<T.ReportsSummary> {
   return parseJson<T.ReportsSummary>(await apiFetch(`${base}/reports/summary`))
 }
 
+export async function getPlannedSocialPosts(): Promise<T.PlannedSocialPost[]> {
+  return parseJson<T.PlannedSocialPost[]>(await apiFetch(`${base}/social-planner/posts`))
+}
+
+export async function createPlannedSocialPosts(body: {
+  sourcePrompt?: string
+  posts: Array<{
+    title: string
+    platform: string
+    format: string
+    imageIdea?: string
+    caption: string
+    hashtags?: string[]
+    cta?: string
+    suggestedTime?: string
+    whyItFits?: string
+    notes?: string
+  }>
+}): Promise<T.PlannedSocialPost[]> {
+  return parseJson<T.PlannedSocialPost[]>(
+    await apiFetch(`${base}/social-planner/posts/bulk`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export async function requestSchedulePlannedSocialPost(id: number): Promise<T.PlannedSocialPost> {
+  return parseJson<T.PlannedSocialPost>(
+    await apiFetch(`${base}/social-planner/posts/${id}/schedule-request`, { method: 'POST' }),
+  )
+}
+
+export async function patchPlannedSocialPostStatus(id: number, status: string): Promise<T.PlannedSocialPost> {
+  return parseJson<T.PlannedSocialPost>(
+    await apiFetch(`${base}/social-planner/posts/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+  )
+}
+
 export async function deleteSupporter(id: number): Promise<void> {
   const res = await apiFetch(`${base}/supporters/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(`Delete supporter failed: ${res.status}`)
@@ -343,14 +382,17 @@ export async function listEducationRecords(residentId?: number): Promise<T.Educa
   return parseJson<T.EducationRecord[]>(await apiFetch(`${base}/education-records${q}`))
 }
 
-export async function createEducationRecord(
-  residentId: number,
-  fields: Record<string, string>,
-): Promise<T.EducationRecord> {
+export async function createEducationRecord(opts: {
+  residentId: number
+  recordDate?: string
+  progressPercent?: number | null
+  extendedJson?: string | null
+}): Promise<T.EducationRecord> {
   const body = {
-    residentId,
-    recordDate: fields.record_date ? new Date(fields.record_date) : undefined,
-    progressPercent: fields.progress_percent ? parseFloat(fields.progress_percent) : undefined,
+    residentId: opts.residentId,
+    recordDate: opts.recordDate ? new Date(opts.recordDate) : undefined,
+    progressPercent: opts.progressPercent ?? undefined,
+    extendedJson: opts.extendedJson ?? undefined,
   }
   return parseJson<T.EducationRecord>(
     await apiFetch(`${base}/education-records`, { method: 'POST', body: JSON.stringify(body) }),
@@ -359,14 +401,16 @@ export async function createEducationRecord(
 
 export async function patchEducationRecord(
   id: number,
-  fields: Record<string, string | null | undefined>,
+  patch: {
+    progressPercent?: number | null
+    recordDate?: string
+    extendedJson?: string | null
+  },
 ): Promise<T.EducationRecord> {
   const body = {
-    progressPercent:
-      fields.progress_percent != null && fields.progress_percent !== ''
-        ? parseFloat(String(fields.progress_percent))
-        : undefined,
-    recordDate: fields.record_date ?? undefined,
+    progressPercent: patch.progressPercent ?? undefined,
+    recordDate: patch.recordDate ?? undefined,
+    extendedJson: patch.extendedJson,
   }
   return parseJson<T.EducationRecord>(
     await apiFetch(`${base}/education-records/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -378,14 +422,17 @@ export async function listHealthRecords(residentId?: number): Promise<T.HealthRe
   return parseJson<T.HealthRecord[]>(await apiFetch(`${base}/health-records${q}`))
 }
 
-export async function createHealthRecord(
-  residentId: number,
-  fields: Record<string, string>,
-): Promise<T.HealthRecord> {
+export async function createHealthRecord(opts: {
+  residentId: number
+  recordDate?: string
+  healthScore?: number | null
+  extendedJson?: string | null
+}): Promise<T.HealthRecord> {
   const body = {
-    residentId,
-    recordDate: fields.record_date ? new Date(fields.record_date) : undefined,
-    healthScore: fields.general_health_score ? parseFloat(fields.general_health_score) : undefined,
+    residentId: opts.residentId,
+    recordDate: opts.recordDate ? new Date(opts.recordDate) : undefined,
+    healthScore: opts.healthScore ?? undefined,
+    extendedJson: opts.extendedJson ?? undefined,
   }
   return parseJson<T.HealthRecord>(
     await apiFetch(`${base}/health-records`, { method: 'POST', body: JSON.stringify(body) }),
@@ -394,14 +441,16 @@ export async function createHealthRecord(
 
 export async function patchHealthRecord(
   id: number,
-  fields: Record<string, string | null | undefined>,
+  patch: {
+    healthScore?: number | null
+    recordDate?: string
+    extendedJson?: string | null
+  },
 ): Promise<T.HealthRecord> {
   const body = {
-    healthScore:
-      fields.general_health_score != null && fields.general_health_score !== ''
-        ? parseFloat(String(fields.general_health_score))
-        : undefined,
-    recordDate: fields.record_date ?? undefined,
+    healthScore: patch.healthScore ?? undefined,
+    recordDate: patch.recordDate ?? undefined,
+    extendedJson: patch.extendedJson,
   }
   return parseJson<T.HealthRecord>(
     await apiFetch(`${base}/health-records/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

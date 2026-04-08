@@ -20,16 +20,32 @@ function planIsOverdue(p: InterventionPlan): boolean {
   return t < new Date().setHours(0, 0, 0, 0)
 }
 
+function planGoalBucket(p: InterventionPlan): 'overdue' | 'in_progress' | 'achieved' | 'hold_closed' {
+  if (planIsOverdue(p)) return 'overdue'
+  const s = p.status.toLowerCase()
+  if (s.includes('achieved') || s.includes('completed')) return 'achieved'
+  if (s.includes('on hold') || s.includes('closed')) return 'hold_closed'
+  return 'in_progress'
+}
+
 export function PlansTabContent({
   residentId,
   plans,
   onReload,
   openCreateSignal,
+  layout = 'list',
+  focusPlanId,
+  onFocusPlanConsumed,
 }: {
   residentId: number
   plans: InterventionPlan[]
   onReload: () => void
   openCreateSignal: number
+  /** `workspace` groups plans into status buckets for the resident case file. */
+  layout?: 'list' | 'workspace'
+  /** When set, opens the plan drawer for this id (e.g. from timeline). */
+  focusPlanId?: number | null
+  onFocusPlanConsumed?: () => void
 }) {
   const [q, setQ] = useState('')
   const [df, setDf] = useState('')
@@ -50,6 +66,17 @@ export function PlansTabContent({
     }
   }, [openCreateSignal])
 
+  useEffect(() => {
+    if (focusPlanId == null) return
+    const p = plans.find((x) => x.id === focusPlanId)
+    if (p) {
+      setSel(p)
+      setEditing(false)
+      setCreateOpen(false)
+    }
+    onFocusPlanConsumed?.()
+  }, [focusPlanId, plans, onFocusPlanConsumed])
+
   const filtered = useMemo(() => {
     let list = [...plans].sort((a, b) => {
       const ta = a.targetDate ? new Date(a.targetDate).getTime() : 0
@@ -68,8 +95,40 @@ export function PlansTabContent({
           p.status.toLowerCase().includes(s),
       )
     }
+    if (layout === 'workspace') {
+      const order = (p: InterventionPlan) => {
+        const b = planGoalBucket(p)
+        const pr = b === 'overdue' ? 0 : b === 'in_progress' ? 1 : b === 'achieved' ? 2 : 3
+        const td = p.targetDate ? new Date(p.targetDate).getTime() : 0
+        return pr * 1e15 + td
+      }
+      list.sort((a, b) => order(a) - order(b))
+    }
     return list
-  }, [plans, q, df, dt, overdueOnly])
+  }, [plans, q, df, dt, overdueOnly, layout])
+
+  const bucketed = useMemo(() => {
+    const overdue: InterventionPlan[] = []
+    const inProgress: InterventionPlan[] = []
+    const achieved: InterventionPlan[] = []
+    const holdClosed: InterventionPlan[] = []
+    for (const p of filtered) {
+      switch (planGoalBucket(p)) {
+        case 'overdue':
+          overdue.push(p)
+          break
+        case 'in_progress':
+          inProgress.push(p)
+          break
+        case 'achieved':
+          achieved.push(p)
+          break
+        default:
+          holdClosed.push(p)
+      }
+    }
+    return { overdue, inProgress, achieved, holdClosed }
+  }, [filtered])
 
   const closeDrawer = () => {
     setSel(null)
@@ -82,8 +141,12 @@ export function PlansTabContent({
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
       <SectionHeader
-        title="Intervention plans"
-        description="Case conference plans, targets, and status for this resident."
+        title={layout === 'workspace' ? 'Plans & goals' : 'Intervention plans'}
+        description={
+          layout === 'workspace'
+            ? 'Intervention plans grouped by urgency and status — link activities from the timeline to plans when reviewing progress.'
+            : 'Case conference plans, targets, and status for this resident.'
+        }
         actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add plan</QuickActionButton>}
       />
       <div className="flex flex-wrap items-end gap-3">
@@ -103,29 +166,78 @@ export function PlansTabContent({
           Overdue only
         </label>
       </div>
-      <div className="space-y-2">
-        {filtered.length === 0 ? (
-          <EmptyState title="No intervention plans" action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add plan</QuickActionButton>} />
-        ) : (
-          filtered.map((p) => (
-            <RecordCardRow key={p.id} highlight={planIsOverdue(p)} onClick={() => { setSel(p); setEditing(false); setCreateOpen(false) }}>
-              <div className="flex flex-wrap items-center gap-2">
-                <CategoryBadge>{p.planCategory}</CategoryBadge>
-                <StatusBadge status={p.status} />
-                {planIsOverdue(p) ? (
-                  <span className="text-xs font-medium text-amber-800 dark:text-amber-200">Overdue</span>
-                ) : null}
+      {layout === 'workspace' ? (
+        <div className="space-y-8">
+          {(
+            [
+              ['Overdue', bucketed.overdue, 'border-amber-500/40 bg-amber-500/5'],
+              ['In progress', bucketed.inProgress, 'border-border'],
+              ['Achieved / completed', bucketed.achieved, 'border-emerald-500/30 bg-emerald-500/5'],
+              ['On hold / closed', bucketed.holdClosed, 'border-muted'],
+            ] as const
+          ).map(([title, list, box]) => (
+            <div key={title} className={`rounded-xl border p-4 ${box}`}>
+              <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+              <p className="mt-1 text-xs text-muted-foreground">{list.length} plan(s)</p>
+              <div className="mt-3 space-y-2">
+                {list.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">None in this bucket.</p>
+                ) : (
+                  list.map((p) => (
+                    <RecordCardRow
+                      key={p.id}
+                      highlight={planIsOverdue(p)}
+                      onClick={() => {
+                        setSel(p)
+                        setEditing(false)
+                        setCreateOpen(false)
+                      }}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CategoryBadge>{p.planCategory}</CategoryBadge>
+                        <StatusBadge status={p.status} />
+                        {planIsOverdue(p) ? (
+                          <span className="text-xs font-medium text-amber-800 dark:text-amber-200">Overdue</span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.planDescription}</p>
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        {p.targetDate ? <span>Target {formatAdminDate(p.targetDate)}</span> : null}
+                        {p.caseConferenceDate ? <span>Conference {formatAdminDate(p.caseConferenceDate)}</span> : null}
+                        {p.servicesProvided ? <span className="truncate">{p.servicesProvided}</span> : null}
+                      </div>
+                    </RecordCardRow>
+                  ))
+                )}
               </div>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.planDescription}</p>
-              <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                {p.targetDate ? <span>Target {formatAdminDate(p.targetDate)}</span> : null}
-                {p.caseConferenceDate ? <span>Conference {formatAdminDate(p.caseConferenceDate)}</span> : null}
-                {p.servicesProvided ? <span className="truncate">{p.servicesProvided}</span> : null}
-              </div>
-            </RecordCardRow>
-          ))
-        )}
-      </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.length === 0 ? (
+            <EmptyState title="No intervention plans" action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add plan</QuickActionButton>} />
+          ) : (
+            filtered.map((p) => (
+              <RecordCardRow key={p.id} highlight={planIsOverdue(p)} onClick={() => { setSel(p); setEditing(false); setCreateOpen(false) }}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <CategoryBadge>{p.planCategory}</CategoryBadge>
+                  <StatusBadge status={p.status} />
+                  {planIsOverdue(p) ? (
+                    <span className="text-xs font-medium text-amber-800 dark:text-amber-200">Overdue</span>
+                  ) : null}
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{p.planDescription}</p>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  {p.targetDate ? <span>Target {formatAdminDate(p.targetDate)}</span> : null}
+                  {p.caseConferenceDate ? <span>Conference {formatAdminDate(p.caseConferenceDate)}</span> : null}
+                  {p.servicesProvided ? <span className="truncate">{p.servicesProvided}</span> : null}
+                </div>
+              </RecordCardRow>
+            ))
+          )}
+        </div>
+      )}
 
       {(sel || createOpen) && (
         <PlanDrawer

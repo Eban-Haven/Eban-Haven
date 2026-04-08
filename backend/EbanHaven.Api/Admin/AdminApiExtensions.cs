@@ -332,7 +332,7 @@ public static class AdminApiExtensions
             var date = body.RecordDate.HasValue
                 ? body.RecordDate.Value
                 : DateOnly.FromDateTime(DateTime.UtcNow);
-            var created = repo.CreateEducationRecord(body.ResidentId, date, body.ProgressPercent);
+            var created = repo.CreateEducationRecord(body.ResidentId, date, body.ProgressPercent, body.ExtendedJson);
             return Results.Created($"/api/admin/education-records/{created.Id}", created);
         });
 
@@ -340,7 +340,7 @@ public static class AdminApiExtensions
         {
             DateOnly? date = null;
             if (body.RecordDate.HasValue) date = body.RecordDate.Value;
-            var u = repo.PatchEducationRecord(id, body.ProgressPercent, date);
+            var u = repo.PatchEducationRecord(id, body.ProgressPercent, date, body.ExtendedJson);
             return u is null ? Results.NotFound() : Results.Ok(u);
         });
 
@@ -353,7 +353,7 @@ public static class AdminApiExtensions
             var date = body.RecordDate.HasValue
                 ? body.RecordDate.Value
                 : DateOnly.FromDateTime(DateTime.UtcNow);
-            var created = repo.CreateHealthRecord(body.ResidentId, date, body.HealthScore);
+            var created = repo.CreateHealthRecord(body.ResidentId, date, body.HealthScore, body.ExtendedJson);
             return Results.Created($"/api/admin/health-records/{created.Id}", created);
         });
 
@@ -361,7 +361,7 @@ public static class AdminApiExtensions
         {
             DateOnly? date = null;
             if (body.RecordDate.HasValue) date = body.RecordDate.Value;
-            var u = repo.PatchHealthRecord(id, body.HealthScore, date);
+            var u = repo.PatchHealthRecord(id, body.HealthScore, date, body.ExtendedJson);
             return u is null ? Results.NotFound() : Results.Ok(u);
         });
     }
@@ -453,10 +453,10 @@ public sealed record CreateInterventionPlanRequest(
     double? TargetValue,
     string? ServicesProvided);
 
-public sealed record CreateEducationRecordRequest(int ResidentId, DateOnly? RecordDate, double? ProgressPercent);
+public sealed record CreateEducationRecordRequest(int ResidentId, DateOnly? RecordDate, double? ProgressPercent, string? ExtendedJson);
 
-public sealed record PatchEducationRecordRequest(double? ProgressPercent, DateOnly? RecordDate);
+public sealed record PatchEducationRecordRequest(double? ProgressPercent, DateOnly? RecordDate, string? ExtendedJson);
 
-public sealed record CreateHealthRecordRequest(int ResidentId, DateOnly? RecordDate, double? HealthScore);
+public sealed record CreateHealthRecordRequest(int ResidentId, DateOnly? RecordDate, double? HealthScore, string? ExtendedJson);
 
-public sealed record PatchHealthRecordRequest(double? HealthScore, DateOnly? RecordDate);
+public sealed record PatchHealthRecordRequest(double? HealthScore, DateOnly? RecordDate, string? ExtendedJson);

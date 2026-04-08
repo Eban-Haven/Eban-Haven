@@ -8,5 +8,7 @@ public sealed class EducationRecord
     [Column("resident_id")] public int ResidentId { get; set; }
     [Column("record_date")] public DateOnly RecordDate { get; set; }
     [Column("progress_percent")] public double? ProgressPercent { get; set; }
+    /// <summary>Optional JSON payload for extended program fields (course, attendance, etc.).</summary>
+    [Column("extended_json")] public string? ExtendedJson { get; set; }
 }
 

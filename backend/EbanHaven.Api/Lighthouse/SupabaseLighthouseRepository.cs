@@ -859,31 +859,34 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 e.EducationRecordId,
                 e.ResidentId,
                 e.RecordDate.ToString("yyyy-MM-dd"),
-                e.ProgressPercent))
+                e.ProgressPercent,
+                NullIfEmpty(e.ExtendedJson)))
             .ToList();
     }
 
-    public EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent)
+    public EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent, string? extendedJson = null)
     {
         var row = new EducationRecord
         {
             ResidentId = residentId,
             RecordDate = recordDate,
             ProgressPercent = progressPercent,
+            ExtendedJson = string.IsNullOrWhiteSpace(extendedJson) ? null : extendedJson.Trim(),
         };
         db.EducationRecords.Add(row);
         db.SaveChanges();
-        return new EducationRecordDto(row.EducationRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.ProgressPercent);
+        return new EducationRecordDto(row.EducationRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.ProgressPercent, NullIfEmpty(row.ExtendedJson));
     }
 
-    public EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate)
+    public EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate, string? extendedJson = null)
     {
         var row = db.EducationRecords.FirstOrDefault(x => x.EducationRecordId == id);
         if (row is null) return null;
         if (progressPercent.HasValue) row.ProgressPercent = progressPercent.Value;
         if (recordDate.HasValue) row.RecordDate = recordDate.Value;
+        if (extendedJson != null) row.ExtendedJson = string.IsNullOrWhiteSpace(extendedJson) ? null : extendedJson.Trim();
         db.SaveChanges();
-        return new EducationRecordDto(row.EducationRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.ProgressPercent);
+        return new EducationRecordDto(row.EducationRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.ProgressPercent, NullIfEmpty(row.ExtendedJson));
     }
 
     public IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId)
@@ -896,31 +899,34 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 h.HealthRecordId,
                 h.ResidentId,
                 h.RecordDate.ToString("yyyy-MM-dd"),
-                h.GeneralHealthScore))
+                h.GeneralHealthScore,
+                NullIfEmpty(h.ExtendedJson)))
             .ToList();
     }
 
-    public HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore)
+    public HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore, string? extendedJson = null)
     {
         var row = new HealthWellbeingRecord
         {
             ResidentId = residentId,
             RecordDate = recordDate,
             GeneralHealthScore = healthScore,
+            ExtendedJson = string.IsNullOrWhiteSpace(extendedJson) ? null : extendedJson.Trim(),
         };
         db.HealthWellbeingRecords.Add(row);
         db.SaveChanges();
-        return new HealthRecordDto(row.HealthRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.GeneralHealthScore);
+        return new HealthRecordDto(row.HealthRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.GeneralHealthScore, NullIfEmpty(row.ExtendedJson));
     }
 
-    public HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate)
+    public HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate, string? extendedJson = null)
     {
         var row = db.HealthWellbeingRecords.FirstOrDefault(x => x.HealthRecordId == id);
         if (row is null) return null;
         if (healthScore.HasValue) row.GeneralHealthScore = healthScore.Value;
         if (recordDate.HasValue) row.RecordDate = recordDate.Value;
+        if (extendedJson != null) row.ExtendedJson = string.IsNullOrWhiteSpace(extendedJson) ? null : extendedJson.Trim();
         db.SaveChanges();
-        return new HealthRecordDto(row.HealthRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.GeneralHealthScore);
+        return new HealthRecordDto(row.HealthRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.GeneralHealthScore, NullIfEmpty(row.ExtendedJson));
     }
 
     // ── Incident Reports ──────────────────────────────────────────────────────
