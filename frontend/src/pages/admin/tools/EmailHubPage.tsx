@@ -246,7 +246,7 @@ export function EmailHubPage() {
       <div>
         <h2 className={`${pageTitle} flex items-center gap-2`}>
           <Mail className="h-7 w-7 text-primary" />
-          Email hub
+          Donor Outreach
         </h2>
         <p className={pageDesc}>
           Review donor history, generate a tailored outreach email, and open a ready-to-send draft from the admin tools area.
@@ -255,8 +255,8 @@ export function EmailHubPage() {
 
       {error && <div className={alertError}>{error}</div>}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-        <aside className={`${card} space-y-4`}>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
+        <aside className={`${card} space-y-4 self-start`}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className={sectionFormTitle}>Donors</p>
@@ -341,7 +341,7 @@ export function EmailHubPage() {
           </div>
         </aside>
 
-        <section className="space-y-6">
+        <section className="min-w-0 space-y-6">
           {loadingProfile ? (
             <div className={`${card} flex items-center gap-3 text-sm text-muted-foreground`}>
               <LoaderCircle className="h-4 w-4 animate-spin" />

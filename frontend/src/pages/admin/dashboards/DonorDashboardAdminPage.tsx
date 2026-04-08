@@ -139,7 +139,7 @@ export function DonorDashboardAdminPage() {
             <ArrowRight className="h-4 w-4 opacity-70" />
           </Link>
           <Link to="/admin/email-hub" className={linkTile}>
-            <span className="flex items-center gap-2"><Mail className="h-4 w-4" /> Email Hub</span>
+            <span className="flex items-center gap-2"><Mail className="h-4 w-4" /> Donor Outreach</span>
             <ArrowRight className="h-4 w-4 opacity-70" />
           </Link>
         </div>

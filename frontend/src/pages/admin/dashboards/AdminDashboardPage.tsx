@@ -453,7 +453,7 @@ export function AdminDashboardPage() {
             to="/admin/email-hub"
             className="mt-4 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
-            Open Email Hub → reach at-risk donors <ArrowRight className="h-3 w-3" />
+            Open Donor Outreach → reach at-risk donors <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
 
@@ -512,7 +512,7 @@ export function AdminDashboardPage() {
           </Link>
           <Link to="/admin/email-hub" className={linkTile}>
             <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4" /> Email Hub
+              <Mail className="h-4 w-4" /> Donor Outreach
             </span>
             <ArrowRight className="h-4 w-4 opacity-70" />
           </Link>

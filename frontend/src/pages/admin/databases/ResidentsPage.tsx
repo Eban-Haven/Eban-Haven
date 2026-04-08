@@ -353,7 +353,7 @@ export function ResidentsPage() {
         <table className="w-full text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              <th className="w-10 px-2 py-2.5">
+              <th className="w-10 pl-3 pr-2 py-2.5">
                 <input
                   type="checkbox"
                   aria-label="Select all on this page"
@@ -397,7 +397,7 @@ export function ResidentsPage() {
                   className={`${tableRowHover} cursor-pointer`}
                   onClick={() => navigate(`/admin/residents/${r.id}`)}
                 >
-                  <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                  <td className="pl-3 pr-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.internalCode}`} />
                   </td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{r.internalCode}</td>

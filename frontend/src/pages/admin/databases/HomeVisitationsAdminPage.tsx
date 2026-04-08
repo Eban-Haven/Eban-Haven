@@ -445,7 +445,7 @@ export function HomeVisitationsAdminPage() {
         <table className="w-full min-w-[800px] text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              <th className="w-10 px-2 py-2.5">
+              <th className="w-10 pl-3 pr-2 py-2.5">
                 <input
                   type="checkbox"
                   aria-label="Select all on this page"
@@ -490,7 +490,7 @@ export function HomeVisitationsAdminPage() {
                   className={`${tableRowHover} cursor-pointer`}
                   onClick={() => navigate(`/admin/residents/${v.residentId}`)}
                 >
-                  <td className="px-2 py-2.5" onClick={(e) => e.stopPropagation()}>
+                  <td className="pl-3 pr-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleSelect(v.id)} aria-label={`Select ${v.id}`} />
                   </td>
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatAdminDate(v.visitDate)}</td>

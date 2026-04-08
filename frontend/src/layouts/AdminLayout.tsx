@@ -55,7 +55,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/admin/donor-dashboard', label: 'Donor Dashboard', icon: TrendingUp },
       { to: '/admin/donor-all', label: 'Donor Information', icon: Layers },
-      { to: '/admin/email-hub', label: 'Donor Retention', icon: RefreshCcw },
+      { to: '/admin/email-hub', label: 'Donor Outreach', icon: RefreshCcw },
     ],
   },
   {
@@ -227,7 +227,6 @@ export function AdminLayout() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <h1 className="font-heading text-lg font-semibold text-foreground">{SITE_DISPLAY_NAME} — Management</h1>
         </header>
         <main className="flex-1 bg-background p-4 lg:p-8">
           <Outlet />
