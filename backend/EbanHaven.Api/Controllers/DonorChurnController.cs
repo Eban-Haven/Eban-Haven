@@ -3,6 +3,7 @@ using Dapper;
 using EbanHaven.Api.DataAccess;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace EbanHaven.Api.Controllers;
 
