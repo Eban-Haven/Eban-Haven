@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   LineChart,
   LogOut,
-  Mail,
   Menu,
   PanelLeftClose,
   PanelLeft,
