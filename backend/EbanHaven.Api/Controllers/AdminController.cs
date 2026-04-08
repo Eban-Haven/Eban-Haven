@@ -4,6 +4,7 @@ using EbanHaven.Api.Lighthouse;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace EbanHaven.Api.Controllers;
 
@@ -111,10 +112,34 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
             var created = repo.CreateResident(body.InternalCode.Trim(), body.CaseStatus.Trim(), body.CaseCategory?.Trim());
             return Created($"/api/admin/residents/{created.Id}", created);
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg)
+        {
+            // Postgres constraint codes: 23505=unique_violation, 23503=foreign_key_violation, 23502=not_null_violation
+            // https://www.postgresql.org/docs/current/errcodes-appendix.html
+            return pg.SqlState switch
+            {
+                PostgresErrorCodes.UniqueViolation => Conflict(new
+                {
+                    error = "A resident with this internal code already exists. Choose a different Internal Code.",
+                }),
+                PostgresErrorCodes.ForeignKeyViolation => Conflict(new
+                {
+                    error = "Resident could not be created because a related record is missing (e.g., safehouse). Verify safehouses exist and try again.",
+                }),
+                PostgresErrorCodes.NotNullViolation => Conflict(new
+                {
+                    error = "Resident could not be created because the database requires a field that wasn't provided. Contact an admin to update required fields or defaults.",
+                }),
+                _ => Conflict(new
+                {
+                    error = "Unable to create resident due to a database constraint.",
+                    detail = pg.MessageText,
+                }),
+            };
+        }
         catch (DbUpdateException)
         {
-            // Most commonly: unique constraint violations, FK issues, or invalid column constraints.
-            return Conflict(new { error = "Unable to create resident due to a database constraint. Check InternalCode and required fields." });
+            return Conflict(new { error = "Unable to create resident due to a database constraint." });
         }
         catch (InvalidOperationException ex)
         {
