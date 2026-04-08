@@ -59,6 +59,10 @@ export type ResidentSummary = {
   dateOfAdmission: string | null
   reintegrationStatus: string | null
   reintegrationType: string | null
+  /** Present age label from program data (e.g. CSV `present_age`). */
+  presentAge?: string | null
+  lengthOfStay?: string | null
+  currentRiskLevel?: string | null
 }
 
 export type ResidentDetail = { id: number; fields: Record<string, string> }
@@ -77,6 +81,7 @@ export type Supporter = {
   status: string
   firstDonationDate: string | null
   acquisitionChannel: string | null
+  relationshipType?: string | null
 }
 
 /** Create supporter (REST accepts a subset; Supabase can persist all optional fields). */

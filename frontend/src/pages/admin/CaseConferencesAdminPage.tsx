@@ -30,48 +30,30 @@ import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirecti
 const PLAN_STATUSES = ['In Progress', 'On Hold', 'Achieved', 'Not Achieved'] as const
 
 type ColFilters = {
-  id: string
+  caseConferenceDate: string
   residentId: string
-  residentInternalCode: string
   planCategory: string
-  planDescription: string
   servicesProvided: string
-  targetValue: string
   targetDate: string
   status: string
-  caseConferenceDate: string
-  createdAt: string
-  updatedAt: string
 }
 
 const emptyFilters = (): ColFilters => ({
-  id: '',
+  caseConferenceDate: '',
   residentId: '',
-  residentInternalCode: '',
   planCategory: '',
-  planDescription: '',
   servicesProvided: '',
-  targetValue: '',
   targetDate: '',
   status: '',
-  caseConferenceDate: '',
-  createdAt: '',
-  updatedAt: '',
 })
 
 const FILTER_LABELS: Record<keyof ColFilters, string> = {
-  id: 'Plan ID',
+  caseConferenceDate: 'Case conference date',
   residentId: 'Resident ID',
-  residentInternalCode: 'Resident code',
-  planCategory: 'Category',
-  planDescription: 'Description',
-  servicesProvided: 'Services',
-  targetValue: 'Target value',
+  planCategory: 'Plan category',
+  servicesProvided: 'Services provided',
   targetDate: 'Target date',
   status: 'Status',
-  caseConferenceDate: 'Conference date',
-  createdAt: 'Created',
-  updatedAt: 'Updated',
 }
 
 export function CaseConferencesAdminPage() {
@@ -127,36 +109,30 @@ export function CaseConferencesAdminPage() {
 
   const filteredSorted = useMemo(() => {
     let list = plans.filter((p) => {
-      const hay = `${p.residentInternalCode} ${p.planCategory} ${p.planDescription} ${p.servicesProvided ?? ''} ${p.status} ${p.id}`.toLowerCase()
+      const hay = `${p.residentInternalCode} ${p.planCategory} ${p.planDescription} ${p.servicesProvided ?? ''} ${p.status} ${p.id} ${p.residentId}`.toLowerCase()
       if (q.trim() && !hay.includes(q.trim().toLowerCase())) return false
-      if (!matchesColFilter(p.id, colFilters.id)) return false
+      if (!matchesColFilter(p.caseConferenceDate, colFilters.caseConferenceDate)) return false
       if (!matchesColFilter(p.residentId, colFilters.residentId)) return false
-      if (!matchesColFilter(p.residentInternalCode, colFilters.residentInternalCode)) return false
       if (!matchesColFilter(p.planCategory, colFilters.planCategory)) return false
-      if (!matchesColFilter(p.planDescription, colFilters.planDescription)) return false
       if (!matchesColFilter(p.servicesProvided, colFilters.servicesProvided)) return false
-      if (!matchesColFilter(p.targetValue, colFilters.targetValue)) return false
       if (!matchesColFilter(p.targetDate, colFilters.targetDate)) return false
       if (!matchesColFilter(p.status, colFilters.status)) return false
-      if (!matchesColFilter(p.caseConferenceDate, colFilters.caseConferenceDate)) return false
-      if (!matchesColFilter(p.createdAt, colFilters.createdAt)) return false
-      if (!matchesColFilter(p.updatedAt, colFilters.updatedAt)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
       switch (key) {
-        case 'id':
-          return row.id
-        case 'residentInternalCode':
-          return row.residentInternalCode
-        case 'planCategory':
-          return row.planCategory
-        case 'status':
-          return row.status
         case 'caseConferenceDate':
           return row.caseConferenceDate ?? ''
+        case 'residentId':
+          return row.residentId
+        case 'planCategory':
+          return row.planCategory
+        case 'servicesProvided':
+          return row.servicesProvided ?? ''
         case 'targetDate':
           return row.targetDate ?? ''
+        case 'status':
+          return row.status
         default:
           return ''
       }
@@ -399,12 +375,12 @@ export function CaseConferencesAdminPage() {
                   />
                 </th>
               )}
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Resident" sortKey="residentInternalCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Category" sortKey="planCategory" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Conference date" sortKey="caseConferenceDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Resident ID" sortKey="residentId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Plan category" sortKey="planCategory" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Services provided" sortKey="servicesProvided" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Target date" sortKey="targetDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Conference" sortKey="caseConferenceDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <th className="px-4 py-3">Services</th>
             </tr>
           </thead>
           <tbody className={tableBody}>
@@ -432,16 +408,18 @@ export function CaseConferencesAdminPage() {
                       <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} aria-label={`Select ${p.id}`} />
                     </td>
                   )}
-                  <td className="px-4 py-3 text-muted-foreground">{p.id}</td>
-                  <td className="px-4 py-3 font-medium text-primary">{p.residentInternalCode}</td>
-                  <td className="px-4 py-3">{p.planCategory}</td>
-                  <td className="px-4 py-3">{p.status}</td>
-                  <td className="px-4 py-3 text-muted-foreground">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
                     {p.caseConferenceDate ? new Date(p.caseConferenceDate).toLocaleDateString() : '—'}
                   </td>
-                  <td className="max-w-xs truncate px-4 py-3 text-muted-foreground" title={p.servicesProvided ?? ''}>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.residentId}</td>
+                  <td className="px-4 py-3">{p.planCategory}</td>
+                  <td className="max-w-xs truncate px-4 py-3 text-sm text-muted-foreground" title={p.servicesProvided ?? ''}>
                     {p.servicesProvided ?? '—'}
                   </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                    {p.targetDate ? new Date(p.targetDate).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="px-4 py-3">{p.status}</td>
                 </tr>
               ))
             )}

@@ -44,7 +44,10 @@ public sealed record ResidentSummaryDto(
     string? AssignedSocialWorker,
     string? DateOfAdmission,
     string? ReintegrationStatus,
-    string? ReintegrationType);
+    string? ReintegrationType,
+    string? PresentAge,
+    string? LengthOfStay,
+    string? CurrentRiskLevel);
 
 public sealed record ResidentDetailDto(
     int Id,
@@ -63,7 +66,8 @@ public sealed record SupporterDto(
     string? Phone,
     string Status,
     string? FirstDonationDate,
-    string? AcquisitionChannel);
+    string? AcquisitionChannel,
+    string? RelationshipType);
 
 public sealed record DonationDto(
     int Id,

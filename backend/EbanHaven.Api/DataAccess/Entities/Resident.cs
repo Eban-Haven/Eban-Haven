@@ -15,5 +15,8 @@ public sealed class Resident
     [Column("date_of_admission")] public string? DateOfAdmission { get; set; }
     [Column("reintegration_status")] public string? ReintegrationStatus { get; set; }
     [Column("reintegration_type")] public string? ReintegrationType { get; set; }
+    [Column("present_age")] public string? PresentAge { get; set; }
+    [Column("length_of_stay")] public string? LengthOfStay { get; set; }
+    [Column("current_risk_level")] public string? CurrentRiskLevel { get; set; }
 }
 

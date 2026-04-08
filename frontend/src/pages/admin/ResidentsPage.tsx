@@ -22,44 +22,44 @@ import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirecti
 
 type ColFilters = {
   internalCode: string
-  caseControlNo: string
-  caseStatus: string
-  caseCategory: string
   safehouseId: string
-  safehouseName: string
+  caseStatus: string
   sex: string
-  assignedSocialWorker: string
+  presentAge: string
+  caseCategory: string
   dateOfAdmission: string
+  lengthOfStay: string
   reintegrationStatus: string
-  reintegrationType: string
+  currentRiskLevel: string
+  assignedSocialWorker: string
 }
 
 const emptyFilters = (): ColFilters => ({
   internalCode: '',
-  caseControlNo: '',
-  caseStatus: '',
-  caseCategory: '',
   safehouseId: '',
-  safehouseName: '',
+  caseStatus: '',
   sex: '',
-  assignedSocialWorker: '',
+  presentAge: '',
+  caseCategory: '',
   dateOfAdmission: '',
+  lengthOfStay: '',
   reintegrationStatus: '',
-  reintegrationType: '',
+  currentRiskLevel: '',
+  assignedSocialWorker: '',
 })
 
 const FILTER_LABELS: Record<keyof ColFilters, string> = {
   internalCode: 'Internal code',
-  caseControlNo: 'Control no.',
-  caseStatus: 'Status',
-  caseCategory: 'Category',
   safehouseId: 'Safehouse ID',
-  safehouseName: 'Safehouse',
+  caseStatus: 'Case status',
   sex: 'Sex',
-  assignedSocialWorker: 'Social worker',
-  dateOfAdmission: 'Admission date',
+  presentAge: 'Present age',
+  caseCategory: 'Case category',
+  dateOfAdmission: 'Date of admission',
+  lengthOfStay: 'Length of stay',
   reintegrationStatus: 'Reintegration status',
-  reintegrationType: 'Reintegration type',
+  currentRiskLevel: 'Current risk level',
+  assignedSocialWorker: 'Assigned social worker',
 }
 
 export function ResidentsPage() {
@@ -100,35 +100,45 @@ export function ResidentsPage() {
 
   const filteredSorted = useMemo(() => {
     let list = rows.filter((r) => {
-      const hay = `${r.internalCode} ${r.caseControlNo} ${r.caseCategory} ${r.caseStatus} ${r.safehouseName ?? ''} ${r.assignedSocialWorker ?? ''} ${r.reintegrationStatus ?? ''} ${r.reintegrationType ?? ''} ${r.sex} ${r.id} ${r.safehouseId} ${r.dateOfAdmission ?? ''}`.toLowerCase()
+      const hay = `${r.internalCode} ${r.caseControlNo} ${r.caseCategory} ${r.caseStatus} ${r.safehouseName ?? ''} ${r.assignedSocialWorker ?? ''} ${r.reintegrationStatus ?? ''} ${r.reintegrationType ?? ''} ${r.sex} ${r.id} ${r.safehouseId} ${r.dateOfAdmission ?? ''} ${r.presentAge ?? ''} ${r.lengthOfStay ?? ''} ${r.currentRiskLevel ?? ''}`.toLowerCase()
       if (q.trim() && !hay.includes(q.trim().toLowerCase())) return false
       if (!matchesColFilter(r.internalCode, colFilters.internalCode)) return false
-      if (!matchesColFilter(r.caseControlNo, colFilters.caseControlNo)) return false
-      if (!matchesColFilter(r.caseStatus, colFilters.caseStatus)) return false
-      if (!matchesColFilter(r.caseCategory, colFilters.caseCategory)) return false
       if (!matchesColFilter(r.safehouseId, colFilters.safehouseId)) return false
-      if (!matchesColFilter(r.safehouseName, colFilters.safehouseName)) return false
+      if (!matchesColFilter(r.caseStatus, colFilters.caseStatus)) return false
       if (!matchesColFilter(r.sex, colFilters.sex)) return false
-      if (!matchesColFilter(r.assignedSocialWorker, colFilters.assignedSocialWorker)) return false
+      if (!matchesColFilter(r.presentAge, colFilters.presentAge)) return false
+      if (!matchesColFilter(r.caseCategory, colFilters.caseCategory)) return false
       if (!matchesColFilter(r.dateOfAdmission, colFilters.dateOfAdmission)) return false
+      if (!matchesColFilter(r.lengthOfStay, colFilters.lengthOfStay)) return false
       if (!matchesColFilter(r.reintegrationStatus, colFilters.reintegrationStatus)) return false
-      if (!matchesColFilter(r.reintegrationType, colFilters.reintegrationType)) return false
+      if (!matchesColFilter(r.currentRiskLevel, colFilters.currentRiskLevel)) return false
+      if (!matchesColFilter(r.assignedSocialWorker, colFilters.assignedSocialWorker)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
       switch (key) {
         case 'internalCode':
           return row.internalCode
+        case 'safehouseId':
+          return row.safehouseId
         case 'caseStatus':
           return row.caseStatus
+        case 'sex':
+          return row.sex
+        case 'presentAge':
+          return row.presentAge ?? ''
         case 'caseCategory':
           return row.caseCategory
-        case 'safehouseName':
-          return row.safehouseName ?? ''
-        case 'assignedSocialWorker':
-          return row.assignedSocialWorker ?? ''
         case 'dateOfAdmission':
           return row.dateOfAdmission ?? ''
+        case 'lengthOfStay':
+          return row.lengthOfStay ?? ''
+        case 'reintegrationStatus':
+          return row.reintegrationStatus ?? ''
+        case 'currentRiskLevel':
+          return row.currentRiskLevel ?? ''
+        case 'assignedSocialWorker':
+          return row.assignedSocialWorker ?? ''
         default:
           return ''
       }
@@ -207,7 +217,7 @@ export function ResidentsPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-resident')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 7 : 6
+  const colCount = sbData ? 13 : 12
 
   return (
     <div className="space-y-8">
@@ -314,12 +324,17 @@ export function ResidentsPage() {
                     />
                   </th>
                 )}
-                <SortableTh label="Code" sortKey="internalCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Status" sortKey="caseStatus" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Category" sortKey="caseCategory" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="House" sortKey="safehouseName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Social worker" sortKey="assignedSocialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Internal code" sortKey="internalCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Safehouse ID" sortKey="safehouseId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Case status" sortKey="caseStatus" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Sex" sortKey="sex" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Present age" sortKey="presentAge" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Case category" sortKey="caseCategory" activeKey={sortKey} direction={sortDir} onSort={onSort} />
                 <SortableTh label="Admission" sortKey="dateOfAdmission" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Length of stay" sortKey="lengthOfStay" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Reintegration" sortKey="reintegrationStatus" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Risk level" sortKey="currentRiskLevel" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Social worker" sortKey="assignedSocialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               </tr>
             </thead>
             <tbody className={tableBody}>
@@ -348,13 +363,18 @@ export function ResidentsPage() {
                       </td>
                     )}
                     <td className="px-3 py-2 font-medium">{r.internalCode}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.safehouseId}</td>
                     <td className="px-3 py-2 text-muted-foreground">{r.caseStatus}</td>
+                    <td className="px-3 py-2 text-xs">{r.sex}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{r.presentAge ?? '—'}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{r.caseCategory}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{r.safehouseName ?? r.safehouseId}</td>
-                    <td className="px-3 py-2 text-xs">{r.assignedSocialWorker ?? '—'}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {r.dateOfAdmission ? new Date(r.dateOfAdmission).toLocaleDateString() : '—'}
                     </td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{r.lengthOfStay ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{r.reintegrationStatus ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{r.currentRiskLevel ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{r.assignedSocialWorker ?? '—'}</td>
                   </tr>
                 ))
               )}

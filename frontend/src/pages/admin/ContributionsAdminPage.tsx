@@ -29,48 +29,39 @@ import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirecti
 const moneyPhp = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'PHP' })
 
 type ColFilters = {
-  id: string
-  supporterDisplayName: string
+  donationDate: string
+  supporterId: string
   donationType: string
   amount: string
-  donationDate: string
+  currencyCode: string
   isRecurring: string
   campaignName: string
   channelSource: string
-  currencyCode: string
-  estimatedValue: string
   impactUnit: string
-  notes: string
 }
 
 const emptyFilters = (): ColFilters => ({
-  id: '',
-  supporterDisplayName: '',
+  donationDate: '',
+  supporterId: '',
   donationType: '',
   amount: '',
-  donationDate: '',
+  currencyCode: '',
   isRecurring: '',
   campaignName: '',
   channelSource: '',
-  currencyCode: '',
-  estimatedValue: '',
   impactUnit: '',
-  notes: '',
 })
 
 const FILTER_LABELS: Record<keyof ColFilters, string> = {
-  id: 'ID',
-  supporterDisplayName: 'Donor name',
-  donationType: 'Type',
+  donationDate: 'Donation date',
+  supporterId: 'Supporter ID',
+  donationType: 'Donation type',
   amount: 'Amount',
-  donationDate: 'Date',
+  currencyCode: 'Currency code',
   isRecurring: 'Recurring (yes/no)',
-  campaignName: 'Campaign',
-  channelSource: 'Channel',
-  currencyCode: 'Currency',
-  estimatedValue: 'Est. value',
+  campaignName: 'Campaign name',
+  channelSource: 'Channel source',
   impactUnit: 'Impact unit',
-  notes: 'Notes',
 }
 
 export function ContributionsAdminPage() {
@@ -116,34 +107,39 @@ export function ContributionsAdminPage() {
 
   const filteredSorted = useMemo(() => {
     let list = rows.filter((r) => {
-      const hay = `${r.supporterDisplayName} ${r.donationType} ${r.notes ?? ''} ${r.campaignName ?? ''} ${r.id} ${r.channelSource ?? ''}`.toLowerCase()
+      const hay = `${r.supporterDisplayName} ${r.donationType} ${r.notes ?? ''} ${r.campaignName ?? ''} ${r.id} ${r.supporterId} ${r.channelSource ?? ''} ${r.currencyCode ?? ''} ${r.impactUnit ?? ''}`.toLowerCase()
       if (q.trim() && !hay.includes(q.trim().toLowerCase())) return false
-      if (!matchesColFilter(r.id, colFilters.id)) return false
-      if (!matchesColFilter(r.supporterDisplayName, colFilters.supporterDisplayName)) return false
+      if (!matchesColFilter(r.donationDate, colFilters.donationDate)) return false
+      if (!matchesColFilter(r.supporterId, colFilters.supporterId)) return false
       if (!matchesColFilter(r.donationType, colFilters.donationType)) return false
       if (!matchesColFilter(r.amount, colFilters.amount)) return false
-      if (!matchesColFilter(r.donationDate, colFilters.donationDate)) return false
+      if (!matchesColFilter(r.currencyCode, colFilters.currencyCode)) return false
       if (!matchesColFilter(r.isRecurring, colFilters.isRecurring)) return false
       if (!matchesColFilter(r.campaignName, colFilters.campaignName)) return false
       if (!matchesColFilter(r.channelSource, colFilters.channelSource)) return false
-      if (!matchesColFilter(r.currencyCode, colFilters.currencyCode)) return false
-      if (!matchesColFilter(r.estimatedValue, colFilters.estimatedValue)) return false
       if (!matchesColFilter(r.impactUnit, colFilters.impactUnit)) return false
-      if (!matchesColFilter(r.notes, colFilters.notes)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
       switch (key) {
-        case 'id':
-          return row.id
-        case 'supporterDisplayName':
-          return row.supporterDisplayName
+        case 'donationDate':
+          return row.donationDate
+        case 'supporterId':
+          return row.supporterId
         case 'donationType':
           return row.donationType
         case 'amount':
           return row.amount ?? 0
-        case 'donationDate':
-          return row.donationDate
+        case 'currencyCode':
+          return row.currencyCode ?? ''
+        case 'isRecurring':
+          return row.isRecurring ? 1 : 0
+        case 'campaignName':
+          return row.campaignName ?? ''
+        case 'channelSource':
+          return row.channelSource ?? ''
+        case 'impactUnit':
+          return row.impactUnit ?? ''
         default:
           return ''
       }
@@ -243,7 +239,7 @@ export function ContributionsAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-contribution')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 8 : 6
+  const colCount = sbData ? 11 : 9
 
   return (
     <div className="space-y-8">
@@ -353,12 +349,15 @@ export function ContributionsAdminPage() {
                   />
                 </th>
               )}
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Donor" sortKey="supporterDisplayName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Donation date" sortKey="donationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Supporter ID" sortKey="supporterId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Type" sortKey="donationType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Amount" sortKey="amount" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Date" sortKey="donationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <th className="px-3 py-2">Notes</th>
+              <SortableTh label="Currency" sortKey="currencyCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Recurring" sortKey="isRecurring" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Campaign" sortKey="campaignName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Channel" sortKey="channelSource" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Impact unit" sortKey="impactUnit" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               {sbData && <th className="w-24 px-3 py-2">Edit</th>}
             </tr>
           </thead>
@@ -387,14 +386,19 @@ export function ContributionsAdminPage() {
                       <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
                     </td>
                   )}
-                  <td className="px-3 py-2 text-muted-foreground">{r.id}</td>
-                  <td className="px-3 py-2 font-medium text-primary">{r.supporterDisplayName}</td>
+                  <td className="px-3 py-2 text-xs">{new Date(r.donationDate).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.supporterId}</td>
                   <td className="px-3 py-2">{r.donationType}</td>
                   <td className="px-3 py-2">{moneyPhp.format(r.amount ?? 0)}</td>
-                  <td className="px-3 py-2 text-xs">{new Date(r.donationDate).toLocaleDateString()}</td>
-                  <td className="max-w-[200px] truncate px-3 py-2 text-xs text-muted-foreground" title={r.notes ?? ''}>
-                    {r.notes ?? '—'}
+                  <td className="px-3 py-2 text-xs">{r.currencyCode ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs">{r.isRecurring ? 'Yes' : 'No'}</td>
+                  <td className="max-w-[140px] truncate px-3 py-2 text-xs" title={r.campaignName ?? ''}>
+                    {r.campaignName ?? '—'}
                   </td>
+                  <td className="max-w-[120px] truncate px-3 py-2 text-xs text-muted-foreground" title={r.channelSource ?? ''}>
+                    {r.channelSource ?? '—'}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{r.impactUnit ?? '—'}</td>
                   {sbData && (
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...r })}>

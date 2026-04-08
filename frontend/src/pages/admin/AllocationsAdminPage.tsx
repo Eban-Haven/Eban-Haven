@@ -29,26 +29,28 @@ import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirecti
 const moneyPhp = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'PHP' })
 
 type ColFilters = {
-  id: string
+  allocationDate: string
   donationId: string
   safehouseId: string
-  safehouseName: string
   programArea: string
   amountAllocated: string
-  allocationDate: string
-  notes: string
 }
 
 const emptyFilters = (): ColFilters => ({
-  id: '',
+  allocationDate: '',
   donationId: '',
   safehouseId: '',
-  safehouseName: '',
   programArea: '',
   amountAllocated: '',
-  allocationDate: '',
-  notes: '',
 })
+
+const FILTER_LABELS: Record<keyof ColFilters, string> = {
+  allocationDate: 'Allocation date',
+  donationId: 'Donation ID',
+  safehouseId: 'Safehouse ID',
+  programArea: 'Program area',
+  amountAllocated: 'Amount allocated',
+}
 
 export function AllocationsAdminPage() {
   const sbData = useSupabaseForLighthouseData()
@@ -98,32 +100,27 @@ export function AllocationsAdminPage() {
 
   const filteredSorted = useMemo(() => {
     let list = rows.filter((r) => {
-      const hay = `${r.safehouseName ?? ''} ${r.programArea} ${r.notes ?? ''} ${r.donationId} ${r.safehouseId} ${r.id}`.toLowerCase()
+      const hay = `${r.safehouseName ?? ''} ${r.programArea} ${r.notes ?? ''} ${r.donationId} ${r.safehouseId} ${r.id} ${r.allocationDate}`.toLowerCase()
       if (q.trim() && !hay.includes(q.trim().toLowerCase())) return false
-      if (!matchesColFilter(r.id, colFilters.id)) return false
+      if (!matchesColFilter(r.allocationDate, colFilters.allocationDate)) return false
       if (!matchesColFilter(r.donationId, colFilters.donationId)) return false
       if (!matchesColFilter(r.safehouseId, colFilters.safehouseId)) return false
-      if (!matchesColFilter(r.safehouseName, colFilters.safehouseName)) return false
       if (!matchesColFilter(r.programArea, colFilters.programArea)) return false
       if (!matchesColFilter(r.amountAllocated, colFilters.amountAllocated)) return false
-      if (!matchesColFilter(r.allocationDate, colFilters.allocationDate)) return false
-      if (!matchesColFilter(r.notes, colFilters.notes)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
       switch (key) {
-        case 'id':
-          return row.id
+        case 'allocationDate':
+          return row.allocationDate
         case 'donationId':
           return row.donationId
-        case 'safehouseName':
-          return row.safehouseName ?? ''
+        case 'safehouseId':
+          return row.safehouseId
         case 'programArea':
           return row.programArea
         case 'amountAllocated':
           return row.amountAllocated
-        case 'allocationDate':
-          return row.allocationDate
         default:
           return ''
       }
@@ -225,7 +222,7 @@ export function AllocationsAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-allocation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 8 : 6
+  const colCount = sbData ? 7 : 6
 
   return (
     <div className="space-y-8">
@@ -265,7 +262,7 @@ export function AllocationsAdminPage() {
           <p className="text-sm font-medium sm:col-span-2 lg:col-span-3">Filter by column (contains)</p>
           {(Object.keys(colFilters) as (keyof ColFilters)[]).map((k) => (
             <label key={k} className={label}>
-              {k === 'donationId' ? 'Donation ID' : k === 'safehouseId' ? 'Safehouse ID' : k === 'amountAllocated' ? 'Amount' : k === 'allocationDate' ? 'Date' : k === 'programArea' ? 'Program' : k.charAt(0).toUpperCase() + k.slice(1)}
+              {FILTER_LABELS[k]}
               <input
                 className={input}
                 value={colFilters[k]}
@@ -339,12 +336,11 @@ export function AllocationsAdminPage() {
                   />
                 </th>
               )}
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <th className="px-3 py-2">Donation</th>
-              <SortableTh label="Safehouse" sortKey="safehouseName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Program" sortKey="programArea" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Amount" sortKey="amountAllocated" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Date" sortKey="allocationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Allocation date" sortKey="allocationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Donation ID" sortKey="donationId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Safehouse ID" sortKey="safehouseId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Program area" sortKey="programArea" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Amount allocated" sortKey="amountAllocated" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               {sbData && <th className="w-24 px-3 py-2">Edit</th>}
             </tr>
           </thead>
@@ -373,25 +369,24 @@ export function AllocationsAdminPage() {
                       <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
                     </td>
                   )}
-                  <td className="px-3 py-2 text-muted-foreground">{r.id}</td>
-                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-3 py-2 text-xs">{new Date(r.allocationDate).toLocaleDateString()}</td>
+                  <td className="px-3 py-2 font-mono text-xs" onClick={(e) => e.stopPropagation()}>
                     <Link className="text-primary hover:underline" to="/admin/contributions">
-                      #{r.donationId}
+                      {r.donationId}
                     </Link>
                     {donationSupporter.get(r.donationId) != null && (
-                      <span className="ml-2 text-xs text-muted-foreground">
+                      <span className="ml-2 text-muted-foreground">
                         (
                         <Link className="hover:underline" to={`/admin/donors/${donationSupporter.get(r.donationId)!}`}>
-                          donor
+                          profile
                         </Link>
                         )
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs">{r.safehouseName ?? r.safehouseId}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.safehouseId}</td>
                   <td className="px-3 py-2">{r.programArea}</td>
                   <td className="px-3 py-2">{moneyPhp.format(r.amountAllocated)}</td>
-                  <td className="px-3 py-2 text-xs">{new Date(r.allocationDate).toLocaleDateString()}</td>
                   {sbData && (
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...r })}>

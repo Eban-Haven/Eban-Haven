@@ -252,6 +252,7 @@ export async function getSupporters(): Promise<T.Supporter[]> {
       status: gs(s, 'status'),
       firstDonationDate: nullIfEmpty(gs(s, 'first_donation_date')),
       acquisitionChannel: nullIfEmpty(gs(s, 'acquisition_channel')),
+      relationshipType: nullIfEmpty(gs(s, 'relationship_type')),
     }))
 }
 
@@ -480,6 +481,9 @@ export async function getResidents(params: {
     dateOfAdmission: nullIfEmpty(gs(r, 'date_of_admission')),
     reintegrationStatus: nullIfEmpty(gs(r, 'reintegration_status')),
     reintegrationType: nullIfEmpty(gs(r, 'reintegration_type')),
+    presentAge: nullIfEmpty(gs(r, 'present_age')),
+    lengthOfStay: nullIfEmpty(gs(r, 'length_of_stay')),
+    currentRiskLevel: nullIfEmpty(gs(r, 'current_risk_level')),
   }))
 }
 

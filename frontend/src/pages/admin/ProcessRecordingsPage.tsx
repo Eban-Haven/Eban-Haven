@@ -31,57 +31,36 @@ import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirecti
 const sessionTypes = ['Individual', 'Group'] as const
 
 type ColFilters = {
-  id: string
-  residentId: string
-  residentInternalCode: string
   sessionDate: string
+  residentId: string
   socialWorker: string
   sessionType: string
   sessionDurationMinutes: string
   emotionalStateObserved: string
-  emotionalStateEnd: string
-  sessionNarrative: string
-  interventionsApplied: string
-  followUpActions: string
   progressNoted: string
   concernsFlagged: string
-  referralMade: string
 }
 
 const emptyFilters = (): ColFilters => ({
-  id: '',
-  residentId: '',
-  residentInternalCode: '',
   sessionDate: '',
+  residentId: '',
   socialWorker: '',
   sessionType: '',
   sessionDurationMinutes: '',
   emotionalStateObserved: '',
-  emotionalStateEnd: '',
-  sessionNarrative: '',
-  interventionsApplied: '',
-  followUpActions: '',
   progressNoted: '',
   concernsFlagged: '',
-  referralMade: '',
 })
 
 const FILTER_LABELS: Record<keyof ColFilters, string> = {
-  id: 'Recording ID',
-  residentId: 'Resident ID',
-  residentInternalCode: 'Resident code',
   sessionDate: 'Session date',
+  residentId: 'Resident ID',
   socialWorker: 'Social worker',
   sessionType: 'Session type',
-  sessionDurationMinutes: 'Duration (min)',
-  emotionalStateObserved: 'Emotion (start)',
-  emotionalStateEnd: 'Emotion (end)',
-  sessionNarrative: 'Narrative',
-  interventionsApplied: 'Interventions',
-  followUpActions: 'Follow-up',
+  sessionDurationMinutes: 'Session duration (minutes)',
+  emotionalStateObserved: 'Emotional state observed',
   progressNoted: 'Progress noted (yes/no)',
-  concernsFlagged: 'Concerns (yes/no)',
-  referralMade: 'Referral (yes/no)',
+  concernsFlagged: 'Concerns flagged (yes/no)',
 }
 
 export function ProcessRecordingsPage() {
@@ -137,39 +116,36 @@ export function ProcessRecordingsPage() {
 
   const filteredSorted = useMemo(() => {
     let list = rows.filter((r) => {
-      const hay = `${r.residentInternalCode} ${r.sessionType} ${r.socialWorker} ${r.sessionNarrative} ${r.interventionsApplied ?? ''} ${r.followUpActions ?? ''} ${r.id}`.toLowerCase()
+      const hay = `${r.residentInternalCode} ${r.sessionType} ${r.socialWorker} ${r.sessionNarrative} ${r.interventionsApplied ?? ''} ${r.followUpActions ?? ''} ${r.id} ${r.residentId}`.toLowerCase()
       if (search.trim() && !hay.includes(search.trim().toLowerCase())) return false
-      if (!matchesColFilter(r.id, colFilters.id)) return false
-      if (!matchesColFilter(r.residentId, colFilters.residentId)) return false
-      if (!matchesColFilter(r.residentInternalCode, colFilters.residentInternalCode)) return false
       if (!matchesColFilter(r.sessionDate, colFilters.sessionDate)) return false
+      if (!matchesColFilter(r.residentId, colFilters.residentId)) return false
       if (!matchesColFilter(r.socialWorker, colFilters.socialWorker)) return false
       if (!matchesColFilter(r.sessionType, colFilters.sessionType)) return false
       if (!matchesColFilter(r.sessionDurationMinutes, colFilters.sessionDurationMinutes)) return false
       if (!matchesColFilter(r.emotionalStateObserved, colFilters.emotionalStateObserved)) return false
-      if (!matchesColFilter(r.emotionalStateEnd, colFilters.emotionalStateEnd)) return false
-      if (!matchesColFilter(r.sessionNarrative, colFilters.sessionNarrative)) return false
-      if (!matchesColFilter(r.interventionsApplied, colFilters.interventionsApplied)) return false
-      if (!matchesColFilter(r.followUpActions, colFilters.followUpActions)) return false
       if (!matchesColFilter(r.progressNoted, colFilters.progressNoted)) return false
       if (!matchesColFilter(r.concernsFlagged, colFilters.concernsFlagged)) return false
-      if (!matchesColFilter(r.referralMade, colFilters.referralMade)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
       switch (key) {
-        case 'id':
-          return row.id
-        case 'residentInternalCode':
-          return row.residentInternalCode
         case 'sessionDate':
           return row.sessionDate
+        case 'residentId':
+          return row.residentId
         case 'socialWorker':
           return row.socialWorker
         case 'sessionType':
           return row.sessionType
         case 'sessionDurationMinutes':
           return row.sessionDurationMinutes ?? 0
+        case 'emotionalStateObserved':
+          return row.emotionalStateObserved ?? ''
+        case 'progressNoted':
+          return row.progressNoted ? 1 : 0
+        case 'concernsFlagged':
+          return row.concernsFlagged ? 1 : 0
         default:
           return ''
       }
@@ -256,7 +232,7 @@ export function ProcessRecordingsPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-process')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 8 : 7
+  const colCount = sbData ? 9 : 8
 
   return (
     <div className="space-y-8">
@@ -399,13 +375,14 @@ export function ProcessRecordingsPage() {
                     />
                   </th>
                 )}
-                <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Resident" sortKey="residentInternalCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Date" sortKey="sessionDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Type" sortKey="sessionType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Worker" sortKey="socialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <SortableTh label="Min" sortKey="sessionDurationMinutes" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-                <th className="px-3 py-2">Narrative</th>
+                <SortableTh label="Session date" sortKey="sessionDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Resident ID" sortKey="residentId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Social worker" sortKey="socialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Session type" sortKey="sessionType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Duration (min)" sortKey="sessionDurationMinutes" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Emotional state" sortKey="emotionalStateObserved" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Progress noted" sortKey="progressNoted" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+                <SortableTh label="Concerns flagged" sortKey="concernsFlagged" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               </tr>
             </thead>
             <tbody className={tableBody}>
@@ -433,15 +410,16 @@ export function ProcessRecordingsPage() {
                         <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
                       </td>
                     )}
-                    <td className="px-3 py-2 text-muted-foreground">{r.id}</td>
-                    <td className="px-3 py-2 font-medium text-primary">{r.residentInternalCode}</td>
                     <td className="px-3 py-2 text-xs">{new Date(r.sessionDate).toLocaleDateString()}</td>
-                    <td className="px-3 py-2">{r.sessionType}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.residentId}</td>
                     <td className="px-3 py-2 text-xs">{r.socialWorker}</td>
+                    <td className="px-3 py-2">{r.sessionType}</td>
                     <td className="px-3 py-2 text-xs">{r.sessionDurationMinutes ?? '—'}</td>
-                    <td className="max-w-[240px] truncate px-3 py-2 text-xs text-muted-foreground" title={r.sessionNarrative}>
-                      {r.sessionNarrative}
+                    <td className="max-w-[160px] truncate px-3 py-2 text-xs text-muted-foreground" title={r.emotionalStateObserved ?? ''}>
+                      {r.emotionalStateObserved ?? '—'}
                     </td>
+                    <td className="px-3 py-2 text-xs">{r.progressNoted ? 'Yes' : 'No'}</td>
+                    <td className="px-3 py-2 text-xs">{r.concernsFlagged ? 'Yes' : 'No'}</td>
                   </tr>
                 ))
               )}

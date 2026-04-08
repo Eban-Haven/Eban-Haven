@@ -120,7 +120,8 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 NullIfEmpty(s.Phone),
                 s.Status,
                 NullIfEmpty(s.FirstDonationDate),
-                NullIfEmpty(s.AcquisitionChannel)))
+                NullIfEmpty(s.AcquisitionChannel),
+                NullIfEmpty(s.RelationshipType)))
             .ToList();
     }
 
@@ -264,7 +265,10 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 NullIfEmpty(r.AssignedSocialWorker),
                 NullIfEmpty(r.DateOfAdmission),
                 NullIfEmpty(r.ReintegrationStatus),
-                NullIfEmpty(r.ReintegrationType)))
+                NullIfEmpty(r.ReintegrationType),
+                NullIfEmpty(r.PresentAge),
+                NullIfEmpty(r.LengthOfStay),
+                NullIfEmpty(r.CurrentRiskLevel)))
             .ToList();
     }
 

@@ -39,37 +39,31 @@ const supporterTypes = [
 type ColFilters = {
   displayName: string
   supporterType: string
+  relationshipType: string
   email: string
-  phone: string
   region: string
-  country: string
   status: string
-  organizationName: string
-  acquisitionChannel: string
+  firstDonationDate: string
 }
 
 const emptyColFilters = (): ColFilters => ({
   displayName: '',
   supporterType: '',
+  relationshipType: '',
   email: '',
-  phone: '',
   region: '',
-  country: '',
   status: '',
-  organizationName: '',
-  acquisitionChannel: '',
+  firstDonationDate: '',
 })
 
 const COL_LABELS: Record<keyof ColFilters, string> = {
-  displayName: 'Name',
-  supporterType: 'Type',
+  displayName: 'Display name',
+  supporterType: 'Supporter type',
+  relationshipType: 'Relationship type',
   email: 'Email',
-  phone: 'Phone',
   region: 'Region',
-  country: 'Country',
   status: 'Status',
-  organizationName: 'Organization',
-  acquisitionChannel: 'Acquisition channel',
+  firstDonationDate: 'First donation date',
 }
 
 export function DonorsAdminPage() {
@@ -115,17 +109,15 @@ export function DonorsAdminPage() {
 
   const filteredSorted = useMemo(() => {
     let list = rows.filter((s) => {
-      const hay = `${s.displayName} ${s.email ?? ''} ${s.supporterType} ${s.region ?? ''} ${s.phone ?? ''} ${s.country ?? ''} ${s.status} ${s.organizationName ?? ''} ${s.acquisitionChannel ?? ''} ${s.firstName ?? ''} ${s.lastName ?? ''}`.toLowerCase()
+      const hay = `${s.displayName} ${s.email ?? ''} ${s.supporterType} ${s.relationshipType ?? ''} ${s.region ?? ''} ${s.phone ?? ''} ${s.country ?? ''} ${s.status} ${s.organizationName ?? ''} ${s.acquisitionChannel ?? ''} ${s.firstName ?? ''} ${s.lastName ?? ''} ${s.firstDonationDate ?? ''}`.toLowerCase()
       if (q.trim() && !hay.includes(q.trim().toLowerCase())) return false
       if (!matchesColFilter(s.displayName, colFilters.displayName)) return false
       if (!matchesColFilter(s.supporterType, colFilters.supporterType)) return false
+      if (!matchesColFilter(s.relationshipType, colFilters.relationshipType)) return false
       if (!matchesColFilter(s.email, colFilters.email)) return false
-      if (!matchesColFilter(s.phone, colFilters.phone)) return false
       if (!matchesColFilter(s.region, colFilters.region)) return false
-      if (!matchesColFilter(s.country, colFilters.country)) return false
       if (!matchesColFilter(s.status, colFilters.status)) return false
-      if (!matchesColFilter(s.organizationName, colFilters.organizationName)) return false
-      if (!matchesColFilter(s.acquisitionChannel, colFilters.acquisitionChannel)) return false
+      if (!matchesColFilter(s.firstDonationDate, colFilters.firstDonationDate)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
@@ -134,20 +126,16 @@ export function DonorsAdminPage() {
           return row.displayName
         case 'supporterType':
           return row.supporterType
+        case 'relationshipType':
+          return row.relationshipType ?? ''
         case 'email':
           return row.email ?? ''
-        case 'phone':
-          return row.phone ?? ''
         case 'region':
           return row.region ?? ''
-        case 'country':
-          return row.country ?? ''
         case 'status':
           return row.status
-        case 'organizationName':
-          return row.organizationName ?? ''
-        case 'acquisitionChannel':
-          return row.acquisitionChannel ?? ''
+        case 'firstDonationDate':
+          return row.firstDonationDate ?? ''
         default:
           return ''
       }
@@ -246,6 +234,7 @@ export function DonorsAdminPage() {
         organization_name: edit.organizationName ?? '',
         first_name: edit.firstName ?? '',
         last_name: edit.lastName ?? '',
+        relationship_type: edit.relationshipType ?? '',
         region: edit.region ?? '',
         country: edit.country ?? '',
         email: edit.email ?? '',
@@ -269,7 +258,7 @@ export function DonorsAdminPage() {
     })
   }
 
-  const colCount = sbData ? 6 : 4
+  const colCount = sbData ? 10 : 8
 
   return (
     <div className="space-y-8">
@@ -413,10 +402,13 @@ export function DonorsAdminPage() {
                   />
                 </th>
               )}
-              <SortableTh label="Name" sortKey="displayName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Type" sortKey="supporterType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Display name" sortKey="displayName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Supporter type" sortKey="supporterType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Relationship" sortKey="relationshipType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Email" sortKey="email" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Region" sortKey="region" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="First donation" sortKey="firstDonationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               {sbData && <th className="w-24 px-3 py-2">Edit</th>}
             </tr>
           </thead>
@@ -452,8 +444,17 @@ export function DonorsAdminPage() {
                   )}
                   <td className="px-3 py-2 font-medium">{s.displayName}</td>
                   <td className="px-3 py-2 text-muted-foreground">{s.supporterType}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{s.relationshipType ?? '—'}</td>
                   <td className="px-3 py-2 text-xs">{s.email ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{s.region ?? '—'}</td>
                   <td className="px-3 py-2 text-xs">{s.status}</td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {s.firstDonationDate
+                      ? /^\d{4}-\d{2}-\d{2}/.test(s.firstDonationDate)
+                        ? new Date(s.firstDonationDate).toLocaleDateString()
+                        : s.firstDonationDate
+                      : '—'}
+                  </td>
                   {sbData && (
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...s })}>
@@ -477,6 +478,7 @@ export function DonorsAdminPage() {
                 [
                   ['displayName', 'Display name'],
                   ['supporterType', 'Type'],
+                  ['relationshipType', 'Relationship type'],
                   ['email', 'Email'],
                   ['phone', 'Phone'],
                   ['organizationName', 'Organization'],

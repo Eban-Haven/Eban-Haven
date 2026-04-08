@@ -39,57 +39,36 @@ const visitTypes = [
 const coopLevels = ['Highly Cooperative', 'Cooperative', 'Neutral', 'Uncooperative', ''] as const
 
 type ColFilters = {
-  id: string
-  residentId: string
-  residentInternalCode: string
   visitDate: string
+  residentId: string
   socialWorker: string
   visitType: string
   locationVisited: string
-  familyMembersPresent: string
-  purpose: string
-  observations: string
   familyCooperationLevel: string
   safetyConcernsNoted: string
-  followUpNeeded: string
-  followUpNotes: string
   visitOutcome: string
 }
 
 const emptyFilters = (): ColFilters => ({
-  id: '',
-  residentId: '',
-  residentInternalCode: '',
   visitDate: '',
+  residentId: '',
   socialWorker: '',
   visitType: '',
   locationVisited: '',
-  familyMembersPresent: '',
-  purpose: '',
-  observations: '',
   familyCooperationLevel: '',
   safetyConcernsNoted: '',
-  followUpNeeded: '',
-  followUpNotes: '',
   visitOutcome: '',
 })
 
 const FILTER_LABELS: Record<keyof ColFilters, string> = {
-  id: 'Visit ID',
-  residentId: 'Resident ID',
-  residentInternalCode: 'Resident code',
   visitDate: 'Visit date',
+  residentId: 'Resident ID',
   socialWorker: 'Social worker',
   visitType: 'Visit type',
-  locationVisited: 'Location',
-  familyMembersPresent: 'Family present',
-  purpose: 'Purpose',
-  observations: 'Observations',
-  familyCooperationLevel: 'Cooperation',
-  safetyConcernsNoted: 'Safety concern (yes/no)',
-  followUpNeeded: 'Follow-up needed (yes/no)',
-  followUpNotes: 'Follow-up notes',
-  visitOutcome: 'Outcome',
+  locationVisited: 'Location visited',
+  familyCooperationLevel: 'Family cooperation level',
+  safetyConcernsNoted: 'Safety concerns noted (yes/no)',
+  visitOutcome: 'Visit outcome',
 }
 
 export function HomeVisitationsAdminPage() {
@@ -141,39 +120,34 @@ export function HomeVisitationsAdminPage() {
 
   const filteredSorted = useMemo(() => {
     let list = visits.filter((v) => {
-      const hay = `${v.residentInternalCode} ${v.visitType} ${v.socialWorker} ${v.locationVisited ?? ''} ${v.observations ?? ''} ${v.visitOutcome ?? ''} ${v.id}`.toLowerCase()
+      const hay = `${v.residentInternalCode} ${v.visitType} ${v.socialWorker} ${v.locationVisited ?? ''} ${v.observations ?? ''} ${v.visitOutcome ?? ''} ${v.id} ${v.residentId}`.toLowerCase()
       if (q.trim() && !hay.includes(q.trim().toLowerCase())) return false
-      if (!matchesColFilter(v.id, colFilters.id)) return false
-      if (!matchesColFilter(v.residentId, colFilters.residentId)) return false
-      if (!matchesColFilter(v.residentInternalCode, colFilters.residentInternalCode)) return false
       if (!matchesColFilter(v.visitDate, colFilters.visitDate)) return false
+      if (!matchesColFilter(v.residentId, colFilters.residentId)) return false
       if (!matchesColFilter(v.socialWorker, colFilters.socialWorker)) return false
       if (!matchesColFilter(v.visitType, colFilters.visitType)) return false
       if (!matchesColFilter(v.locationVisited, colFilters.locationVisited)) return false
-      if (!matchesColFilter(v.familyMembersPresent, colFilters.familyMembersPresent)) return false
-      if (!matchesColFilter(v.purpose, colFilters.purpose)) return false
-      if (!matchesColFilter(v.observations, colFilters.observations)) return false
       if (!matchesColFilter(v.familyCooperationLevel, colFilters.familyCooperationLevel)) return false
       if (!matchesColFilter(v.safetyConcernsNoted, colFilters.safetyConcernsNoted)) return false
-      if (!matchesColFilter(v.followUpNeeded, colFilters.followUpNeeded)) return false
-      if (!matchesColFilter(v.followUpNotes, colFilters.followUpNotes)) return false
       if (!matchesColFilter(v.visitOutcome, colFilters.visitOutcome)) return false
       return true
     })
     list = sortRows(list, sortKey, sortDir, (row, key) => {
       switch (key) {
-        case 'id':
-          return row.id
         case 'visitDate':
           return row.visitDate
-        case 'residentInternalCode':
-          return row.residentInternalCode
-        case 'visitType':
-          return row.visitType
+        case 'residentId':
+          return row.residentId
         case 'socialWorker':
           return row.socialWorker
+        case 'visitType':
+          return row.visitType
         case 'locationVisited':
           return row.locationVisited ?? ''
+        case 'familyCooperationLevel':
+          return row.familyCooperationLevel ?? ''
+        case 'safetyConcernsNoted':
+          return row.safetyConcernsNoted ? 1 : 0
         case 'visitOutcome':
           return row.visitOutcome ?? ''
         default:
@@ -261,7 +235,7 @@ export function HomeVisitationsAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-visitation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 8 : 7
+  const colCount = sbData ? 9 : 8
 
   return (
     <div className="space-y-8">
@@ -404,12 +378,13 @@ export function HomeVisitationsAdminPage() {
                   />
                 </th>
               )}
-              <SortableTh label="ID" sortKey="id" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Date" sortKey="visitDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Resident" sortKey="residentInternalCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="Type" sortKey="visitType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              <SortableTh label="SW" sortKey="socialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Visit date" sortKey="visitDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Resident ID" sortKey="residentId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Social worker" sortKey="socialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Visit type" sortKey="visitType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Location" sortKey="locationVisited" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Cooperation" sortKey="familyCooperationLevel" activeKey={sortKey} direction={sortDir} onSort={onSort} />
+              <SortableTh label="Safety concerns" sortKey="safetyConcernsNoted" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Outcome" sortKey="visitOutcome" activeKey={sortKey} direction={sortDir} onSort={onSort} />
             </tr>
           </thead>
@@ -438,13 +413,18 @@ export function HomeVisitationsAdminPage() {
                       <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleSelect(v.id)} aria-label={`Select ${v.id}`} />
                     </td>
                   )}
-                  <td className="px-4 py-3 text-muted-foreground">{v.id}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{new Date(v.visitDate).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 font-medium text-primary">{v.residentInternalCode}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(v.visitDate).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{v.residentId}</td>
+                  <td className="px-4 py-3 text-sm">{v.socialWorker}</td>
                   <td className="px-4 py-3">{v.visitType}</td>
-                  <td className="px-4 py-3">{v.socialWorker}</td>
                   <td className="px-4 py-3 text-muted-foreground">{v.locationVisited ?? '—'}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{v.visitOutcome ?? '—'}</td>
+                  <td className="max-w-[140px] truncate px-4 py-3 text-xs text-muted-foreground" title={v.familyCooperationLevel ?? ''}>
+                    {v.familyCooperationLevel ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-xs">{v.safetyConcernsNoted ? 'Yes' : 'No'}</td>
+                  <td className="max-w-[160px] truncate px-4 py-3 text-xs text-muted-foreground" title={v.visitOutcome ?? ''}>
+                    {v.visitOutcome ?? '—'}
+                  </td>
                 </tr>
               ))
             )}

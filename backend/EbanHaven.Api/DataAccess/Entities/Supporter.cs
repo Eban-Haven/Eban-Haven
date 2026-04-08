@@ -17,5 +17,6 @@ public sealed class Supporter
     [Column("status")] public string Status { get; set; } = "";
     [Column("first_donation_date")] public string? FirstDonationDate { get; set; }
     [Column("acquisition_channel")] public string? AcquisitionChannel { get; set; }
+    [Column("relationship_type")] public string? RelationshipType { get; set; }
 }
 

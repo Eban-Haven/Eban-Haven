@@ -225,7 +225,10 @@ public sealed class LighthouseDataStore
                     string.IsNullOrWhiteSpace(GetStr(r, "assigned_social_worker")) ? null : GetStr(r, "assigned_social_worker"),
                     string.IsNullOrWhiteSpace(GetStr(r, "date_of_admission")) ? null : GetStr(r, "date_of_admission"),
                     string.IsNullOrWhiteSpace(GetStr(r, "reintegration_status")) ? null : GetStr(r, "reintegration_status"),
-                    string.IsNullOrWhiteSpace(GetStr(r, "reintegration_type")) ? null : GetStr(r, "reintegration_type")))
+                    string.IsNullOrWhiteSpace(GetStr(r, "reintegration_type")) ? null : GetStr(r, "reintegration_type"),
+                    string.IsNullOrWhiteSpace(GetStr(r, "present_age")) ? null : GetStr(r, "present_age"),
+                    string.IsNullOrWhiteSpace(GetStr(r, "length_of_stay")) ? null : GetStr(r, "length_of_stay"),
+                    string.IsNullOrWhiteSpace(GetStr(r, "current_risk_level")) ? null : GetStr(r, "current_risk_level")))
                 .OrderByDescending(x => x.Id)
                 .ToList();
         }
@@ -315,7 +318,8 @@ public sealed class LighthouseDataStore
                     string.IsNullOrWhiteSpace(GetStr(s, "phone")) ? null : GetStr(s, "phone"),
                     GetStr(s, "status"),
                     string.IsNullOrWhiteSpace(GetStr(s, "first_donation_date")) ? null : GetStr(s, "first_donation_date"),
-                    string.IsNullOrWhiteSpace(GetStr(s, "acquisition_channel")) ? null : GetStr(s, "acquisition_channel")))
+                    string.IsNullOrWhiteSpace(GetStr(s, "acquisition_channel")) ? null : GetStr(s, "acquisition_channel"),
+                    string.IsNullOrWhiteSpace(GetStr(s, "relationship_type")) ? null : GetStr(s, "relationship_type")))
                 .ToList();
         }
     }
