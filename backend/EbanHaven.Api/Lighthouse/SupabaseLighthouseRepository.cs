@@ -505,8 +505,8 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             .ToList();
 
         var activeResidentsBySafehouse = db.Residents
-            .Where(r => r.CaseStatus.ToLower() == "active" && r.SafehouseId != null)
-            .GroupBy(r => r.SafehouseId!.Value)
+            .Where(r => r.CaseStatus.ToLower() == "active")
+            .GroupBy(r => r.SafehouseId)
             .Select(g => new { SafehouseId = g.Key, Count = g.Count() })
             .ToDictionary(x => x.SafehouseId, x => x.Count);
 
