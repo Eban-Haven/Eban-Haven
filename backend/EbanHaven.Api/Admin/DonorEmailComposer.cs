@@ -417,19 +417,28 @@ public sealed class DonorEmailComposer(
         return $"""
 <!doctype html>
 <html>
-  <body style="margin:0;padding:0;background:#f4efe8;font-family:Georgia,'Times New Roman',serif;">
+  <body style="margin:0;padding:0;background:#f5f1ea;font-family:Georgia,'Times New Roman',serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{EscapeHtml(preview)}</div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4efe8;padding:24px 0;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1ea;padding:28px 0;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fffdf9;border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(61,47,32,.12);">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fffdf9;border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(61,47,32,.10);">
             <tr>
-              <td style="background:linear-gradient(135deg,#114b5f 0%,#1f7a8c 55%,#f2c14e 100%);padding:28px 36px;">
-                <img src="{heroImageUrl}" alt="Eban Haven" style="display:block;width:120px;max-width:120px;height:auto;margin-bottom:18px;" />
-                <div style="color:#fff7ec;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-family:Arial,sans-serif;">Eban Haven</div>
-                <h1 style="margin:10px 0 0;color:white;font-size:30px;line-height:1.2;font-weight:700;">{EscapeHtml(subject)}</h1>
-                <p style="margin:12px 0 0;color:rgba(255,247,236,.9);font-size:15px;line-height:1.6;font-family:Arial,sans-serif;">{EscapeHtml(preview)}</p>
+              <td style="background:#184e5d;padding:24px 34px 0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td style="padding-bottom:22px;">
+                      <img src="{heroImageUrl}" alt="Eban Haven" style="display:block;width:78px;max-width:78px;height:auto;margin-bottom:18px;border-radius:22px;background:rgba(255,255,255,.08);padding:10px;" />
+                      <div style="color:#d8e7e3;font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-family:Arial,sans-serif;">Eban Haven</div>
+                      <h1 style="margin:12px 0 0;color:#ffffff;font-size:34px;line-height:1.15;font-weight:700;max-width:520px;">{EscapeHtml(subject)}</h1>
+                      <p style="margin:14px 0 0;color:#d3e2de;font-size:15px;line-height:1.7;font-family:Arial,sans-serif;max-width:520px;">{EscapeHtml(preview)}</p>
+                    </td>
+                  </tr>
+                </table>
               </td>
+            </tr>
+            <tr>
+              <td style="background:#e7d6c3;height:10px;line-height:10px;font-size:0;">&nbsp;</td>
             </tr>
             <tr>
               <td style="padding:36px;">

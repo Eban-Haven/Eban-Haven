@@ -93,6 +93,7 @@ export function EmailHubPage() {
   const [sendResult, setSendResult] = useState<SentDonorEmail | null>(null)
   const [copyState, setCopyState] = useState<'subject' | 'body' | 'html' | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [showComposerSettings, setShowComposerSettings] = useState(false)
   const [previewMode, setPreviewMode] = useState<'plain' | 'rich'>('rich')
   const [signature, setSignature] = useState<SignatureFields>(() => loadStoredSignature())
   const [recipientEmail, setRecipientEmail] = useState('')
@@ -220,19 +221,14 @@ export function EmailHubPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h2 className={`${pageTitle} flex items-center gap-2`}>
-            <Mail className="h-7 w-7 text-primary" />
-            Email hub
-          </h2>
-          <p className={pageDesc}>
-            Review donor history, generate a tailored outreach email, and open a ready-to-send draft from the admin tools area.
-          </p>
-        </div>
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground lg:max-w-sm">
-          Drafts now use cleaner plain-text formatting and your own sender signature details.
-        </div>
+      <div>
+        <h2 className={`${pageTitle} flex items-center gap-2`}>
+          <Mail className="h-7 w-7 text-primary" />
+          Email hub
+        </h2>
+        <p className={pageDesc}>
+          Review donor history, generate a tailored outreach email, and open a ready-to-send draft from the admin tools area.
+        </p>
       </div>
 
       {error && <div className={alertError}>{error}</div>}
@@ -436,7 +432,11 @@ export function EmailHubPage() {
                     <button
                       key={preset}
                       type="button"
-                      className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/50"
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        goal === preset
+                          ? 'border-primary/60 bg-primary/15 text-foreground shadow-sm'
+                          : 'border-border bg-background text-muted-foreground hover:bg-muted/50'
+                      }`}
                       onClick={() => setGoal(preset)}
                     >
                       {preset}
@@ -460,18 +460,6 @@ export function EmailHubPage() {
                     </select>
                   </label>
 
-                  <label className={`${label} flex items-center gap-3 pt-6 text-sm text-foreground`}>
-                    <input
-                      type="checkbox"
-                      checked={preferAi}
-                      onChange={(event) => setPreferAi(event.target.checked)}
-                      className="h-4 w-4 rounded border-border"
-                    />
-                    Try AI first, then fall back to template
-                  </label>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
                   <label className={label}>
                     Send to
                     <input
@@ -481,41 +469,74 @@ export function EmailHubPage() {
                       placeholder="donor@example.org"
                     />
                   </label>
-                  <label className={label}>
-                    Sender name
-                    <input
-                      className={input}
-                      value={signature.senderName}
-                      onChange={(event) => updateSignature('senderName', event.target.value)}
-                      placeholder="Your name"
+                </div>
+
+                <div className="overflow-hidden rounded-xl border border-border bg-muted/20">
+                  <button
+                    type="button"
+                    onClick={() => setShowComposerSettings((current) => !current)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Signature & AI settings</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Sender details and generation fallback behavior.</p>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${showComposerSettings ? 'rotate-180' : ''}`}
                     />
-                  </label>
-                  <label className={label}>
-                    Sender title
-                    <input
-                      className={input}
-                      value={signature.senderTitle}
-                      onChange={(event) => updateSignature('senderTitle', event.target.value)}
-                      placeholder="Development Director"
-                    />
-                  </label>
-                  <label className={label}>
-                    Organization
-                    <input
-                      className={input}
-                      value={signature.senderOrganization}
-                      onChange={(event) => updateSignature('senderOrganization', event.target.value)}
-                    />
-                  </label>
-                  <label className={label}>
-                    Contact line
-                    <input
-                      className={input}
-                      value={signature.senderContact}
-                      onChange={(event) => updateSignature('senderContact', event.target.value)}
-                      placeholder="Email or phone"
-                    />
-                  </label>
+                  </button>
+
+                  {showComposerSettings && (
+                    <div className="border-t border-border bg-background px-4 py-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className={label}>
+                          Sender name
+                          <input
+                            className={input}
+                            value={signature.senderName}
+                            onChange={(event) => updateSignature('senderName', event.target.value)}
+                            placeholder="Your name"
+                          />
+                        </label>
+                        <label className={label}>
+                          Sender title
+                          <input
+                            className={input}
+                            value={signature.senderTitle}
+                            onChange={(event) => updateSignature('senderTitle', event.target.value)}
+                            placeholder="Development Director"
+                          />
+                        </label>
+                        <label className={label}>
+                          Organization
+                          <input
+                            className={input}
+                            value={signature.senderOrganization}
+                            onChange={(event) => updateSignature('senderOrganization', event.target.value)}
+                          />
+                        </label>
+                        <label className={label}>
+                          Contact line
+                          <input
+                            className={input}
+                            value={signature.senderContact}
+                            onChange={(event) => updateSignature('senderContact', event.target.value)}
+                            placeholder="Email or phone"
+                          />
+                        </label>
+                      </div>
+
+                      <label className={`${label} mt-4 flex items-center gap-3 text-sm text-foreground`}>
+                        <input
+                          type="checkbox"
+                          checked={preferAi}
+                          onChange={(event) => setPreferAi(event.target.checked)}
+                          className="h-4 w-4 rounded border-border"
+                        />
+                        Try AI first, then fall back to template
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
