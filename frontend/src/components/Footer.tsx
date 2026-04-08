@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Heart } from 'lucide-react'
 import { PUBLIC_CONTACT, SITE_DISPLAY_NAME, SOCIAL_LINKS } from '../site'
+import { SiteLogoMark } from './SiteLogoMark'
 
 function IconFacebook({ className }: { className?: string }) {
   return (
@@ -44,9 +44,7 @@ export function Footer() {
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           <div>
             <Link to="/" className="mb-4 inline-flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Heart className="h-4 w-4 fill-current text-primary-foreground" />
-              </div>
+              <SiteLogoMark className="h-8 max-w-[10rem] sm:h-9 sm:max-w-[11rem]" />
               <span className="font-heading text-lg font-semibold">{SITE_DISPLAY_NAME}</span>
             </Link>
             <p className="text-sm leading-relaxed text-muted-foreground">

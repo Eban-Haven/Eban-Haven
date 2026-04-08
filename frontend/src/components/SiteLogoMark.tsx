@@ -1,6 +1,4 @@
-/**
- * Horizontal brand mark for header / admin shell only (not footer or inline icons).
- */
+/** Horizontal brand mark (same asset as the main nav). */
 export function SiteLogoMark({ className }: { className?: string }) {
   return (
     <img
