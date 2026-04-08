@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { GitBranch } from 'lucide-react'
 import { getSupporters, type Supporter } from '../../../api/admin'
 import { alertError, btnPrimary, card, input, label, pageDesc, pageTitle } from '../shared/adminStyles'
+import { AtRiskDonors } from '../../../components/ml/AtRiskDonors'
 
 type Stage = 'prospect' | 'donor' | 'inactive'
 
@@ -101,6 +102,8 @@ export function DonorPipelinePage() {
       </div>
 
       {error && <div className={alertError}>{error}</div>}
+
+      <AtRiskDonors />
 
       <div className={`${card} max-w-md`}>
         <label className={label}>

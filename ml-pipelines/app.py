@@ -110,36 +110,49 @@ def predict_reintegration(features: ResidentFeatures):
 # ── Donor Churn ────────────────────────────────────────────────────────────────
 
 class DonorFeatures(BaseModel):
-    supporter_id:             Optional[int]  = None
-    supporter_type:           str
-    total_donations:          float          = Field(..., ge=0)
-    total_amount_php:         float          = Field(..., ge=0)
-    months_since_last_gift:   float          = Field(..., ge=0)
-    avg_gift_amount:          float          = Field(..., ge=0)
-    donation_frequency:       float          = Field(..., ge=0)
-    is_recurring:             float          = Field(..., ge=0.0, le=1.0)
-    num_campaigns:            float          = Field(..., ge=0)
-    channel_diversity:        float          = Field(..., ge=0)
+    supporter_id              : Optional[int]   = None
+    days_since_last_donation  : float           = Field(..., ge=0)
+    days_since_first_donation : float           = Field(..., ge=0)
+    days_since_joined         : float           = Field(..., ge=0)
+    total_donations           : float           = Field(..., ge=0)
+    pct_recurring             : float           = Field(..., ge=0.0, le=1.0)
+    avg_days_between_donations: Optional[float] = Field(None, ge=0)
+    total_amount              : float           = Field(..., ge=0)
+    avg_amount                : float           = Field(..., ge=0)
+    max_amount                : float           = Field(..., ge=0)
+    amount_trend              : float           = Field(0.0)
+    acquisition_channel       : str
+    supporter_type            : str
+    relationship_type         : str
 
 class DonorChurnResponse(BaseModel):
-    supporter_id:      Optional[int]
-    churn_probability: float
-    prediction:        str
-    risk_tier:         str
-    threshold_used:    float
+    supporter_id      : Optional[int]
+    churn_probability : float
+    prediction        : str
+    risk_tier         : str
+    threshold_used    : float
+    top_risk_signals  : list[str]
 
-@app.post("/predict/donor-churn", response_model=DonorChurnResponse)
-def predict_churn(features: DonorFeatures):
+def _churn_risk_signals(f: DonorFeatures) -> list[str]:
+    signals = []
+    if f.days_since_last_donation > 365:
+        signals.append("high_recency")
+    if f.pct_recurring == 0.0:
+        signals.append("zero_recurring")
+    if f.amount_trend < 0:
+        signals.append("negative_trend")
+    if f.total_donations <= 1:
+        signals.append("one_time_only")
+    return signals
+
+def _score_churn(features: DonorFeatures) -> DonorChurnResponse:
     threshold = _churn_meta["best_threshold"]
-    try:
-        row  = features.model_dump()
-        df   = pd.DataFrame([row])[_churn_meta["feature_columns"]]
-        prob = float(_churn_model.predict_proba(df)[0, 1])
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    row  = features.model_dump()
+    df   = pd.DataFrame([row])[_churn_meta["feature_columns"]]
+    prob = float(_churn_model.predict_proba(df)[0, 1])
 
-    prediction = "Likely to Churn" if prob >= threshold else "Likely to Retain"
-    risk_tier  = "High Risk" if prob >= 0.70 else ("Moderate Risk" if prob >= threshold else "Low Risk")
+    prediction = "At Risk" if prob >= threshold else "Stable"
+    risk_tier  = "High Risk" if prob >= 0.75 else ("Moderate Risk" if prob >= threshold else "Low Risk")
 
     return DonorChurnResponse(
         supporter_id=features.supporter_id,
@@ -147,4 +160,37 @@ def predict_churn(features: DonorFeatures):
         prediction=prediction,
         risk_tier=risk_tier,
         threshold_used=round(threshold, 4),
+        top_risk_signals=_churn_risk_signals(features),
     )
+
+@app.post("/predict/donor-churn", response_model=DonorChurnResponse)
+def predict_churn(features: DonorFeatures):
+    try:
+        return _score_churn(features)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+@app.post("/predict/donor-churn-batch", response_model=list[DonorChurnResponse])
+def predict_churn_batch(features_list: list[DonorFeatures]):
+    """Score multiple supporters in one call. Caller filters by threshold/limit."""
+    if not features_list:
+        return []
+    try:
+        rows  = [f.model_dump() for f in features_list]
+        df    = pd.DataFrame(rows)[_churn_meta["feature_columns"]]
+        probs = _churn_model.predict_proba(df)[:, 1]
+        return [
+            DonorChurnResponse(
+                supporter_id=f.supporter_id,
+                churn_probability=round(float(p), 4),
+                prediction="At Risk" if float(p) >= _churn_meta["best_threshold"] else "Stable",
+                risk_tier="High Risk" if float(p) >= 0.75 else (
+                    "Moderate Risk" if float(p) >= _churn_meta["best_threshold"] else "Low Risk"
+                ),
+                threshold_used=round(_churn_meta["best_threshold"], 4),
+                top_risk_signals=_churn_risk_signals(f),
+            )
+            for f, p in zip(features_list, probs)
+        ]
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))

@@ -49,6 +49,13 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddScoped<ISocialChatContextService, SocialChatContextService>();
 builder.Services.AddScoped<ISocialChatService, OpenAISocialChatService>();
 
+builder.Services.AddHttpClient("MlService", client =>
+{
+    var baseUrl = builder.Configuration["MlService:BaseUrl"] ?? "http://localhost:8000";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout     = TimeSpan.FromSeconds(30);
+});
+
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
