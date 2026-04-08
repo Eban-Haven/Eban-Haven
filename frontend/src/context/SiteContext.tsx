@@ -7,8 +7,6 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
-import { useSupabaseForLighthouseData } from '../lib/useSupabaseLighthouse'
 import { apiFetch } from '../api/client'
 import { DEFAULT_SITE_NAME } from '../site'
 
@@ -26,24 +24,6 @@ export function SiteProvider({ children }: { children: ReactNode }) {
   })
 
   const load = useCallback(async () => {
-    if (useSupabaseForLighthouseData() && isSupabaseConfigured()) {
-      try {
-        const { data, error } = await getSupabase()
-          .from('lighthouse_site_settings')
-          .select('name,description')
-          .eq('id', 1)
-          .maybeSingle()
-        if (!error && data) {
-          setInfo({
-            name: data.name?.trim() || DEFAULT_SITE_NAME,
-            description: data.description ?? null,
-          })
-          return
-        }
-      } catch {
-        /* fall through to API / defaults */
-      }
-    }
     try {
       const res = await apiFetch('/api/site')
       if (!res.ok) return

@@ -23,7 +23,6 @@ import {
   type CreateSupporterBody,
   type Supporter,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -67,7 +66,6 @@ const COL_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function DonorsAdminPage() {
-  const sbData = useSupabaseForLighthouseData()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Supporter[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -177,7 +175,7 @@ export function DonorsAdminPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     const names = filteredSorted.filter((s) => selected.has(s.id)).map((s) => s.displayName)
     if (
       !confirm(
@@ -224,7 +222,7 @@ export function DonorsAdminPage() {
   }
 
   async function saveEdit() {
-    if (!edit || !sbData) return
+    if (!edit) return
     setSaving(true)
     setError(null)
     try {
@@ -258,7 +256,7 @@ export function DonorsAdminPage() {
     })
   }
 
-  const colCount = sbData ? 10 : 8
+  const colCount = 10
 
   return (
     <div className="space-y-8">
@@ -282,7 +280,7 @@ export function DonorsAdminPage() {
         addLabel="Add donor"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -392,7 +390,7 @@ export function DonorsAdminPage() {
         <table className="w-full text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              {sbData && (
+              
                 <th className="w-10 px-2 py-2">
                   <input
                     type="checkbox"
@@ -401,7 +399,7 @@ export function DonorsAdminPage() {
                     onChange={() => toggleSelectAll()}
                   />
                 </th>
-              )}
+              
               <SortableTh label="Display name" sortKey="displayName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Supporter type" sortKey="supporterType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Relationship" sortKey="relationshipType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
@@ -409,7 +407,7 @@ export function DonorsAdminPage() {
               <SortableTh label="Region" sortKey="region" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Status" sortKey="status" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="First donation" sortKey="firstDonationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              {sbData && <th className="w-24 px-3 py-2">Edit</th>}
+              <th className="w-24 px-3 py-2">Edit</th>
             </tr>
           </thead>
           <tbody className={tableBody}>
@@ -432,7 +430,7 @@ export function DonorsAdminPage() {
                   className={`${tableRowHover} cursor-pointer`}
                   onClick={() => navigate(`/admin/donors/${s.id}`)}
                 >
-                  {sbData && (
+                  
                     <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
@@ -441,7 +439,7 @@ export function DonorsAdminPage() {
                         onChange={() => toggleSelect(s.id)}
                       />
                     </td>
-                  )}
+                  
                   <td className="px-3 py-2 font-medium">{s.displayName}</td>
                   <td className="px-3 py-2 text-muted-foreground">{s.supporterType}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{s.relationshipType ?? '—'}</td>
@@ -455,13 +453,13 @@ export function DonorsAdminPage() {
                         : s.firstDonationDate
                       : '—'}
                   </td>
-                  {sbData && (
+                  
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...s })}>
                         Edit
                       </button>
                     </td>
-                  )}
+                  
                 </tr>
               ))
             )}

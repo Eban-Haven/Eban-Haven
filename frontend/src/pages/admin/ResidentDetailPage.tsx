@@ -30,14 +30,11 @@ import {
   type JsonTableRow,
   type ResidentDetail,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
-
 type Tab = 'overview' | 'process' | 'visits' | 'education' | 'health' | 'plans' | 'incidents'
 
 export function ResidentDetailPage() {
   const { id: idParam } = useParams()
   const id = Number(idParam)
-  const sbData = useSupabaseForLighthouseData()
 
   const [tab, setTab] = useState<Tab>('overview')
   const [detail, setDetail] = useState<ResidentDetail | null>(null)
@@ -72,8 +69,8 @@ export function ResidentDetailPage() {
       setProc(p)
       setVis(v)
       setPlans(pl)
-      setEdu(e)
-      setHl(h)
+      setEdu(e.map(r => ({ id: r.id, fields: { residentId: String(r.residentId), recordDate: r.recordDate, progressPercent: String(r.progressPercent ?? '') } })))
+      setHl(h.map(r => ({ id: r.id, fields: { residentId: String(r.residentId), recordDate: r.recordDate, healthScore: String(r.healthScore ?? '') } })))
       setInc(i)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
@@ -133,12 +130,6 @@ export function ResidentDetailPage() {
         </div>
       </div>
 
-      {!sbData && (
-        <p className="rounded-lg border border-border bg-muted/40 px-4 py-2 text-sm text-muted-foreground">
-          Education, health, and incident lists and edits require Supabase data mode (VITE_USE_SUPABASE_DATA=true).
-        </p>
-      )}
-
       {error && <div className={alertError}>{error}</div>}
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-2">
@@ -191,7 +182,7 @@ export function ResidentDetailPage() {
         <JsonRowsTab
           title="Education records"
           rows={edu}
-          sbData={sbData}
+
           onPatch={async (rowId, f) => {
             await patchEducationRecord(rowId, f)
             await load()
@@ -206,7 +197,7 @@ export function ResidentDetailPage() {
         <JsonRowsTab
           title="Health & wellbeing"
           rows={hl}
-          sbData={sbData}
+
           onPatch={async (rowId, f) => {
             await patchHealthRecord(rowId, f)
             await load()
@@ -225,7 +216,7 @@ export function ResidentDetailPage() {
         <div className="space-y-3">
           {plans.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No intervention plans yet. Add one from <strong>Admin → Case conferences</strong> (Supabase data mode), or import data.
+              No intervention plans yet. Add one from <strong>Admin → Case conferences</strong>.
             </p>
           ) : (
             plans.map((p) => (
@@ -245,7 +236,7 @@ export function ResidentDetailPage() {
         <JsonRowsTab
           title="Incident reports"
           rows={inc}
-          sbData={sbData}
+
           onPatch={async (rowId, f) => {
             await patchIncidentReport(rowId, f)
             await load()
@@ -431,14 +422,12 @@ function VisitsTab({
 function JsonRowsTab({
   title,
   rows,
-  sbData,
   onPatch,
   onAdd,
   defaults,
 }: {
   title: string
   rows: JsonTableRow[]
-  sbData: boolean
   onPatch: (id: number, f: Record<string, string | null | undefined>) => Promise<void>
   onAdd: (f: Record<string, string>) => Promise<void>
   defaults: Record<string, string>
@@ -446,9 +435,7 @@ function JsonRowsTab({
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState(defaults)
 
-  if (!sbData) {
-    return <p className="text-sm text-muted-foreground">No rows (enable Supabase data mode to manage {title}).</p>
-  }
+
 
   return (
     <div className="space-y-4">

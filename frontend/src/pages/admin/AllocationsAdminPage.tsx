@@ -22,7 +22,6 @@ import {
   patchAllocationFields,
   type DonationAllocation,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -53,7 +52,6 @@ const FILTER_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function AllocationsAdminPage() {
-  const sbData = useSupabaseForLighthouseData()
   const [rows, setRows] = useState<DonationAllocation[]>([])
   const [donations, setDonations] = useState<Awaited<ReturnType<typeof getDonations>>>([])
   const [error, setError] = useState<string | null>(null)
@@ -155,7 +153,7 @@ export function AllocationsAdminPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} allocation(s)? This cannot be undone.`)) return
     setSaving(true)
     setError(null)
@@ -176,18 +174,13 @@ export function AllocationsAdminPage() {
     e.preventDefault()
     const n = parseFloat(amt)
     if (!donId || !Number.isFinite(n)) return
-    if (!sbData) {
-      setError('Allocations require Supabase data mode.')
-      return
-    }
     setSaving(true)
     setError(null)
     try {
       await createAllocation({
         donationId: donId,
         safehouseId: shId,
-        programArea: prog,
-        amountAllocated: n,
+        amount: n,
       })
       setAmt('')
       setAddOpen(false)
@@ -200,7 +193,7 @@ export function AllocationsAdminPage() {
   }
 
   async function saveEdit() {
-    if (!edit || !sbData) return
+    if (!edit) return
     setSaving(true)
     try {
       await patchAllocationFields(edit.id, {
@@ -222,15 +215,14 @@ export function AllocationsAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-allocation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 7 : 6
+  const colCount = 7
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className={pageTitle}>Allocations</h2>
         <p className={pageDesc}>
-          Filter by any column; click a row to edit. Donation ID links to the contributions list. Bulk delete requires
-          Supabase.
+          Filter by any column; click a row to edit. Donation ID links to the contributions list.
         </p>
       </div>
       {error && <div className={alertError}>{error}</div>}
@@ -245,7 +237,7 @@ export function AllocationsAdminPage() {
         addLabel="Add allocation"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -285,40 +277,33 @@ export function AllocationsAdminPage() {
               Close
             </button>
           </div>
-          {!sbData ? (
-            <p className="text-sm text-muted-foreground">
-              Adding allocations requires Supabase program data. Set <code className="rounded bg-muted px-1">VITE_USE_SUPABASE_DATA=true</code> and apply
-              lighthouse migrations.
-            </p>
-          ) : (
-            <form onSubmit={onCreate} className="flex flex-wrap items-end gap-3">
-              <label className={label}>
-                Donation id
-                <select className={input} value={donId} onChange={(e) => setDonId(Number(e.target.value))}>
-                  {donations.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      #{d.id} — {d.supporterDisplayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className={label}>
-                Safehouse id
-                <input type="number" className={input} value={shId} onChange={(e) => setShId(Number(e.target.value))} />
-              </label>
-              <label className={label}>
-                Program area
-                <input className={input} value={prog} onChange={(e) => setProg(e.target.value)} />
-              </label>
-              <label className={label}>
-                Amount
-                <input className={input} value={amt} onChange={(e) => setAmt(e.target.value)} />
-              </label>
-              <button type="submit" disabled={saving} className={btnPrimary}>
-                Add allocation
-              </button>
-            </form>
-          )}
+          <form onSubmit={onCreate} className="flex flex-wrap items-end gap-3">
+            <label className={label}>
+              Donation id
+              <select className={input} value={donId} onChange={(e) => setDonId(Number(e.target.value))}>
+                {donations.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    #{d.id} — {d.supporterDisplayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={label}>
+              Safehouse id
+              <input type="number" className={input} value={shId} onChange={(e) => setShId(Number(e.target.value))} />
+            </label>
+            <label className={label}>
+              Program area
+              <input className={input} value={prog} onChange={(e) => setProg(e.target.value)} />
+            </label>
+            <label className={label}>
+              Amount
+              <input className={input} value={amt} onChange={(e) => setAmt(e.target.value)} />
+            </label>
+            <button type="submit" disabled={saving} className={btnPrimary}>
+              Add allocation
+            </button>
+          </form>
         </div>
       )}
 
@@ -326,22 +311,20 @@ export function AllocationsAdminPage() {
         <table className="w-full text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              {sbData && (
-                <th className="w-10 px-2 py-2">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all"
-                    checked={filteredSorted.length > 0 && filteredSorted.every((r) => selected.has(r.id))}
-                    onChange={() => toggleSelectAll()}
-                  />
-                </th>
-              )}
+              <th className="w-10 px-2 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={filteredSorted.length > 0 && filteredSorted.every((r) => selected.has(r.id))}
+                  onChange={() => toggleSelectAll()}
+                />
+              </th>
               <SortableTh label="Allocation date" sortKey="allocationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Donation ID" sortKey="donationId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Safehouse ID" sortKey="safehouseId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Program area" sortKey="programArea" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Amount allocated" sortKey="amountAllocated" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              {sbData && <th className="w-24 px-3 py-2">Edit</th>}
+              <th className="w-24 px-3 py-2">Edit</th>
             </tr>
           </thead>
           <tbody className={tableBody}>
@@ -361,14 +344,12 @@ export function AllocationsAdminPage() {
               filteredSorted.map((r) => (
                 <tr
                   key={r.id}
-                  className={`${tableRowHover} ${sbData ? 'cursor-pointer' : ''}`}
-                  onClick={() => sbData && setEdit({ ...r })}
+                  className={`${tableRowHover} cursor-pointer`}
+                  onClick={() => setEdit({ ...r })}
                 >
-                  {sbData && (
-                    <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
-                    </td>
-                  )}
+                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
+                  </td>
                   <td className="px-3 py-2 text-xs">{new Date(r.allocationDate).toLocaleDateString()}</td>
                   <td className="px-3 py-2 font-mono text-xs" onClick={(e) => e.stopPropagation()}>
                     <Link className="text-primary hover:underline" to="/admin/contributions">
@@ -387,13 +368,11 @@ export function AllocationsAdminPage() {
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.safehouseId}</td>
                   <td className="px-3 py-2">{r.programArea}</td>
                   <td className="px-3 py-2">{moneyPhp.format(r.amountAllocated)}</td>
-                  {sbData && (
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...r })}>
-                        Edit
-                      </button>
-                    </td>
-                  )}
+                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...r })}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -401,7 +380,7 @@ export function AllocationsAdminPage() {
         </table>
       </div>
 
-      {edit && sbData && (
+      {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
           <div className={`${card} w-full max-w-md space-y-2`}>
             <label className={label}>

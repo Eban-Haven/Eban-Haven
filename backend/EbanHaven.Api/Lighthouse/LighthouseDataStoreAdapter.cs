@@ -32,6 +32,26 @@ public sealed class LighthouseDataStoreAdapter(LighthouseDataStore inner) : ILig
         inner.CreateHomeVisitation(residentId, visitDate, socialWorker, visitType, locationVisited, observations, familyCooperation,
             safetyConcerns, followUpNeeded, followUpNotes);
     public IReadOnlyList<InterventionPlanDto> ListInterventionPlans(int? residentId) => inner.ListInterventionPlans(residentId);
+
+    public bool DeleteSupporter(int id) => throw new NotImplementedException();
+    public SupporterDto? PatchSupporterFields(int id, IReadOnlyDictionary<string, string?> fields) => throw new NotImplementedException();
+    public bool DeleteDonation(int id) => throw new NotImplementedException();
+    public DonationDto? PatchDonationFields(int id, IReadOnlyDictionary<string, string?> fields) => throw new NotImplementedException();
+    public DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes) => throw new NotImplementedException();
+    public DonationAllocationDto? PatchAllocationFields(int id, IReadOnlyDictionary<string, string?> fields) => throw new NotImplementedException();
+    public bool DeleteAllocation(int id) => throw new NotImplementedException();
+    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status, DateOnly? targetDate, DateOnly? caseConferenceDate) => throw new NotImplementedException();
+    public bool DeleteInterventionPlan(int id) => throw new NotImplementedException();
+    public bool DeleteResident(int id) => throw new NotImplementedException();
+    public bool DeleteProcessRecording(int id) => throw new NotImplementedException();
+    public bool DeleteHomeVisitation(int id) => throw new NotImplementedException();
+    public IReadOnlyList<EducationRecordDto> ListEducationRecords(int? residentId) => throw new NotImplementedException();
+    public EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent) => throw new NotImplementedException();
+    public EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate) => throw new NotImplementedException();
+    public IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId) => throw new NotImplementedException();
+    public HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore) => throw new NotImplementedException();
+    public HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate) => throw new NotImplementedException();
+
     public ReportsSummaryDto GetReportsSummary() => inner.GetReportsSummary();
     public PublicImpactSummaryDto GetPublicImpactSummary() => inner.GetPublicImpactSummary();
     public IReadOnlyList<PublicImpactSnapshotDto> GetPublishedSnapshots() => inner.GetPublishedSnapshots();

@@ -617,6 +617,243 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             .ToList();
     }
 
+    public bool DeleteSupporter(int id)
+    {
+        var row = db.Supporters.FirstOrDefault(x => x.SupporterId == id);
+        if (row is null) return false;
+        db.Supporters.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public SupporterDto? PatchSupporterFields(int id, IReadOnlyDictionary<string, string?> fields)
+    {
+        var row = db.Supporters.FirstOrDefault(x => x.SupporterId == id);
+        if (row is null) return null;
+        foreach (var (k, v) in fields)
+        {
+            if (v is null) continue;
+            switch (k.ToLowerInvariant())
+            {
+                case "display_name": row.DisplayName = v; break;
+                case "email": row.Email = v; break;
+                case "region": row.Region = v; break;
+                case "status": row.Status = v; break;
+                case "supporter_type": row.SupporterType = v; break;
+                case "country": row.Country = v; break;
+            }
+        }
+        db.SaveChanges();
+        return ListSupporters().FirstOrDefault(x => x.Id == id);
+    }
+
+    public bool DeleteDonation(int id)
+    {
+        var row = db.Donations.FirstOrDefault(x => x.DonationId == id);
+        if (row is null) return false;
+        db.Donations.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public DonationDto? PatchDonationFields(int id, IReadOnlyDictionary<string, string?> fields)
+    {
+        var row = db.Donations.FirstOrDefault(x => x.DonationId == id);
+        if (row is null) return null;
+        foreach (var (k, v) in fields)
+        {
+            if (v is null) continue;
+            switch (k.ToLowerInvariant())
+            {
+                case "donation_type": row.DonationType = v; break;
+                case "campaign_name": row.CampaignName = v; break;
+                case "currency_code": row.CurrencyCode = v; break;
+                case "notes": row.Notes = v; break;
+                case "amount":
+                    if (decimal.TryParse(v, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var amt))
+                        row.Amount = amt;
+                    break;
+            }
+        }
+        db.SaveChanges();
+        return ListDonations(null).FirstOrDefault(x => x.Id == id);
+    }
+
+    public DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes)
+    {
+        var row = new DonationAllocation
+        {
+            DonationId = donationId,
+            SafehouseId = safehouseId,
+            AmountAllocated = amount ?? 0m,
+            AllocationNotes = notes,
+            ProgramArea = "General",
+            AllocationDate = DateOnly.FromDateTime(DateTime.UtcNow),
+        };
+        db.DonationAllocations.Add(row);
+        db.SaveChanges();
+        return ListAllocations(donationId, null).First(x => x.Id == row.AllocationId);
+    }
+
+    public DonationAllocationDto? PatchAllocationFields(int id, IReadOnlyDictionary<string, string?> fields)
+    {
+        var row = db.DonationAllocations.FirstOrDefault(x => x.AllocationId == id);
+        if (row is null) return null;
+        foreach (var (k, v) in fields)
+        {
+            if (v is null) continue;
+            switch (k.ToLowerInvariant())
+            {
+                case "program_area": row.ProgramArea = v; break;
+                case "allocation_notes": row.AllocationNotes = v; break;
+                case "amount_allocated":
+                    if (decimal.TryParse(v, System.Globalization.NumberStyles.Any, CultureInfo.InvariantCulture, out var amt))
+                        row.AmountAllocated = amt;
+                    break;
+            }
+        }
+        db.SaveChanges();
+        return ListAllocations(null, null).FirstOrDefault(x => x.Id == id);
+    }
+
+    public bool DeleteAllocation(int id)
+    {
+        var row = db.DonationAllocations.FirstOrDefault(x => x.AllocationId == id);
+        if (row is null) return false;
+        db.DonationAllocations.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status, DateOnly? targetDate, DateOnly? caseConferenceDate)
+    {
+        var now = DateTime.UtcNow;
+        var row = new InterventionPlan
+        {
+            ResidentId = residentId,
+            PlanCategory = planCategory,
+            PlanDescription = planDescription,
+            Status = string.IsNullOrWhiteSpace(status) ? "In Progress" : status,
+            TargetDate = targetDate,
+            CaseConferenceDate = caseConferenceDate,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        db.InterventionPlans.Add(row);
+        db.SaveChanges();
+        return ListInterventionPlans(residentId).First(x => x.Id == row.PlanId);
+    }
+
+    public bool DeleteInterventionPlan(int id)
+    {
+        var row = db.InterventionPlans.FirstOrDefault(x => x.PlanId == id);
+        if (row is null) return false;
+        db.InterventionPlans.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public bool DeleteResident(int id)
+    {
+        var row = db.Residents.FirstOrDefault(x => x.ResidentId == id);
+        if (row is null) return false;
+        db.Residents.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public bool DeleteProcessRecording(int id)
+    {
+        var row = db.ProcessRecordings.FirstOrDefault(x => x.RecordingId == id);
+        if (row is null) return false;
+        db.ProcessRecordings.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public bool DeleteHomeVisitation(int id)
+    {
+        var row = db.HomeVisitations.FirstOrDefault(x => x.VisitationId == id);
+        if (row is null) return false;
+        db.HomeVisitations.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
+    public IReadOnlyList<EducationRecordDto> ListEducationRecords(int? residentId)
+    {
+        IQueryable<EducationRecord> q = db.EducationRecords;
+        if (residentId is > 0) q = q.Where(e => e.ResidentId == residentId.Value);
+        return q
+            .OrderByDescending(e => e.RecordDate)
+            .Select(e => new EducationRecordDto(
+                e.EducationRecordId,
+                e.ResidentId,
+                e.RecordDate.ToString("yyyy-MM-dd"),
+                e.ProgressPercent))
+            .ToList();
+    }
+
+    public EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent)
+    {
+        var row = new EducationRecord
+        {
+            ResidentId = residentId,
+            RecordDate = recordDate,
+            ProgressPercent = progressPercent,
+        };
+        db.EducationRecords.Add(row);
+        db.SaveChanges();
+        return new EducationRecordDto(row.EducationRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.ProgressPercent);
+    }
+
+    public EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate)
+    {
+        var row = db.EducationRecords.FirstOrDefault(x => x.EducationRecordId == id);
+        if (row is null) return null;
+        if (progressPercent.HasValue) row.ProgressPercent = progressPercent.Value;
+        if (recordDate.HasValue) row.RecordDate = recordDate.Value;
+        db.SaveChanges();
+        return new EducationRecordDto(row.EducationRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.ProgressPercent);
+    }
+
+    public IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId)
+    {
+        IQueryable<HealthWellbeingRecord> q = db.HealthWellbeingRecords;
+        if (residentId is > 0) q = q.Where(h => h.ResidentId == residentId.Value);
+        return q
+            .OrderByDescending(h => h.RecordDate)
+            .Select(h => new HealthRecordDto(
+                h.HealthRecordId,
+                h.ResidentId,
+                h.RecordDate.ToString("yyyy-MM-dd"),
+                h.GeneralHealthScore))
+            .ToList();
+    }
+
+    public HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore)
+    {
+        var row = new HealthWellbeingRecord
+        {
+            ResidentId = residentId,
+            RecordDate = recordDate,
+            GeneralHealthScore = healthScore,
+        };
+        db.HealthWellbeingRecords.Add(row);
+        db.SaveChanges();
+        return new HealthRecordDto(row.HealthRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.GeneralHealthScore);
+    }
+
+    public HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate)
+    {
+        var row = db.HealthWellbeingRecords.FirstOrDefault(x => x.HealthRecordId == id);
+        if (row is null) return null;
+        if (healthScore.HasValue) row.GeneralHealthScore = healthScore.Value;
+        if (recordDate.HasValue) row.RecordDate = recordDate.Value;
+        db.SaveChanges();
+        return new HealthRecordDto(row.HealthRecordId, row.ResidentId, row.RecordDate.ToString("yyyy-MM-dd"), row.GeneralHealthScore);
+    }
+
     private ServicePillarCountsDto CountPillarKeywords()
     {
         var caring = 0;

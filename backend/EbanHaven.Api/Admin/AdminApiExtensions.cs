@@ -225,6 +225,116 @@ public static class AdminApiExtensions
                 return Results.BadRequest(new { error = ex.Message });
             }
         });
+
+        // ── New REST endpoints replacing Supabase-only paths ─────────────────────
+
+        admin.MapDelete("/supporters/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteSupporter(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapPatch("/supporters/{id:int}/fields", (int id, IReadOnlyDictionary<string, string?> body, ILighthouseRepository repo) =>
+        {
+            var u = repo.PatchSupporterFields(id, body);
+            return u is null ? Results.NotFound() : Results.Ok(u);
+        });
+
+        admin.MapDelete("/donations/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteDonation(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapPatch("/donations/{id:int}/fields", (int id, IReadOnlyDictionary<string, string?> body, ILighthouseRepository repo) =>
+        {
+            var u = repo.PatchDonationFields(id, body);
+            return u is null ? Results.NotFound() : Results.Ok(u);
+        });
+
+        admin.MapPost("/donation-allocations", (CreateAllocationRequest body, ILighthouseRepository repo) =>
+        {
+            if (body.DonationId <= 0) return Results.BadRequest(new { error = "DonationId is required." });
+            if (body.SafehouseId <= 0) return Results.BadRequest(new { error = "SafehouseId is required." });
+            var created = repo.CreateAllocation(body.DonationId, body.SafehouseId, body.Amount, body.Notes);
+            return Results.Created($"/api/admin/donation-allocations/{created.Id}", created);
+        });
+
+        admin.MapPatch("/donation-allocations/{id:int}", (int id, IReadOnlyDictionary<string, string?> body, ILighthouseRepository repo) =>
+        {
+            var u = repo.PatchAllocationFields(id, body);
+            return u is null ? Results.NotFound() : Results.Ok(u);
+        });
+
+        admin.MapDelete("/donation-allocations/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteAllocation(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapPost("/intervention-plans", (CreateInterventionPlanRequest body, ILighthouseRepository repo) =>
+        {
+            if (body.ResidentId <= 0) return Results.BadRequest(new { error = "ResidentId is required." });
+            if (string.IsNullOrWhiteSpace(body.PlanCategory)) return Results.BadRequest(new { error = "PlanCategory is required." });
+            if (string.IsNullOrWhiteSpace(body.PlanDescription)) return Results.BadRequest(new { error = "PlanDescription is required." });
+            DateOnly? targetDate = null;
+            if (!string.IsNullOrWhiteSpace(body.TargetDate) && DateOnly.TryParse(body.TargetDate, out var td)) targetDate = td;
+            DateOnly? confDate = null;
+            if (!string.IsNullOrWhiteSpace(body.CaseConferenceDate) && DateOnly.TryParse(body.CaseConferenceDate, out var cd)) confDate = cd;
+            var created = repo.CreateInterventionPlan(
+                body.ResidentId,
+                body.PlanCategory.Trim(),
+                body.PlanDescription.Trim(),
+                body.Status?.Trim(),
+                targetDate,
+                confDate);
+            return Results.Created($"/api/admin/intervention-plans/{created.Id}", created);
+        });
+
+        admin.MapDelete("/intervention-plans/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteInterventionPlan(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapDelete("/residents/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteResident(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapDelete("/process-recordings/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteProcessRecording(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapDelete("/home-visitations/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteHomeVisitation(id) ? Results.NoContent() : Results.NotFound());
+
+        admin.MapGet("/education-records", (int? residentId, ILighthouseRepository repo) =>
+            Results.Ok(repo.ListEducationRecords(residentId)));
+
+        admin.MapPost("/education-records", (CreateEducationRecordRequest body, ILighthouseRepository repo) =>
+        {
+            if (body.ResidentId <= 0) return Results.BadRequest(new { error = "ResidentId is required." });
+            var date = body.RecordDate.HasValue
+                ? body.RecordDate.Value
+                : DateOnly.FromDateTime(DateTime.UtcNow);
+            var created = repo.CreateEducationRecord(body.ResidentId, date, body.ProgressPercent);
+            return Results.Created($"/api/admin/education-records/{created.Id}", created);
+        });
+
+        admin.MapPatch("/education-records/{id:int}", (int id, PatchEducationRecordRequest body, ILighthouseRepository repo) =>
+        {
+            DateOnly? date = null;
+            if (body.RecordDate.HasValue) date = body.RecordDate.Value;
+            var u = repo.PatchEducationRecord(id, body.ProgressPercent, date);
+            return u is null ? Results.NotFound() : Results.Ok(u);
+        });
+
+        admin.MapGet("/health-records", (int? residentId, ILighthouseRepository repo) =>
+            Results.Ok(repo.ListHealthRecords(residentId)));
+
+        admin.MapPost("/health-records", (CreateHealthRecordRequest body, ILighthouseRepository repo) =>
+        {
+            if (body.ResidentId <= 0) return Results.BadRequest(new { error = "ResidentId is required." });
+            var date = body.RecordDate.HasValue
+                ? body.RecordDate.Value
+                : DateOnly.FromDateTime(DateTime.UtcNow);
+            var created = repo.CreateHealthRecord(body.ResidentId, date, body.HealthScore);
+            return Results.Created($"/api/admin/health-records/{created.Id}", created);
+        });
+
+        admin.MapPatch("/health-records/{id:int}", (int id, PatchHealthRecordRequest body, ILighthouseRepository repo) =>
+        {
+            DateOnly? date = null;
+            if (body.RecordDate.HasValue) date = body.RecordDate.Value;
+            var u = repo.PatchHealthRecord(id, body.HealthScore, date);
+            return u is null ? Results.NotFound() : Results.Ok(u);
+        });
     }
 
     private static object LegacyCaseFromSummary(ResidentSummaryDto r) => new
@@ -295,3 +405,21 @@ public sealed record CreateHomeVisitationRequest(
 public sealed record LegacyCreateCaseRequest(string ReferenceCode, string Status, string? Summary);
 
 public sealed record LegacyCreateVisitationRequest(int? CaseId, string VisitorName, DateTime ScheduledAt, string Status);
+
+public sealed record CreateAllocationRequest(int DonationId, int SafehouseId, decimal? Amount, string? Notes);
+
+public sealed record CreateInterventionPlanRequest(
+    int ResidentId,
+    string PlanCategory,
+    string PlanDescription,
+    string? Status,
+    string? TargetDate,
+    string? CaseConferenceDate);
+
+public sealed record CreateEducationRecordRequest(int ResidentId, DateOnly? RecordDate, double? ProgressPercent);
+
+public sealed record PatchEducationRecordRequest(double? ProgressPercent, DateOnly? RecordDate);
+
+public sealed record CreateHealthRecordRequest(int ResidentId, DateOnly? RecordDate, double? HealthScore);
+
+public sealed record PatchHealthRecordRequest(double? HealthScore, DateOnly? RecordDate);

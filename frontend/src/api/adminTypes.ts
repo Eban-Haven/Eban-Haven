@@ -131,6 +131,20 @@ export type DonationAllocation = {
 
 export type SafehouseOption = { id: number; code: string; name: string; region: string }
 
+export type EducationRecord = {
+  id: number
+  residentId: number
+  recordDate: string
+  progressPercent: number | null
+}
+
+export type HealthRecord = {
+  id: number
+  residentId: number
+  recordDate: string
+  healthScore: number | null
+}
+
 export type ProcessRecording = {
   id: number
   residentId: number

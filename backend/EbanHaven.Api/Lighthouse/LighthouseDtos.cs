@@ -196,6 +196,9 @@ public sealed record PublicImpactSnapshotDto(
 
 public sealed record SafehouseOptionDto(int Id, string Code, string Name, string Region);
 
+public sealed record EducationRecordDto(int Id, int ResidentId, string RecordDate, double? ProgressPercent);
+public sealed record HealthRecordDto(int Id, int ResidentId, string RecordDate, double? HealthScore);
+
 // ── ML feature extraction DTOs ────────────────────────────────────────────────
 
 /// <summary>Pre-computed feature vector for the Reintegration Readiness model.</summary>

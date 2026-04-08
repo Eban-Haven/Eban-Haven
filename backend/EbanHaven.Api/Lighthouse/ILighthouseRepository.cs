@@ -31,6 +31,25 @@ public interface ILighthouseRepository
 
     IReadOnlyList<InterventionPlanDto> ListInterventionPlans(int? residentId);
 
+    bool DeleteSupporter(int id);
+    SupporterDto? PatchSupporterFields(int id, IReadOnlyDictionary<string, string?> fields);
+    bool DeleteDonation(int id);
+    DonationDto? PatchDonationFields(int id, IReadOnlyDictionary<string, string?> fields);
+    DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes);
+    DonationAllocationDto? PatchAllocationFields(int id, IReadOnlyDictionary<string, string?> fields);
+    bool DeleteAllocation(int id);
+    InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status, DateOnly? targetDate, DateOnly? caseConferenceDate);
+    bool DeleteInterventionPlan(int id);
+    bool DeleteResident(int id);
+    bool DeleteProcessRecording(int id);
+    bool DeleteHomeVisitation(int id);
+    IReadOnlyList<EducationRecordDto> ListEducationRecords(int? residentId);
+    EducationRecordDto CreateEducationRecord(int residentId, DateOnly recordDate, double? progressPercent);
+    EducationRecordDto? PatchEducationRecord(int id, double? progressPercent, DateOnly? recordDate);
+    IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId);
+    HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore);
+    HealthRecordDto? PatchHealthRecord(int id, double? healthScore, DateOnly? recordDate);
+
     ReportsSummaryDto GetReportsSummary();
     PublicImpactSummaryDto GetPublicImpactSummary();
     IReadOnlyList<PublicImpactSnapshotDto> GetPublishedSnapshots();

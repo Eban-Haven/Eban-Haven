@@ -1,9 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { getMe } from '../api/auth'
-import { getSupabase, isSupabaseConfigured } from '../lib/supabase'
 
-/** Any signed-in user (Supabase session or legacy cookie). */
+/** Any signed-in user (cookie session). */
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<'loading' | 'in' | 'out'>('loading')
   const location = useLocation()
@@ -14,35 +13,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       setState('in')
       return
     }
-    if (isSupabaseConfigured()) {
-      try {
-        const { data } = await getSupabase().auth.getSession()
-        if (data.session) {
-          setState('in')
-          return
-        }
-      } catch {
-        /* ignore */
-      }
-    }
     setState('out')
   }, [])
 
   useEffect(() => {
     refresh()
-  }, [refresh])
-
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return
-    try {
-      const supabase = getSupabase()
-      const {
-        data: { subscription },
-      } = supabase.auth.onAuthStateChange(() => refresh())
-      return () => subscription.unsubscribe()
-    } catch {
-      return
-    }
   }, [refresh])
 
   if (state === 'loading') {

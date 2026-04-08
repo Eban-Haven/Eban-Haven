@@ -22,7 +22,6 @@ import {
   patchDonationFields,
   type Donation,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -65,7 +64,6 @@ const FILTER_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function ContributionsAdminPage() {
-  const sbData = useSupabaseForLighthouseData()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Donation[]>([])
   const [supporters, setSupporters] = useState<Awaited<ReturnType<typeof getSupporters>>>([])
@@ -174,7 +172,7 @@ export function ContributionsAdminPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} contribution(s)? This cannot be undone.`)) return
     setSaving(true)
     setError(null)
@@ -216,7 +214,7 @@ export function ContributionsAdminPage() {
   }
 
   async function saveEdit() {
-    if (!edit || !sbData) return
+    if (!edit) return
     setSaving(true)
     try {
       await patchDonationFields(edit.id, {
@@ -239,7 +237,7 @@ export function ContributionsAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-contribution')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 11 : 9
+  const colCount = 11
 
   return (
     <div className="space-y-8">
@@ -261,7 +259,7 @@ export function ContributionsAdminPage() {
         addLabel="Add contribution"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -339,7 +337,7 @@ export function ContributionsAdminPage() {
         <table className="w-full text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              {sbData && (
+              
                 <th className="w-10 px-2 py-2">
                   <input
                     type="checkbox"
@@ -348,7 +346,7 @@ export function ContributionsAdminPage() {
                     onChange={() => toggleSelectAll()}
                   />
                 </th>
-              )}
+              
               <SortableTh label="Donation date" sortKey="donationDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Supporter ID" sortKey="supporterId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Type" sortKey="donationType" activeKey={sortKey} direction={sortDir} onSort={onSort} />
@@ -358,7 +356,7 @@ export function ContributionsAdminPage() {
               <SortableTh label="Campaign" sortKey="campaignName" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Channel" sortKey="channelSource" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Impact unit" sortKey="impactUnit" activeKey={sortKey} direction={sortDir} onSort={onSort} />
-              {sbData && <th className="w-24 px-3 py-2">Edit</th>}
+              <th className="w-24 px-3 py-2">Edit</th>
             </tr>
           </thead>
           <tbody className={tableBody}>
@@ -381,11 +379,11 @@ export function ContributionsAdminPage() {
                   className={`${tableRowHover} cursor-pointer`}
                   onClick={() => navigate(`/admin/donors/${r.supporterId}`)}
                 >
-                  {sbData && (
+                  
                     <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
                     </td>
-                  )}
+                  
                   <td className="px-3 py-2 text-xs">{new Date(r.donationDate).toLocaleDateString()}</td>
                   <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.supporterId}</td>
                   <td className="px-3 py-2">{r.donationType}</td>
@@ -399,13 +397,13 @@ export function ContributionsAdminPage() {
                     {r.channelSource ?? '—'}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted-foreground">{r.impactUnit ?? '—'}</td>
-                  {sbData && (
+                  
                     <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                       <button type="button" className="text-primary hover:underline" onClick={() => setEdit({ ...r })}>
                         Edit
                       </button>
                     </td>
-                  )}
+                  
                 </tr>
               ))
             )}
@@ -413,7 +411,7 @@ export function ContributionsAdminPage() {
         </table>
       </div>
 
-      {edit && sbData && (
+      {edit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
           <div className={`${card} w-full max-w-md space-y-2`}>
             <label className={label}>

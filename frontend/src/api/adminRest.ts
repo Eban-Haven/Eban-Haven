@@ -176,3 +176,188 @@ export async function getInterventionPlans(residentId?: number): Promise<T.Inter
 export async function getReportsSummary(): Promise<T.ReportsSummary> {
   return parseJson<T.ReportsSummary>(await apiFetch(`${base}/reports/summary`))
 }
+
+export async function deleteSupporter(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/supporters/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete supporter failed: ${res.status}`)
+}
+
+export async function patchSupporterFields(
+  id: number,
+  fields: Record<string, string | null | undefined>,
+): Promise<T.Supporter> {
+  return parseJson<T.Supporter>(
+    await apiFetch(`${base}/supporters/${id}/fields`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+    }),
+  )
+}
+
+export async function deleteDonation(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/donations/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete donation failed: ${res.status}`)
+}
+
+export async function patchDonationFields(
+  id: number,
+  fields: Record<string, string | null | undefined>,
+): Promise<T.Donation> {
+  return parseJson<T.Donation>(
+    await apiFetch(`${base}/donations/${id}/fields`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+    }),
+  )
+}
+
+export async function createAllocation(body: {
+  donationId: number
+  safehouseId: number
+  amount?: number | null
+  notes?: string | null
+}): Promise<T.DonationAllocation> {
+  return parseJson<T.DonationAllocation>(
+    await apiFetch(`${base}/donation-allocations`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export async function patchAllocationFields(
+  id: number,
+  fields: Record<string, string | null | undefined>,
+): Promise<T.DonationAllocation> {
+  return parseJson<T.DonationAllocation>(
+    await apiFetch(`${base}/donation-allocations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(fields),
+    }),
+  )
+}
+
+export async function deleteAllocation(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/donation-allocations/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete allocation failed: ${res.status}`)
+}
+
+export async function createInterventionPlan(body: {
+  residentId: number
+  planCategory: string
+  planDescription: string
+  status?: string | null
+  targetDate?: string | null
+  targetValue?: number | null
+  caseConferenceDate?: string | null
+}): Promise<T.InterventionPlan> {
+  return parseJson<T.InterventionPlan>(
+    await apiFetch(`${base}/intervention-plans`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export async function deleteInterventionPlan(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/intervention-plans/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete intervention plan failed: ${res.status}`)
+}
+
+export async function deleteResident(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/residents/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete resident failed: ${res.status}`)
+}
+
+export async function deleteProcessRecording(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/process-recordings/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete process recording failed: ${res.status}`)
+}
+
+export async function deleteHomeVisitation(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/home-visitations/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete home visitation failed: ${res.status}`)
+}
+
+export async function listEducationRecords(residentId?: number): Promise<T.EducationRecord[]> {
+  const q = residentId != null ? `?residentId=${residentId}` : ''
+  return parseJson<T.EducationRecord[]>(await apiFetch(`${base}/education-records${q}`))
+}
+
+export async function createEducationRecord(
+  residentId: number,
+  fields: Record<string, string>,
+): Promise<T.EducationRecord> {
+  const body = {
+    residentId,
+    recordDate: fields.record_date ? new Date(fields.record_date) : undefined,
+    progressPercent: fields.progress_percent ? parseFloat(fields.progress_percent) : undefined,
+  }
+  return parseJson<T.EducationRecord>(
+    await apiFetch(`${base}/education-records`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export async function patchEducationRecord(
+  id: number,
+  fields: Record<string, string | null | undefined>,
+): Promise<T.EducationRecord> {
+  const body = {
+    progressPercent:
+      fields.progress_percent != null && fields.progress_percent !== ''
+        ? parseFloat(String(fields.progress_percent))
+        : undefined,
+    recordDate: fields.record_date ?? undefined,
+  }
+  return parseJson<T.EducationRecord>(
+    await apiFetch(`${base}/education-records/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  )
+}
+
+export async function listHealthRecords(residentId?: number): Promise<T.HealthRecord[]> {
+  const q = residentId != null ? `?residentId=${residentId}` : ''
+  return parseJson<T.HealthRecord[]>(await apiFetch(`${base}/health-records${q}`))
+}
+
+export async function createHealthRecord(
+  residentId: number,
+  fields: Record<string, string>,
+): Promise<T.HealthRecord> {
+  const body = {
+    residentId,
+    recordDate: fields.record_date ? new Date(fields.record_date) : undefined,
+    healthScore: fields.general_health_score ? parseFloat(fields.general_health_score) : undefined,
+  }
+  return parseJson<T.HealthRecord>(
+    await apiFetch(`${base}/health-records`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export async function patchHealthRecord(
+  id: number,
+  fields: Record<string, string | null | undefined>,
+): Promise<T.HealthRecord> {
+  const body = {
+    healthScore:
+      fields.general_health_score != null && fields.general_health_score !== ''
+        ? parseFloat(String(fields.general_health_score))
+        : undefined,
+    recordDate: fields.record_date ?? undefined,
+  }
+  return parseJson<T.HealthRecord>(
+    await apiFetch(`${base}/health-records/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  )
+}
+
+// Incident reports are not yet backed by a table.
+export async function listIncidentReports(_residentId?: number): Promise<T.JsonTableRow[]> {
+  return []
+}
+
+export async function createIncidentReport(
+  _residentId: number,
+  _fields: Record<string, string>,
+): Promise<T.JsonTableRow> {
+  throw new Error('Incident reports not yet available')
+}
+
+export async function patchIncidentReport(
+  _id: number,
+  _fields: Record<string, string | null | undefined>,
+): Promise<T.JsonTableRow> {
+  throw new Error('Incident reports not yet available')
+}

@@ -24,7 +24,6 @@ import {
   type HomeVisitation,
   type ResidentSummary,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -72,7 +71,6 @@ const FILTER_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function HomeVisitationsAdminPage() {
-  const sbData = useSupabaseForLighthouseData()
   const navigate = useNavigate()
   const [residents, setResidents] = useState<ResidentSummary[]>([])
   const [q, setQ] = useState('')
@@ -184,7 +182,7 @@ export function HomeVisitationsAdminPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} visitation record(s)? This cannot be undone.`)) return
     setSaving(true)
     setError(null)
@@ -235,7 +233,7 @@ export function HomeVisitationsAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-visitation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 9 : 8
+  const colCount = 9
 
   return (
     <div className="space-y-8">
@@ -259,7 +257,7 @@ export function HomeVisitationsAdminPage() {
         addLabel="Add visitation"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -368,7 +366,7 @@ export function HomeVisitationsAdminPage() {
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              {sbData && (
+              
                 <th className="w-10 px-2 py-2">
                   <input
                     type="checkbox"
@@ -377,7 +375,7 @@ export function HomeVisitationsAdminPage() {
                     onChange={() => toggleSelectAll()}
                   />
                 </th>
-              )}
+              
               <SortableTh label="Visit date" sortKey="visitDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Resident ID" sortKey="residentId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Social worker" sortKey="socialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
@@ -408,11 +406,11 @@ export function HomeVisitationsAdminPage() {
                   className={`${tableRowHover} cursor-pointer`}
                   onClick={() => navigate(`/admin/residents/${v.residentId}`)}
                 >
-                  {sbData && (
+                  
                     <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(v.id)} onChange={() => toggleSelect(v.id)} aria-label={`Select ${v.id}`} />
                     </td>
-                  )}
+                  
                   <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(v.visitDate).toLocaleDateString()}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{v.residentId}</td>
                   <td className="px-4 py-3 text-sm">{v.socialWorker}</td>

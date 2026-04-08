@@ -23,7 +23,6 @@ import {
   type InterventionPlan,
   type ResidentSummary,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -57,7 +56,6 @@ const FILTER_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function CaseConferencesAdminPage() {
-  const sbData = useSupabaseForLighthouseData()
   const navigate = useNavigate()
   const [residents, setResidents] = useState<ResidentSummary[]>([])
   const [q, setQ] = useState('')
@@ -176,7 +174,7 @@ export function CaseConferencesAdminPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} plan(s)? This cannot be undone.`)) return
     setSaving(true)
     setError(null)
@@ -195,8 +193,8 @@ export function CaseConferencesAdminPage() {
 
   async function onCreatePlan(e: FormEvent) {
     e.preventDefault()
-    if (!sbData || !newResidentId || !newCategory.trim() || !newDescription.trim()) return
-    const tv = newTargetVal.trim() ? parseFloat(newTargetVal) : null
+    if (!newResidentId || !newCategory.trim() || !newDescription.trim()) return
+    const targetValue = newTargetVal.trim() ? parseFloat(newTargetVal) : null
     setSaving(true)
     setError(null)
     try {
@@ -204,9 +202,8 @@ export function CaseConferencesAdminPage() {
         residentId: newResidentId,
         planCategory: newCategory.trim(),
         planDescription: newDescription.trim(),
-        servicesProvided: newServices.trim() || undefined,
-        targetValue: tv != null && Number.isFinite(tv) ? tv : null,
         targetDate: newTargetDate.trim() || null,
+        targetValue,
         status: newStatus,
         caseConferenceDate: newConfDate.trim() || null,
       })
@@ -231,15 +228,14 @@ export function CaseConferencesAdminPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-intervention-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 7 : 6
+  const colCount = 7
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className={pageTitle}>Case conferences</h2>
         <p className={pageDesc}>
-          Intervention plans and conference dates. Filter by any column; click a row to open the resident. Bulk delete
-          requires Supabase.
+          Intervention plans and conference dates. Filter by any column; click a row to open the resident.
         </p>
       </div>
 
@@ -255,7 +251,7 @@ export function CaseConferencesAdminPage() {
         addLabel="Add plan"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -295,13 +291,7 @@ export function CaseConferencesAdminPage() {
               Close
             </button>
           </div>
-          {!sbData ? (
-            <p className="text-sm text-muted-foreground">
-              Creating plans requires Supabase program data. Set <code className="rounded bg-muted px-1">VITE_USE_SUPABASE_DATA=true</code> and apply
-              lighthouse migrations.
-            </p>
-          ) : (
-            <form onSubmit={onCreatePlan} className="grid gap-3 sm:grid-cols-2">
+          <form onSubmit={onCreatePlan} className="grid gap-3 sm:grid-cols-2">
               <label className={label}>
                 Resident *
                 <select
@@ -357,7 +347,6 @@ export function CaseConferencesAdminPage() {
                 </button>
               </div>
             </form>
-          )}
         </div>
       )}
 
@@ -365,16 +354,14 @@ export function CaseConferencesAdminPage() {
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className={tableHead}>
             <tr>
-              {sbData && (
-                <th className="w-10 px-2 py-2">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all"
-                    checked={filteredSorted.length > 0 && filteredSorted.every((p) => selected.has(p.id))}
-                    onChange={() => toggleSelectAll()}
-                  />
-                </th>
-              )}
+              <th className="w-10 px-2 py-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={filteredSorted.length > 0 && filteredSorted.every((p) => selected.has(p.id))}
+                  onChange={() => toggleSelectAll()}
+                />
+              </th>
               <SortableTh label="Conference date" sortKey="caseConferenceDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Resident ID" sortKey="residentId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
               <SortableTh label="Plan category" sortKey="planCategory" activeKey={sortKey} direction={sortDir} onSort={onSort} />
@@ -403,11 +390,9 @@ export function CaseConferencesAdminPage() {
                   className={`${tableRowHover} cursor-pointer`}
                   onClick={() => navigate(`/admin/residents/${p.residentId}`)}
                 >
-                  {sbData && (
-                    <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} aria-label={`Select ${p.id}`} />
-                    </td>
-                  )}
+                  <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} aria-label={`Select ${p.id}`} />
+                  </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {p.caseConferenceDate ? new Date(p.caseConferenceDate).toLocaleDateString() : '—'}
                   </td>

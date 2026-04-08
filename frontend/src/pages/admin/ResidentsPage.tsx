@@ -16,7 +16,6 @@ import {
   tableWrap,
 } from './adminStyles'
 import { createResident, deleteResident, getResidents, type ResidentSummary } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -63,7 +62,6 @@ const FILTER_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function ResidentsPage() {
-  const sbData = useSupabaseForLighthouseData()
   const navigate = useNavigate()
   const [rows, setRows] = useState<ResidentSummary[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -173,7 +171,7 @@ export function ResidentsPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} resident record(s)? Related data may block deletes. This cannot be undone.`)) return
     setSaving(true)
     setError(null)
@@ -217,7 +215,7 @@ export function ResidentsPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-resident')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 13 : 12
+  const colCount = 13
 
   return (
     <div className="space-y-8">
@@ -240,7 +238,7 @@ export function ResidentsPage() {
         addLabel="Add resident"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -314,7 +312,7 @@ export function ResidentsPage() {
           <table className="w-full text-left text-sm">
             <thead className={tableHead}>
               <tr>
-                {sbData && (
+                
                   <th className="w-10 px-2 py-2">
                     <input
                       type="checkbox"
@@ -323,7 +321,7 @@ export function ResidentsPage() {
                       onChange={() => toggleSelectAll()}
                     />
                   </th>
-                )}
+                
                 <SortableTh label="Internal code" sortKey="internalCode" activeKey={sortKey} direction={sortDir} onSort={onSort} />
                 <SortableTh label="Safehouse ID" sortKey="safehouseId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
                 <SortableTh label="Case status" sortKey="caseStatus" activeKey={sortKey} direction={sortDir} onSort={onSort} />
@@ -357,11 +355,11 @@ export function ResidentsPage() {
                     className={`${tableRowHover} cursor-pointer`}
                     onClick={() => navigate(`/admin/residents/${r.id}`)}
                   >
-                    {sbData && (
+                    
                       <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.internalCode}`} />
                       </td>
-                    )}
+                    
                     <td className="px-3 py-2 font-medium">{r.internalCode}</td>
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.safehouseId}</td>
                     <td className="px-3 py-2 text-muted-foreground">{r.caseStatus}</td>

@@ -24,7 +24,6 @@ import {
   type ProcessRecording,
   type ResidentSummary,
 } from '../../api/admin'
-import { useSupabaseForLighthouseData } from '../../lib/useSupabaseLighthouse'
 import { AdminListToolbar } from './AdminListToolbar'
 import { matchesColFilter, nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 
@@ -64,7 +63,6 @@ const FILTER_LABELS: Record<keyof ColFilters, string> = {
 }
 
 export function ProcessRecordingsPage() {
-  const sbData = useSupabaseForLighthouseData()
   const navigate = useNavigate()
   const [residents, setResidents] = useState<ResidentSummary[]>([])
   const [rows, setRows] = useState<ProcessRecording[]>([])
@@ -180,7 +178,7 @@ export function ProcessRecordingsPage() {
   }
 
   async function bulkDelete() {
-    if (!sbData || selected.size === 0) return
+    if (selected.size === 0) return
     if (!confirm(`Delete ${selected.size} recording(s)? This cannot be undone.`)) return
     setSaving(true)
     setError(null)
@@ -232,7 +230,7 @@ export function ProcessRecordingsPage() {
     requestAnimationFrame(() => document.getElementById('admin-add-process')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
-  const colCount = sbData ? 9 : 8
+  const colCount = 9
 
   return (
     <div className="space-y-8">
@@ -256,7 +254,7 @@ export function ProcessRecordingsPage() {
         addLabel="Add recording"
       />
 
-      {selected.size > 0 && sbData && (
+      {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
           <span className="text-muted-foreground">{selected.size} selected</span>
           <button type="button" className={btnPrimary} disabled={saving} onClick={() => void bulkDelete()}>
@@ -365,7 +363,7 @@ export function ProcessRecordingsPage() {
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className={tableHead}>
               <tr>
-                {sbData && (
+                
                   <th className="w-10 px-2 py-2">
                     <input
                       type="checkbox"
@@ -374,7 +372,7 @@ export function ProcessRecordingsPage() {
                       onChange={() => toggleSelectAll()}
                     />
                   </th>
-                )}
+                
                 <SortableTh label="Session date" sortKey="sessionDate" activeKey={sortKey} direction={sortDir} onSort={onSort} />
                 <SortableTh label="Resident ID" sortKey="residentId" activeKey={sortKey} direction={sortDir} onSort={onSort} />
                 <SortableTh label="Social worker" sortKey="socialWorker" activeKey={sortKey} direction={sortDir} onSort={onSort} />
@@ -405,11 +403,11 @@ export function ProcessRecordingsPage() {
                     className={`${tableRowHover} cursor-pointer`}
                     onClick={() => navigate(`/admin/residents/${r.residentId}`)}
                   >
-                    {sbData && (
+                    
                       <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.id}`} />
                       </td>
-                    )}
+                    
                     <td className="px-3 py-2 text-xs">{new Date(r.sessionDate).toLocaleDateString()}</td>
                     <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{r.residentId}</td>
                     <td className="px-3 py-2 text-xs">{r.socialWorker}</td>
