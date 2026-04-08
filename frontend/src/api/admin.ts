@@ -15,6 +15,7 @@ export {
   getAllocations,
   getDonorEmailProfile,
   generateDonorEmail,
+  sendDonorEmail,
   createAllocation,
   patchAllocationFields,
   deleteAllocation,

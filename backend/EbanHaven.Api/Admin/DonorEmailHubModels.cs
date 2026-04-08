@@ -32,3 +32,14 @@ public sealed record GeneratedDonorEmailDto(
     string HtmlBody,
     bool UsedAi,
     string Strategy);
+
+public sealed record SendDonorEmailRequest(
+    string ToEmail,
+    string Subject,
+    string Body,
+    string HtmlBody);
+
+public sealed record SentDonorEmailDto(
+    string ProviderMessageId,
+    string ToEmail,
+    DateTimeOffset SentAtUtc);

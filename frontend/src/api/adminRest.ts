@@ -94,6 +94,18 @@ export async function generateDonorEmail(
   )
 }
 
+export async function sendDonorEmail(
+  supporterId: number,
+  body: { toEmail: string; subject: string; body: string; htmlBody: string },
+): Promise<T.SentDonorEmail> {
+  return parseJson<T.SentDonorEmail>(
+    await apiFetch(`${base}/email-hub/supporters/${supporterId}/send`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
 export async function getResidents(params: {
   status?: string
   safehouseId?: number

@@ -3,9 +3,11 @@ import { ChevronDown, LoaderCircle, Mail, RefreshCw, Sparkles } from 'lucide-rea
 import {
   generateDonorEmail,
   getDonorEmailProfile,
+  sendDonorEmail,
   getSupporters,
   type DonorEmailProfile,
   type GeneratedDonorEmail,
+  type SentDonorEmail,
   type Supporter,
 } from '../../../api/admin'
 import { PUBLIC_CONTACT, SITE_DISPLAY_NAME } from '../../../site'
@@ -86,11 +88,14 @@ export function EmailHubPage() {
   const [loadingList, setLoadingList] = useState(true)
   const [loadingProfile, setLoadingProfile] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sendResult, setSendResult] = useState<SentDonorEmail | null>(null)
   const [copyState, setCopyState] = useState<'subject' | 'body' | 'html' | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [previewMode, setPreviewMode] = useState<'plain' | 'rich'>('rich')
   const [signature, setSignature] = useState<SignatureFields>(() => loadStoredSignature())
+  const [recipientEmail, setRecipientEmail] = useState('')
 
   useEffect(() => {
     try {
@@ -120,6 +125,8 @@ export function EmailHubPage() {
       const nextProfile = await getDonorEmailProfile(supporterId)
       setProfile(nextProfile)
       setGenerated(null)
+      setSendResult(null)
+      setRecipientEmail(nextProfile.supporter.email ?? '')
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load donor history.')
@@ -160,6 +167,7 @@ export function EmailHubPage() {
         senderContact: signature.senderContact,
       })
       setGenerated(result)
+      setSendResult(null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate email.')
@@ -182,6 +190,25 @@ export function EmailHubPage() {
     if (!profile?.supporter.email || !generated) return null
     return `mailto:${profile.supporter.email}?subject=${encodeMailtoValue(generated.subject)}&body=${encodeMailtoValue(generated.body)}`
   }, [generated, profile])
+
+  async function onSendEmail() {
+    if (selectedId == null || !generated) return
+    setSending(true)
+    try {
+      const result = await sendDonorEmail(selectedId, {
+        toEmail: recipientEmail.trim(),
+        subject: generated.subject,
+        body: generated.body,
+        htmlBody: generated.htmlBody,
+      })
+      setSendResult(result)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send email.')
+    } finally {
+      setSending(false)
+    }
+  }
 
   function updateSignature<K extends keyof SignatureFields>(key: K, value: SignatureFields[K]) {
     setSignature((current) => ({ ...current, [key]: value }))
@@ -446,6 +473,15 @@ export function EmailHubPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className={label}>
+                    Send to
+                    <input
+                      className={input}
+                      value={recipientEmail}
+                      onChange={(event) => setRecipientEmail(event.target.value)}
+                      placeholder="donor@example.org"
+                    />
+                  </label>
+                  <label className={label}>
                     Sender name
                     <input
                       className={input}
@@ -566,8 +602,21 @@ export function EmailHubPage() {
                       ) : (
                         <span className="text-sm text-muted-foreground">Add an email address to this donor to open a draft.</span>
                       )}
+                      <button
+                        type="button"
+                        className={btnPrimary}
+                        onClick={() => void onSendEmail()}
+                        disabled={sending || !generated || !recipientEmail.trim()}
+                      >
+                        {sending ? 'Sending styled email…' : 'Send styled email'}
+                      </button>
                       <p className="text-xs text-muted-foreground">{generated.strategy}</p>
                     </div>
+                    {sendResult ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                        Sent to {sendResult.toEmail} at {new Date(sendResult.sentAtUtc).toLocaleString()}.
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

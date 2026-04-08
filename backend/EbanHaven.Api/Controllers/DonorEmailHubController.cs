@@ -10,7 +10,8 @@ namespace EbanHaven.Api.Controllers;
 [Authorize]
 public sealed class DonorEmailHubController(
     ILighthouseRepository repo,
-    IDonorEmailComposer composer) : ControllerBase
+    IDonorEmailComposer composer,
+    IDonorEmailDeliveryService deliveryService) : ControllerBase
 {
     [HttpGet("supporters/{id:int}")]
     public IActionResult GetProfile(int id)
@@ -30,6 +31,26 @@ public sealed class DonorEmailHubController(
 
         var email = await composer.ComposeAsync(profile, request, cancellationToken);
         return Ok(email);
+    }
+
+    [HttpPost("supporters/{id:int}/send")]
+    public async Task<IActionResult> SendEmail(
+        int id,
+        [FromBody] SendDonorEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var supporter = repo.ListSupporters().FirstOrDefault(s => s.Id == id);
+        if (supporter is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(request.ToEmail))
+            return BadRequest(new { error = "Recipient email is required." });
+        if (string.IsNullOrWhiteSpace(request.Subject))
+            return BadRequest(new { error = "Subject is required." });
+        if (string.IsNullOrWhiteSpace(request.Body) || string.IsNullOrWhiteSpace(request.HtmlBody))
+            return BadRequest(new { error = "Email content is required." });
+
+        var sent = await deliveryService.SendAsync(request, cancellationToken);
+        return Ok(sent);
     }
 
     private DonorEmailProfileDto? BuildProfile(int supporterId)

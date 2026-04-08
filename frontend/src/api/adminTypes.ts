@@ -153,6 +153,12 @@ export type GeneratedDonorEmail = {
   strategy: string
 }
 
+export type SentDonorEmail = {
+  providerMessageId: string
+  toEmail: string
+  sentAtUtc: string
+}
+
 export type SafehouseOption = { id: number; code: string; name: string; region: string }
 
 export type EducationRecord = {
