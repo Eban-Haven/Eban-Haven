@@ -380,7 +380,8 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
     }
 
     public ProcessRecordingDto CreateProcessRecording(int residentId, DateTime sessionDate, string socialWorker, string sessionType,
-        int? durationMinutes, string? emotionalStart, string? emotionalEnd, string narrative, string? interventions, string? followUp)
+        int? durationMinutes, string? emotionalStart, string? emotionalEnd, string narrative, string? interventions, string? followUp,
+        bool? progressNoted, bool? concernsFlagged, bool? referralMade)
     {
         if (!db.Residents.Any(x => x.ResidentId == residentId))
             throw new InvalidOperationException("Unknown resident.");
@@ -397,13 +398,33 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             SessionNarrative = narrative,
             InterventionsApplied = interventions,
             FollowUpActions = followUp,
-            ProgressNoted = true,
-            ConcernsFlagged = false,
-            ReferralMade = false,
+            ProgressNoted = progressNoted ?? true,
+            ConcernsFlagged = concernsFlagged ?? false,
+            ReferralMade = referralMade ?? false,
         };
         db.ProcessRecordings.Add(row);
         db.SaveChanges();
         return ListProcessRecordings(residentId).Last();
+    }
+
+    public ProcessRecordingDto? PatchProcessRecording(int id, PatchProcessRecordingDto p)
+    {
+        var row = db.ProcessRecordings.FirstOrDefault(x => x.RecordingId == id);
+        if (row is null) return null;
+        if (p.SessionDate.HasValue) row.SessionDate = DateOnly.FromDateTime(p.SessionDate.Value);
+        if (p.SocialWorker != null) row.SocialWorker = p.SocialWorker;
+        if (p.SessionType != null) row.SessionType = p.SessionType;
+        if (p.SessionDurationMinutes.HasValue) row.SessionDurationMinutes = p.SessionDurationMinutes;
+        if (p.EmotionalStateObserved != null) row.EmotionalStateObserved = p.EmotionalStateObserved;
+        if (p.EmotionalStateEnd != null) row.EmotionalStateEnd = p.EmotionalStateEnd;
+        if (p.SessionNarrative != null) row.SessionNarrative = p.SessionNarrative;
+        if (p.InterventionsApplied != null) row.InterventionsApplied = p.InterventionsApplied;
+        if (p.FollowUpActions != null) row.FollowUpActions = p.FollowUpActions;
+        if (p.ProgressNoted.HasValue) row.ProgressNoted = p.ProgressNoted.Value;
+        if (p.ConcernsFlagged.HasValue) row.ConcernsFlagged = p.ConcernsFlagged.Value;
+        if (p.ReferralMade.HasValue) row.ReferralMade = p.ReferralMade.Value;
+        db.SaveChanges();
+        return ListProcessRecordings(row.ResidentId).First(x => x.Id == id);
     }
 
     public IReadOnlyList<HomeVisitationDto> ListHomeVisitations(int? residentId)
@@ -435,7 +456,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
 
     public HomeVisitationDto CreateHomeVisitation(int residentId, DateTime visitDate, string socialWorker, string visitType,
         string? locationVisited, string? observations, string? familyCooperation, bool safetyConcerns, bool followUpNeeded,
-        string? followUpNotes)
+        string? followUpNotes, string? purpose, string? familyMembersPresent, string? visitOutcome)
     {
         if (!db.Residents.Any(x => x.ResidentId == residentId))
             throw new InvalidOperationException("Unknown resident.");
@@ -452,12 +473,33 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             SafetyConcernsNoted = safetyConcerns,
             FollowUpNeeded = followUpNeeded,
             FollowUpNotes = followUpNotes,
-            Purpose = $"Visitation for {visitType.ToLowerInvariant()}",
-            VisitOutcome = "Favorable",
+            FamilyMembersPresent = familyMembersPresent,
+            Purpose = string.IsNullOrWhiteSpace(purpose) ? $"Visitation for {visitType.ToLowerInvariant()}" : purpose,
+            VisitOutcome = string.IsNullOrWhiteSpace(visitOutcome) ? "Favorable" : visitOutcome,
         };
         db.HomeVisitations.Add(row);
         db.SaveChanges();
         return ListHomeVisitations(residentId).First(x => x.Id == row.VisitationId);
+    }
+
+    public HomeVisitationDto? PatchHomeVisitation(int id, PatchHomeVisitationDto p)
+    {
+        var row = db.HomeVisitations.FirstOrDefault(x => x.VisitationId == id);
+        if (row is null) return null;
+        if (p.VisitDate.HasValue) row.VisitDate = DateOnly.FromDateTime(p.VisitDate.Value);
+        if (p.SocialWorker != null) row.SocialWorker = p.SocialWorker;
+        if (p.VisitType != null) row.VisitType = p.VisitType;
+        if (p.LocationVisited != null) row.LocationVisited = p.LocationVisited;
+        if (p.FamilyMembersPresent != null) row.FamilyMembersPresent = p.FamilyMembersPresent;
+        if (p.Purpose != null) row.Purpose = p.Purpose;
+        if (p.Observations != null) row.Observations = p.Observations;
+        if (p.FamilyCooperationLevel != null) row.FamilyCooperationLevel = p.FamilyCooperationLevel;
+        if (p.SafetyConcernsNoted.HasValue) row.SafetyConcernsNoted = p.SafetyConcernsNoted.Value;
+        if (p.FollowUpNeeded.HasValue) row.FollowUpNeeded = p.FollowUpNeeded.Value;
+        if (p.FollowUpNotes != null) row.FollowUpNotes = p.FollowUpNotes;
+        if (p.VisitOutcome != null) row.VisitOutcome = p.VisitOutcome;
+        db.SaveChanges();
+        return ListHomeVisitations(row.ResidentId).First(x => x.Id == id);
     }
 
     public IReadOnlyList<InterventionPlanDto> ListInterventionPlans(int? residentId)
@@ -725,7 +767,8 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         return true;
     }
 
-    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status, DateOnly? targetDate, DateOnly? caseConferenceDate)
+    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status,
+        DateOnly? targetDate, DateOnly? caseConferenceDate, double? targetValue, string? servicesProvided)
     {
         var now = DateTime.UtcNow;
         var row = new InterventionPlan
@@ -733,6 +776,8 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             ResidentId = residentId,
             PlanCategory = planCategory,
             PlanDescription = planDescription,
+            ServicesProvided = servicesProvided,
+            TargetValue = targetValue,
             Status = string.IsNullOrWhiteSpace(status) ? "In Progress" : status,
             TargetDate = targetDate,
             CaseConferenceDate = caseConferenceDate,
@@ -742,6 +787,30 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         db.InterventionPlans.Add(row);
         db.SaveChanges();
         return ListInterventionPlans(residentId).First(x => x.Id == row.PlanId);
+    }
+
+    public InterventionPlanDto? PatchInterventionPlan(int id, PatchInterventionPlanDto p)
+    {
+        var row = db.InterventionPlans.FirstOrDefault(x => x.PlanId == id);
+        if (row is null) return null;
+        if (p.PlanCategory != null) row.PlanCategory = p.PlanCategory;
+        if (p.PlanDescription != null) row.PlanDescription = p.PlanDescription;
+        if (p.ServicesProvided != null) row.ServicesProvided = p.ServicesProvided;
+        if (p.TargetValue.HasValue) row.TargetValue = p.TargetValue;
+        if (p.TargetDate != null)
+        {
+            if (string.IsNullOrWhiteSpace(p.TargetDate)) row.TargetDate = null;
+            else if (DateOnly.TryParse(p.TargetDate, out var td)) row.TargetDate = td;
+        }
+        if (p.Status != null) row.Status = p.Status;
+        if (p.CaseConferenceDate != null)
+        {
+            if (string.IsNullOrWhiteSpace(p.CaseConferenceDate)) row.CaseConferenceDate = null;
+            else if (DateOnly.TryParse(p.CaseConferenceDate, out var cd)) row.CaseConferenceDate = cd;
+        }
+        row.UpdatedAt = DateTime.UtcNow;
+        db.SaveChanges();
+        return ListInterventionPlans(row.ResidentId).First(x => x.Id == id);
     }
 
     public bool DeleteInterventionPlan(int id)

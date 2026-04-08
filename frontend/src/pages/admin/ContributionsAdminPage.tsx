@@ -26,7 +26,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { BoolPill, MutedTinyPill, NeutralPill } from './adminDataTable/AdminBadges'
+import { BooleanBadge, CategoryBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -470,24 +470,20 @@ export function ContributionsAdminPage() {
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatAdminDate(r.donationDate)}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{r.supporterDisplayName}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{r.donationType}</NeutralPill>
+                    <CategoryBadge>{r.donationType}</CategoryBadge>
                   </td>
                   <td className="px-3 py-2.5 tabular-nums font-medium">{formatMoney(r.amount, r.currencyCode)}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{r.currencyCode ?? '—'}</td>
                   <td className="px-3 py-2.5">
-                    <MutedTinyPill>{r.currencyCode ?? '—'}</MutedTinyPill>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <BoolPill value={r.isRecurring} />
+                    <BooleanBadge value={r.isRecurring} />
                   </td>
                   <td className="max-w-[160px] truncate px-3 py-2.5 text-muted-foreground" title={r.campaignName ?? ''}>
                     {r.campaignName ?? '—'}
                   </td>
                   <td className="px-3 py-2.5">
-                    {r.channelSource ? <NeutralPill>{r.channelSource}</NeutralPill> : <span className="text-muted-foreground">—</span>}
+                    {r.channelSource ? <CategoryBadge>{r.channelSource}</CategoryBadge> : <span className="text-muted-foreground">—</span>}
                   </td>
-                  <td className="px-3 py-2.5">
-                    {r.impactUnit ? <MutedTinyPill>{r.impactUnit}</MutedTinyPill> : <span className="text-muted-foreground">—</span>}
-                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{r.impactUnit ?? '—'}</td>
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setEdit({ ...r })}>
                       Edit

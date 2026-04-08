@@ -130,13 +130,22 @@ public static class AdminApiExtensions
                     body.EmotionalStateEnd?.Trim(),
                     body.SessionNarrative.Trim(),
                     body.InterventionsApplied?.Trim(),
-                    body.FollowUpActions?.Trim());
+                    body.FollowUpActions?.Trim(),
+                    body.ProgressNoted,
+                    body.ConcernsFlagged,
+                    body.ReferralMade);
                 return Results.Created($"/api/admin/process-recordings/{created.Id}", created);
             }
             catch (InvalidOperationException ex)
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
+        });
+
+        admin.MapPatch("/process-recordings/{id:int}", (int id, PatchProcessRecordingDto body, ILighthouseRepository repo) =>
+        {
+            var u = repo.PatchProcessRecording(id, body);
+            return u is null ? Results.NotFound() : Results.Ok(u);
         });
 
         admin.MapGet("/home-visitations", (int? residentId, ILighthouseRepository repo) =>
@@ -163,13 +172,22 @@ public static class AdminApiExtensions
                     body.FamilyCooperationLevel?.Trim(),
                     body.SafetyConcernsNoted,
                     body.FollowUpNeeded,
-                    body.FollowUpNotes?.Trim());
+                    body.FollowUpNotes?.Trim(),
+                    body.Purpose?.Trim(),
+                    body.FamilyMembersPresent?.Trim(),
+                    body.VisitOutcome?.Trim());
                 return Results.Created($"/api/admin/home-visitations/{created.Id}", created);
             }
             catch (InvalidOperationException ex)
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
+        });
+
+        admin.MapPatch("/home-visitations/{id:int}", (int id, PatchHomeVisitationDto body, ILighthouseRepository repo) =>
+        {
+            var u = repo.PatchHomeVisitation(id, body);
+            return u is null ? Results.NotFound() : Results.Ok(u);
         });
 
         admin.MapGet("/intervention-plans", (int? residentId, ILighthouseRepository repo) =>
@@ -217,6 +235,9 @@ public static class AdminApiExtensions
                     null,
                     false,
                     false,
+                    null,
+                    null,
+                    null,
                     null);
                 return Results.Created($"/api/admin/visitations/{created.Id}", LegacyVisitationFromDto(created));
             }
@@ -272,14 +293,22 @@ public static class AdminApiExtensions
             if (!string.IsNullOrWhiteSpace(body.TargetDate) && DateOnly.TryParse(body.TargetDate, out var td)) targetDate = td;
             DateOnly? confDate = null;
             if (!string.IsNullOrWhiteSpace(body.CaseConferenceDate) && DateOnly.TryParse(body.CaseConferenceDate, out var cd)) confDate = cd;
-            var created = repo.CreateInterventionPlan(
+                var created = repo.CreateInterventionPlan(
                 body.ResidentId,
                 body.PlanCategory.Trim(),
                 body.PlanDescription.Trim(),
                 body.Status?.Trim(),
                 targetDate,
-                confDate);
+                confDate,
+                body.TargetValue,
+                body.ServicesProvided?.Trim());
             return Results.Created($"/api/admin/intervention-plans/{created.Id}", created);
+        });
+
+        admin.MapPatch("/intervention-plans/{id:int}", (int id, PatchInterventionPlanDto body, ILighthouseRepository repo) =>
+        {
+            var u = repo.PatchInterventionPlan(id, body);
+            return u is null ? Results.NotFound() : Results.Ok(u);
         });
 
         admin.MapDelete("/intervention-plans/{id:int}", (int id, ILighthouseRepository repo) =>
@@ -388,7 +417,10 @@ public sealed record CreateProcessRecordingRequest(
     string? EmotionalStateEnd,
     string SessionNarrative,
     string? InterventionsApplied,
-    string? FollowUpActions);
+    string? FollowUpActions,
+    bool? ProgressNoted,
+    bool? ConcernsFlagged,
+    bool? ReferralMade);
 
 public sealed record CreateHomeVisitationRequest(
     int ResidentId,
@@ -400,7 +432,10 @@ public sealed record CreateHomeVisitationRequest(
     string? FamilyCooperationLevel,
     bool SafetyConcernsNoted,
     bool FollowUpNeeded,
-    string? FollowUpNotes);
+    string? FollowUpNotes,
+    string? Purpose,
+    string? FamilyMembersPresent,
+    string? VisitOutcome);
 
 public sealed record LegacyCreateCaseRequest(string ReferenceCode, string Status, string? Summary);
 
@@ -414,7 +449,9 @@ public sealed record CreateInterventionPlanRequest(
     string PlanDescription,
     string? Status,
     string? TargetDate,
-    string? CaseConferenceDate);
+    string? CaseConferenceDate,
+    double? TargetValue,
+    string? ServicesProvided);
 
 public sealed record CreateEducationRecordRequest(int ResidentId, DateOnly? RecordDate, double? ProgressPercent);
 

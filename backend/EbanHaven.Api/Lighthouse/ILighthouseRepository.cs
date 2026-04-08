@@ -22,14 +22,20 @@ public interface ILighthouseRepository
 
     IReadOnlyList<ProcessRecordingDto> ListProcessRecordings(int? residentId);
     ProcessRecordingDto CreateProcessRecording(int residentId, DateTime sessionDate, string socialWorker, string sessionType,
-        int? durationMinutes, string? emotionalStart, string? emotionalEnd, string narrative, string? interventions, string? followUp);
+        int? durationMinutes, string? emotionalStart, string? emotionalEnd, string narrative, string? interventions, string? followUp,
+        bool? progressNoted, bool? concernsFlagged, bool? referralMade);
+    ProcessRecordingDto? PatchProcessRecording(int id, PatchProcessRecordingDto patch);
 
     IReadOnlyList<HomeVisitationDto> ListHomeVisitations(int? residentId);
     HomeVisitationDto CreateHomeVisitation(int residentId, DateTime visitDate, string socialWorker, string visitType,
         string? locationVisited, string? observations, string? familyCooperation, bool safetyConcerns, bool followUpNeeded,
-        string? followUpNotes);
+        string? followUpNotes, string? purpose, string? familyMembersPresent, string? visitOutcome);
+    HomeVisitationDto? PatchHomeVisitation(int id, PatchHomeVisitationDto patch);
 
     IReadOnlyList<InterventionPlanDto> ListInterventionPlans(int? residentId);
+    InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status,
+        DateOnly? targetDate, DateOnly? caseConferenceDate, double? targetValue, string? servicesProvided);
+    InterventionPlanDto? PatchInterventionPlan(int id, PatchInterventionPlanDto patch);
 
     bool DeleteSupporter(int id);
     SupporterDto? PatchSupporterFields(int id, IReadOnlyDictionary<string, string?> fields);
@@ -38,7 +44,6 @@ public interface ILighthouseRepository
     DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes);
     DonationAllocationDto? PatchAllocationFields(int id, IReadOnlyDictionary<string, string?> fields);
     bool DeleteAllocation(int id);
-    InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status, DateOnly? targetDate, DateOnly? caseConferenceDate);
     bool DeleteInterventionPlan(int id);
     bool DeleteResident(int id);
     bool DeleteProcessRecording(int id);

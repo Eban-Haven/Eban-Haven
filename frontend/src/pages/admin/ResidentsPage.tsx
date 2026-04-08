@@ -20,7 +20,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { NeutralPill, RiskBadge, StatusBadge } from './adminDataTable/AdminBadges'
+import { CategoryBadge, ReintegrationBadge, RiskBadge, StatusBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -456,17 +456,17 @@ export function ResidentsPage() {
                   <td className="px-3 py-2.5 font-medium text-foreground">{r.internalCode}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.safehouseName ?? safehouseNameById.get(r.safehouseId) ?? '—'}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{r.caseStatus}</NeutralPill>
+                    <StatusBadge status={r.caseStatus} />
                   </td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.sex}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.presentAge ?? '—'}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{r.caseCategory}</NeutralPill>
+                    <CategoryBadge>{r.caseCategory}</CategoryBadge>
                   </td>
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatAdminDate(r.dateOfAdmission)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.lengthOfStay ?? '—'}</td>
                   <td className="px-3 py-2.5">
-                    {r.reintegrationStatus ? <StatusBadge status={r.reintegrationStatus} /> : <span className="text-muted-foreground">—</span>}
+                    {r.reintegrationStatus ? <ReintegrationBadge value={r.reintegrationStatus} /> : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     {r.currentRiskLevel ? <RiskBadge level={r.currentRiskLevel} /> : <span className="text-muted-foreground">—</span>}

@@ -27,7 +27,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { BoolPill, NeutralPill } from './adminDataTable/AdminBadges'
+import { BooleanBadge, CategoryBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -476,19 +476,19 @@ export function ProcessRecordingsPage() {
                   <td className="px-3 py-2.5 font-medium text-foreground">{r.residentInternalCode}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.socialWorker}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{r.sessionType}</NeutralPill>
+                    <CategoryBadge>{r.sessionType}</CategoryBadge>
                   </td>
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">
                     {r.sessionDurationMinutes != null ? `${r.sessionDurationMinutes} min` : '—'}
                   </td>
                   <td className="px-3 py-2.5">
-                    {r.emotionalStateObserved ? <NeutralPill>{r.emotionalStateObserved}</NeutralPill> : <span className="text-muted-foreground">—</span>}
+                    {r.emotionalStateObserved ? <CategoryBadge>{r.emotionalStateObserved}</CategoryBadge> : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2.5">
-                    <BoolPill value={r.progressNoted} />
+                    <BooleanBadge value={r.progressNoted} />
                   </td>
                   <td className="px-3 py-2.5">
-                    <BoolPill value={r.concernsFlagged} />
+                    <BooleanBadge value={r.concernsFlagged} trueVariant="danger" />
                   </td>
                 </tr>
               ))

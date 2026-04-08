@@ -22,16 +22,23 @@ public sealed class LighthouseDataStoreAdapter(LighthouseDataStore inner) : ILig
         inner.CreateResident(internalCode, caseStatus, caseCategory);
     public IReadOnlyList<ProcessRecordingDto> ListProcessRecordings(int? residentId) => inner.ListProcessRecordings(residentId);
     public ProcessRecordingDto CreateProcessRecording(int residentId, DateTime sessionDate, string socialWorker, string sessionType,
-        int? durationMinutes, string? emotionalStart, string? emotionalEnd, string narrative, string? interventions, string? followUp) =>
+        int? durationMinutes, string? emotionalStart, string? emotionalEnd, string narrative, string? interventions, string? followUp,
+        bool? progressNoted, bool? concernsFlagged, bool? referralMade) =>
         inner.CreateProcessRecording(residentId, sessionDate, socialWorker, sessionType, durationMinutes, emotionalStart, emotionalEnd,
-            narrative, interventions, followUp);
+            narrative, interventions, followUp, progressNoted, concernsFlagged, referralMade);
+    public ProcessRecordingDto? PatchProcessRecording(int id, PatchProcessRecordingDto patch) => inner.PatchProcessRecording(id, patch);
     public IReadOnlyList<HomeVisitationDto> ListHomeVisitations(int? residentId) => inner.ListHomeVisitations(residentId);
     public HomeVisitationDto CreateHomeVisitation(int residentId, DateTime visitDate, string socialWorker, string visitType,
         string? locationVisited, string? observations, string? familyCooperation, bool safetyConcerns, bool followUpNeeded,
-        string? followUpNotes) =>
+        string? followUpNotes, string? purpose, string? familyMembersPresent, string? visitOutcome) =>
         inner.CreateHomeVisitation(residentId, visitDate, socialWorker, visitType, locationVisited, observations, familyCooperation,
-            safetyConcerns, followUpNeeded, followUpNotes);
+            safetyConcerns, followUpNeeded, followUpNotes, purpose, familyMembersPresent, visitOutcome);
+    public HomeVisitationDto? PatchHomeVisitation(int id, PatchHomeVisitationDto patch) => inner.PatchHomeVisitation(id, patch);
     public IReadOnlyList<InterventionPlanDto> ListInterventionPlans(int? residentId) => inner.ListInterventionPlans(residentId);
+    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status,
+        DateOnly? targetDate, DateOnly? caseConferenceDate, double? targetValue, string? servicesProvided) =>
+        inner.CreateInterventionPlan(residentId, planCategory, planDescription, status, targetDate, caseConferenceDate, targetValue, servicesProvided);
+    public InterventionPlanDto? PatchInterventionPlan(int id, PatchInterventionPlanDto patch) => inner.PatchInterventionPlan(id, patch);
 
     public bool DeleteSupporter(int id) => throw new NotImplementedException();
     public SupporterDto? PatchSupporterFields(int id, IReadOnlyDictionary<string, string?> fields) => throw new NotImplementedException();
@@ -40,7 +47,6 @@ public sealed class LighthouseDataStoreAdapter(LighthouseDataStore inner) : ILig
     public DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes) => throw new NotImplementedException();
     public DonationAllocationDto? PatchAllocationFields(int id, IReadOnlyDictionary<string, string?> fields) => throw new NotImplementedException();
     public bool DeleteAllocation(int id) => throw new NotImplementedException();
-    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status, DateOnly? targetDate, DateOnly? caseConferenceDate) => throw new NotImplementedException();
     public bool DeleteInterventionPlan(int id) => throw new NotImplementedException();
     public bool DeleteResident(int id) => throw new NotImplementedException();
     public bool DeleteProcessRecording(int id) => throw new NotImplementedException();

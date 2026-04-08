@@ -140,9 +140,33 @@ export async function createProcessRecording(body: {
   sessionNarrative: string
   interventionsApplied?: string
   followUpActions?: string
+  progressNoted?: boolean
+  concernsFlagged?: boolean
+  referralMade?: boolean
 }): Promise<T.ProcessRecording> {
   return parseJson<T.ProcessRecording>(
     await apiFetch(`${base}/process-recordings`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export type PatchProcessRecordingBody = Partial<{
+  sessionDate: string
+  socialWorker: string
+  sessionType: string
+  sessionDurationMinutes: number
+  emotionalStateObserved: string
+  emotionalStateEnd: string
+  sessionNarrative: string
+  interventionsApplied: string
+  followUpActions: string
+  progressNoted: boolean
+  concernsFlagged: boolean
+  referralMade: boolean
+}>
+
+export async function patchProcessRecording(id: number, body: PatchProcessRecordingBody): Promise<T.ProcessRecording> {
+  return parseJson<T.ProcessRecording>(
+    await apiFetch(`${base}/process-recordings/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   )
 }
 
@@ -162,9 +186,33 @@ export async function createHomeVisitation(body: {
   safetyConcernsNoted: boolean
   followUpNeeded: boolean
   followUpNotes?: string
+  purpose?: string
+  familyMembersPresent?: string
+  visitOutcome?: string
 }): Promise<T.HomeVisitation> {
   return parseJson<T.HomeVisitation>(
     await apiFetch(`${base}/home-visitations`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export type PatchHomeVisitationBody = Partial<{
+  visitDate: string
+  socialWorker: string
+  visitType: string
+  locationVisited: string
+  familyMembersPresent: string
+  purpose: string
+  observations: string
+  familyCooperationLevel: string
+  safetyConcernsNoted: boolean
+  followUpNeeded: boolean
+  followUpNotes: string
+  visitOutcome: string
+}>
+
+export async function patchHomeVisitation(id: number, body: PatchHomeVisitationBody): Promise<T.HomeVisitation> {
+  return parseJson<T.HomeVisitation>(
+    await apiFetch(`${base}/home-visitations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   )
 }
 
@@ -247,9 +295,26 @@ export async function createInterventionPlan(body: {
   targetDate?: string | null
   targetValue?: number | null
   caseConferenceDate?: string | null
+  servicesProvided?: string | null
 }): Promise<T.InterventionPlan> {
   return parseJson<T.InterventionPlan>(
     await apiFetch(`${base}/intervention-plans`, { method: 'POST', body: JSON.stringify(body) }),
+  )
+}
+
+export type PatchInterventionPlanBody = Partial<{
+  planCategory: string
+  planDescription: string
+  servicesProvided: string
+  targetValue: number
+  targetDate: string
+  status: string
+  caseConferenceDate: string
+}>
+
+export async function patchInterventionPlan(id: number, body: PatchInterventionPlanBody): Promise<T.InterventionPlan> {
+  return parseJson<T.InterventionPlan>(
+    await apiFetch(`${base}/intervention-plans/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   )
 }
 

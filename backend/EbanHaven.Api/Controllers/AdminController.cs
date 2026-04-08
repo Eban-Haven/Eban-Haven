@@ -145,13 +145,23 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
                 body.EmotionalStateEnd?.Trim(),
                 body.SessionNarrative.Trim(),
                 body.InterventionsApplied?.Trim(),
-                body.FollowUpActions?.Trim());
+                body.FollowUpActions?.Trim(),
+                body.ProgressNoted,
+                body.ConcernsFlagged,
+                body.ReferralMade);
             return Created($"/api/admin/process-recordings/{created.Id}", created);
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    [HttpPatch("process-recordings/{id:int}")]
+    public IActionResult PatchProcessRecording(int id, [FromBody] PatchProcessRecordingDto body)
+    {
+        var u = repo.PatchProcessRecording(id, body);
+        return u is null ? NotFound() : Ok(u);
     }
 
     [HttpGet("home-visitations")]
@@ -179,13 +189,23 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
                 body.FamilyCooperationLevel?.Trim(),
                 body.SafetyConcernsNoted,
                 body.FollowUpNeeded,
-                body.FollowUpNotes?.Trim());
+                body.FollowUpNotes?.Trim(),
+                body.Purpose?.Trim(),
+                body.FamilyMembersPresent?.Trim(),
+                body.VisitOutcome?.Trim());
             return Created($"/api/admin/home-visitations/{created.Id}", created);
         }
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });
         }
+    }
+
+    [HttpPatch("home-visitations/{id:int}")]
+    public IActionResult PatchHomeVisitation(int id, [FromBody] PatchHomeVisitationDto body)
+    {
+        var u = repo.PatchHomeVisitation(id, body);
+        return u is null ? NotFound() : Ok(u);
     }
 
     [HttpGet("intervention-plans")]
@@ -202,10 +222,17 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
             var targetDate = body.TargetDate != null ? DateOnly.Parse(body.TargetDate) : (DateOnly?)null;
             var confDate   = body.CaseConferenceDate != null ? DateOnly.Parse(body.CaseConferenceDate) : (DateOnly?)null;
             var created = repo.CreateInterventionPlan(body.ResidentId, body.PlanCategory.Trim(), body.PlanDescription.Trim(),
-                body.Status?.Trim(), targetDate, confDate);
+                body.Status?.Trim(), targetDate, confDate, body.TargetValue, body.ServicesProvided?.Trim());
             return Created($"/api/admin/intervention-plans/{created.Id}", created);
         }
         catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPatch("intervention-plans/{id:int}")]
+    public IActionResult PatchInterventionPlan(int id, [FromBody] PatchInterventionPlanDto body)
+    {
+        var u = repo.PatchInterventionPlan(id, body);
+        return u is null ? NotFound() : Ok(u);
     }
 
     [HttpDelete("intervention-plans/{id:int}")]
@@ -357,6 +384,9 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
                 null,
                 false,
                 false,
+                null,
+                null,
+                null,
                 null);
             return Created($"/api/admin/visitations/{created.Id}", LegacyVisitationFromDto(created));
         }
@@ -367,7 +397,15 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
     }
 
     // Request records for new endpoints
-    public sealed record CreateInterventionPlanRequest(int ResidentId, string PlanCategory, string PlanDescription, string? Status, string? TargetDate, string? CaseConferenceDate);
+    public sealed record CreateInterventionPlanRequest(
+        int ResidentId,
+        string PlanCategory,
+        string PlanDescription,
+        string? Status,
+        string? TargetDate,
+        string? CaseConferenceDate,
+        double? TargetValue,
+        string? ServicesProvided);
     public sealed record CreateAllocationRequest(int DonationId, int SafehouseId, decimal? Amount, string? Notes);
     public sealed record CreateEducationRecordRequest(int ResidentId, DateOnly? RecordDate, double? ProgressPercent);
     public sealed record PatchEducationRecordRequest(double? ProgressPercent, DateOnly? RecordDate);

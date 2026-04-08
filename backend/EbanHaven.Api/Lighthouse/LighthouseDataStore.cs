@@ -521,13 +521,16 @@ public sealed class LighthouseDataStore
         string? emotionalEnd,
         string narrative,
         string? interventions,
-        string? followUp)
+        string? followUp,
+        bool? progressNoted,
+        bool? concernsFlagged,
+        bool? referralMade)
     {
         lock (_lock)
         {
             if (_residents.All(x => GetInt(x, "resident_id") != residentId))
                 throw new InvalidOperationException("Unknown resident.");
-            var next = _processRecordings.Max(x => GetInt(x, "recording_id")) + 1;
+            var next = _processRecordings.Count == 0 ? 1 : _processRecordings.Max(x => GetInt(x, "recording_id")) + 1;
             var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["recording_id"] = next.ToString(CultureInfo.InvariantCulture),
@@ -541,13 +544,35 @@ public sealed class LighthouseDataStore
                 ["session_narrative"] = narrative,
                 ["interventions_applied"] = interventions ?? string.Empty,
                 ["follow_up_actions"] = followUp ?? string.Empty,
-                ["progress_noted"] = "True",
-                ["concerns_flagged"] = "False",
-                ["referral_made"] = "False",
+                ["progress_noted"] = (progressNoted ?? true) ? "True" : "False",
+                ["concerns_flagged"] = (concernsFlagged ?? false) ? "True" : "False",
+                ["referral_made"] = (referralMade ?? false) ? "True" : "False",
                 ["notes_restricted"] = string.Empty,
             };
             _processRecordings.Add(row);
             return ListProcessRecordings(residentId).Last();
+        }
+    }
+
+    public ProcessRecordingDto? PatchProcessRecording(int id, PatchProcessRecordingDto p)
+    {
+        lock (_lock)
+        {
+            var row = _processRecordings.FirstOrDefault(x => GetInt(x, "recording_id") == id);
+            if (row is null) return null;
+            if (p.SessionDate.HasValue) row["session_date"] = p.SessionDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (p.SocialWorker != null) row["social_worker"] = p.SocialWorker;
+            if (p.SessionType != null) row["session_type"] = p.SessionType;
+            if (p.SessionDurationMinutes.HasValue) row["session_duration_minutes"] = p.SessionDurationMinutes.Value.ToString(CultureInfo.InvariantCulture);
+            if (p.EmotionalStateObserved != null) row["emotional_state_observed"] = p.EmotionalStateObserved;
+            if (p.EmotionalStateEnd != null) row["emotional_state_end"] = p.EmotionalStateEnd;
+            if (p.SessionNarrative != null) row["session_narrative"] = p.SessionNarrative;
+            if (p.InterventionsApplied != null) row["interventions_applied"] = p.InterventionsApplied;
+            if (p.FollowUpActions != null) row["follow_up_actions"] = p.FollowUpActions;
+            if (p.ProgressNoted.HasValue) row["progress_noted"] = p.ProgressNoted.Value ? "True" : "False";
+            if (p.ConcernsFlagged.HasValue) row["concerns_flagged"] = p.ConcernsFlagged.Value ? "True" : "False";
+            if (p.ReferralMade.HasValue) row["referral_made"] = p.ReferralMade.Value ? "True" : "False";
+            return ListProcessRecordings(GetInt(row, "resident_id")).First(x => x.Id == id);
         }
     }
 
@@ -590,13 +615,16 @@ public sealed class LighthouseDataStore
         string? familyCooperation,
         bool safetyConcerns,
         bool followUpNeeded,
-        string? followUpNotes)
+        string? followUpNotes,
+        string? purpose,
+        string? familyMembersPresent,
+        string? visitOutcome)
     {
         lock (_lock)
         {
             if (_residents.All(x => GetInt(x, "resident_id") != residentId))
                 throw new InvalidOperationException("Unknown resident.");
-            var next = _homeVisitations.Max(x => GetInt(x, "visitation_id")) + 1;
+            var next = _homeVisitations.Count == 0 ? 1 : _homeVisitations.Max(x => GetInt(x, "visitation_id")) + 1;
             var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["visitation_id"] = next.ToString(CultureInfo.InvariantCulture),
@@ -605,17 +633,93 @@ public sealed class LighthouseDataStore
                 ["social_worker"] = socialWorker,
                 ["visit_type"] = visitType,
                 ["location_visited"] = locationVisited ?? string.Empty,
-                ["family_members_present"] = string.Empty,
-                ["purpose"] = $"Visitation for {visitType.ToLowerInvariant()}",
+                ["family_members_present"] = familyMembersPresent ?? string.Empty,
+                ["purpose"] = string.IsNullOrWhiteSpace(purpose) ? $"Visitation for {visitType.ToLowerInvariant()}" : purpose,
                 ["observations"] = observations ?? string.Empty,
                 ["family_cooperation_level"] = familyCooperation ?? string.Empty,
                 ["safety_concerns_noted"] = safetyConcerns ? "True" : "False",
                 ["follow_up_needed"] = followUpNeeded ? "True" : "False",
                 ["follow_up_notes"] = followUpNotes ?? string.Empty,
-                ["visit_outcome"] = "Favorable",
+                ["visit_outcome"] = string.IsNullOrWhiteSpace(visitOutcome) ? "Favorable" : visitOutcome,
             };
             _homeVisitations.Add(row);
             return ListHomeVisitations(residentId).First(x => x.Id == next);
+        }
+    }
+
+    public HomeVisitationDto? PatchHomeVisitation(int id, PatchHomeVisitationDto p)
+    {
+        lock (_lock)
+        {
+            var row = _homeVisitations.FirstOrDefault(x => GetInt(x, "visitation_id") == id);
+            if (row is null) return null;
+            if (p.VisitDate.HasValue) row["visit_date"] = p.VisitDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            if (p.SocialWorker != null) row["social_worker"] = p.SocialWorker;
+            if (p.VisitType != null) row["visit_type"] = p.VisitType;
+            if (p.LocationVisited != null) row["location_visited"] = p.LocationVisited;
+            if (p.FamilyMembersPresent != null) row["family_members_present"] = p.FamilyMembersPresent;
+            if (p.Purpose != null) row["purpose"] = p.Purpose;
+            if (p.Observations != null) row["observations"] = p.Observations;
+            if (p.FamilyCooperationLevel != null) row["family_cooperation_level"] = p.FamilyCooperationLevel;
+            if (p.SafetyConcernsNoted.HasValue) row["safety_concerns_noted"] = p.SafetyConcernsNoted.Value ? "True" : "False";
+            if (p.FollowUpNeeded.HasValue) row["follow_up_needed"] = p.FollowUpNeeded.Value ? "True" : "False";
+            if (p.FollowUpNotes != null) row["follow_up_notes"] = p.FollowUpNotes;
+            if (p.VisitOutcome != null) row["visit_outcome"] = p.VisitOutcome;
+            return ListHomeVisitations(GetInt(row, "resident_id")).First(x => x.Id == id);
+        }
+    }
+
+    public InterventionPlanDto CreateInterventionPlan(int residentId, string planCategory, string planDescription, string? status,
+        DateOnly? targetDate, DateOnly? caseConferenceDate, double? targetValue, string? servicesProvided)
+    {
+        lock (_lock)
+        {
+            if (_residents.All(x => GetInt(x, "resident_id") != residentId))
+                throw new InvalidOperationException("Unknown resident.");
+            var next = _interventionPlans.Count == 0 ? 1 : _interventionPlans.Max(x => GetInt(x, "plan_id")) + 1;
+            var now = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+            var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["plan_id"] = next.ToString(CultureInfo.InvariantCulture),
+                ["resident_id"] = residentId.ToString(CultureInfo.InvariantCulture),
+                ["plan_category"] = planCategory,
+                ["plan_description"] = planDescription,
+                ["services_provided"] = servicesProvided ?? string.Empty,
+                ["target_value"] = targetValue?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                ["target_date"] = targetDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
+                ["status"] = string.IsNullOrWhiteSpace(status) ? "In Progress" : status,
+                ["case_conference_date"] = caseConferenceDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty,
+                ["created_at"] = now,
+                ["updated_at"] = now,
+            };
+            _interventionPlans.Add(row);
+            return ListInterventionPlans(residentId).First(x => x.Id == next);
+        }
+    }
+
+    public InterventionPlanDto? PatchInterventionPlan(int id, PatchInterventionPlanDto p)
+    {
+        lock (_lock)
+        {
+            var row = _interventionPlans.FirstOrDefault(x => GetInt(x, "plan_id") == id);
+            if (row is null) return null;
+            if (p.PlanCategory != null) row["plan_category"] = p.PlanCategory;
+            if (p.PlanDescription != null) row["plan_description"] = p.PlanDescription;
+            if (p.ServicesProvided != null) row["services_provided"] = p.ServicesProvided;
+            if (p.TargetValue.HasValue) row["target_value"] = p.TargetValue.Value.ToString(CultureInfo.InvariantCulture);
+            if (p.TargetDate != null)
+            {
+                if (string.IsNullOrWhiteSpace(p.TargetDate)) row["target_date"] = string.Empty;
+                else row["target_date"] = p.TargetDate;
+            }
+            if (p.Status != null) row["status"] = p.Status;
+            if (p.CaseConferenceDate != null)
+            {
+                if (string.IsNullOrWhiteSpace(p.CaseConferenceDate)) row["case_conference_date"] = string.Empty;
+                else row["case_conference_date"] = p.CaseConferenceDate;
+            }
+            row["updated_at"] = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+            return ListInterventionPlans(GetInt(row, "resident_id")).First(x => x.Id == id);
         }
     }
 

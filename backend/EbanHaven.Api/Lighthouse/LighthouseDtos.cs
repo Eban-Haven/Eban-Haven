@@ -199,6 +199,45 @@ public sealed record SafehouseOptionDto(int Id, string Code, string Name, string
 public sealed record EducationRecordDto(int Id, int ResidentId, string RecordDate, double? ProgressPercent);
 public sealed record HealthRecordDto(int Id, int ResidentId, string RecordDate, double? HealthScore);
 
+/// <summary>Partial update for counseling / process recordings. Omitted/null properties are left unchanged.</summary>
+public sealed record PatchProcessRecordingDto(
+    DateTime? SessionDate,
+    string? SocialWorker,
+    string? SessionType,
+    int? SessionDurationMinutes,
+    string? EmotionalStateObserved,
+    string? EmotionalStateEnd,
+    string? SessionNarrative,
+    string? InterventionsApplied,
+    string? FollowUpActions,
+    bool? ProgressNoted,
+    bool? ConcernsFlagged,
+    bool? ReferralMade);
+
+public sealed record PatchHomeVisitationDto(
+    DateTime? VisitDate,
+    string? SocialWorker,
+    string? VisitType,
+    string? LocationVisited,
+    string? FamilyMembersPresent,
+    string? Purpose,
+    string? Observations,
+    string? FamilyCooperationLevel,
+    bool? SafetyConcernsNoted,
+    bool? FollowUpNeeded,
+    string? FollowUpNotes,
+    string? VisitOutcome);
+
+/// <summary>TargetDate / CaseConferenceDate as yyyy-MM-dd or null to skip.</summary>
+public sealed record PatchInterventionPlanDto(
+    string? PlanCategory,
+    string? PlanDescription,
+    string? ServicesProvided,
+    double? TargetValue,
+    string? TargetDate,
+    string? Status,
+    string? CaseConferenceDate);
+
 // ── ML feature extraction DTOs ────────────────────────────────────────────────
 
 /// <summary>Pre-computed feature vector for the Reintegration Readiness model.</summary>

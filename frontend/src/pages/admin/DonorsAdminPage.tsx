@@ -27,7 +27,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { NeutralPill, StatusBadge } from './adminDataTable/AdminBadges'
+import { CategoryBadge, StatusBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -481,11 +481,9 @@ export function DonorsAdminPage() {
                   </td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{s.displayName}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{s.supporterType}</NeutralPill>
+                    <CategoryBadge>{s.supporterType}</CategoryBadge>
                   </td>
-                  <td className="px-3 py-2.5">
-                    {s.relationshipType ? <NeutralPill>{s.relationshipType}</NeutralPill> : <span className="text-muted-foreground">—</span>}
-                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{s.relationshipType ?? '—'}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{s.email ?? '—'}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{s.region ?? '—'}</td>
                   <td className="px-3 py-2.5">

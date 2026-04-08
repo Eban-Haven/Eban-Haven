@@ -27,7 +27,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { NeutralPill } from './adminDataTable/AdminBadges'
+import { CategoryBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -454,7 +454,7 @@ export function AllocationsAdminPage() {
                   <td className="px-3 py-2.5 text-foreground">{donationLabel(r.donationId)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{r.safehouseName ?? safehouseNameById.get(r.safehouseId) ?? `— (${r.safehouseId})`}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{r.programArea}</NeutralPill>
+                    <CategoryBadge>{r.programArea}</CategoryBadge>
                   </td>
                   <td className="px-3 py-2.5 tabular-nums font-medium">{formatMoneyPhp(r.amountAllocated)}</td>
                   <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>

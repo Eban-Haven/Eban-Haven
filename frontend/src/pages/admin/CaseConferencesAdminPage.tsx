@@ -27,7 +27,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { NeutralPill, StatusBadge } from './adminDataTable/AdminBadges'
+import { CategoryBadge, StatusBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -37,7 +37,7 @@ import {
 } from './adminDataTable/AdminFilterPrimitives'
 import { formatAdminDate, inDateRange, matchesIdMulti, matchesStringMulti, uniqSortedStrings } from './adminDataTable/adminFormatters'
 
-const PLAN_STATUSES = ['In Progress', 'On Hold', 'Achieved', 'Not Achieved'] as const
+const PLAN_STATUSES = ['Open', 'In Progress', 'Achieved', 'On Hold', 'Closed'] as const
 
 function emptyFilters() {
   return {
@@ -453,7 +453,7 @@ export function CaseConferencesAdminPage() {
                   <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatAdminDate(p.caseConferenceDate)}</td>
                   <td className="px-3 py-2.5 font-medium text-foreground">{p.residentInternalCode}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{p.planCategory}</NeutralPill>
+                    <CategoryBadge>{p.planCategory}</CategoryBadge>
                   </td>
                   <td className="max-w-[220px] truncate px-3 py-2.5 text-muted-foreground" title={p.servicesProvided ?? ''}>
                     {p.servicesProvided ?? '—'}

@@ -27,7 +27,7 @@ import { AdminListToolbar } from './AdminListToolbar'
 import { nextSortState, sortRows, SortableTh, type SortDirection } from './SortableTh'
 import { AdminBulkActionsBar } from './adminDataTable/AdminBulkActionsBar'
 import { AdminDeleteModal } from './adminDataTable/AdminDeleteModal'
-import { BoolPill, NeutralPill, VisitOutcomeBadge } from './adminDataTable/AdminBadges'
+import { BooleanBadge, CategoryBadge, VisitOutcomeBadge } from './adminDataTable/AdminBadges'
 import {
   FilterPanelCard,
   DateRangeFilter,
@@ -491,14 +491,14 @@ export function HomeVisitationsAdminPage() {
                   <td className="px-3 py-2.5 font-medium text-foreground">{v.residentInternalCode}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{v.socialWorker}</td>
                   <td className="px-3 py-2.5">
-                    <NeutralPill>{v.visitType}</NeutralPill>
+                    <CategoryBadge>{v.visitType}</CategoryBadge>
                   </td>
                   <td className="px-3 py-2.5 text-muted-foreground">{v.locationVisited ?? '—'}</td>
                   <td className="px-3 py-2.5">
-                    {v.familyCooperationLevel ? <NeutralPill>{v.familyCooperationLevel}</NeutralPill> : <span className="text-muted-foreground">—</span>}
+                    {v.familyCooperationLevel ? <CategoryBadge>{v.familyCooperationLevel}</CategoryBadge> : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2.5">
-                    <BoolPill value={v.safetyConcernsNoted} />
+                    <BooleanBadge value={v.safetyConcernsNoted} trueVariant="danger" />
                   </td>
                   <td className="max-w-[200px] px-3 py-2.5">
                     {v.visitOutcome ? <VisitOutcomeBadge outcome={v.visitOutcome} /> : <span className="text-muted-foreground">—</span>}
