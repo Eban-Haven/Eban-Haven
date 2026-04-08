@@ -226,16 +226,6 @@ export function AdminLayout() {
             <LogOut className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && 'Sign out'}
           </button>
-          <Link
-            to="/"
-            className={`flex items-center gap-2 rounded-lg text-sm text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground ${
-              sidebarCollapsed ? 'justify-center px-2 py-2 lg:px-2' : 'px-3 py-2'
-            }`}
-            title={sidebarCollapsed ? 'Back to public site' : undefined}
-          >
-            <Home className="h-4 w-4 shrink-0" />
-            {!sidebarCollapsed && 'Back to public site'}
-          </Link>
         </div>
       </aside>
 
