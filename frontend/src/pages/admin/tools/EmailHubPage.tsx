@@ -87,8 +87,9 @@ export function EmailHubPage() {
   const [loadingProfile, setLoadingProfile] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [copyState, setCopyState] = useState<'subject' | 'body' | null>(null)
+  const [copyState, setCopyState] = useState<'subject' | 'body' | 'html' | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [previewMode, setPreviewMode] = useState<'plain' | 'rich'>('rich')
   const [signature, setSignature] = useState<SignatureFields>(() => loadStoredSignature())
 
   useEffect(() => {
@@ -167,7 +168,7 @@ export function EmailHubPage() {
     }
   }
 
-  async function handleCopy(kind: 'subject' | 'body', value: string) {
+  async function handleCopy(kind: 'subject' | 'body' | 'html', value: string) {
     try {
       await copyText(value)
       setCopyState(kind)
@@ -184,6 +185,10 @@ export function EmailHubPage() {
 
   function updateSignature<K extends keyof SignatureFields>(key: K, value: SignatureFields[K]) {
     setSignature((current) => ({ ...current, [key]: value }))
+  }
+
+  function createMarkup(html: string) {
+    return { __html: html }
   }
 
   return (
@@ -482,7 +487,7 @@ export function EmailHubPage() {
                     {generating ? 'Generating email…' : 'Generate email'}
                   </button>
                   <p className="text-xs text-muted-foreground">
-                    The generated draft will use plain text formatting so it pastes cleanly into email clients.
+                    `Open email draft` uses plain text. The rich preview below shows the styled HTML version.
                   </p>
                 </div>
 
@@ -505,18 +510,52 @@ export function EmailHubPage() {
 
                     <div>
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Body</p>
-                        <button
-                          type="button"
-                          className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
-                          onClick={() => void handleCopy('body', generated.body)}
-                        >
-                          {copyState === 'body' ? 'Copied' : 'Copy body'}
-                        </button>
+                        <div className="flex items-center gap-2 rounded-full border border-border bg-card p-1">
+                          <button
+                            type="button"
+                            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                              previewMode === 'rich' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                            }`}
+                            onClick={() => setPreviewMode('rich')}
+                          >
+                            Rich preview
+                          </button>
+                          <button
+                            type="button"
+                            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                              previewMode === 'plain' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'
+                            }`}
+                            onClick={() => setPreviewMode('plain')}
+                          >
+                            Plain text
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
+                            onClick={() => void handleCopy('body', generated.body)}
+                          >
+                            {copyState === 'body' ? 'Copied' : 'Copy text'}
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
+                            onClick={() => void handleCopy('html', generated.htmlBody)}
+                          >
+                            {copyState === 'html' ? 'Copied' : 'Copy HTML'}
+                          </button>
+                        </div>
                       </div>
-                      <pre className="mt-2 whitespace-pre-wrap rounded-xl border border-border bg-card p-4 font-sans text-sm leading-relaxed text-foreground">
-                        {generated.body}
-                      </pre>
+                      {previewMode === 'plain' ? (
+                        <pre className="mt-2 whitespace-pre-wrap rounded-xl border border-border bg-card p-4 font-sans text-sm leading-relaxed text-foreground">
+                          {generated.body}
+                        </pre>
+                      ) : (
+                        <div className="mt-2 overflow-hidden rounded-xl border border-border bg-[#f4efe8]">
+                          <div className="max-h-[48rem] overflow-auto" dangerouslySetInnerHTML={createMarkup(generated.htmlBody)} />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">

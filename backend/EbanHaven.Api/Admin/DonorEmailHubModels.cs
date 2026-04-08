@@ -29,5 +29,6 @@ public sealed record GeneratedDonorEmailDto(
     string Subject,
     string Preview,
     string Body,
+    string HtmlBody,
     bool UsedAi,
     string Strategy);

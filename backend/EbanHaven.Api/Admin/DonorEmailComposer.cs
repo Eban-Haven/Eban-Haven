@@ -20,6 +20,10 @@ public sealed class DonorEmailComposer(
     IOptions<OpenAIOptions> options,
     ILogger<DonorEmailComposer> logger) : IDonorEmailComposer
 {
+    private const string PublicSiteUrl = "https://eban-haven.vercel.app";
+    private const string ImpactUrl = $"{PublicSiteUrl}/impact";
+    private const string InfoEmail = "info@ebanhaven.org";
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
@@ -74,10 +78,14 @@ public sealed class DonorEmailComposer(
         if (parsed is null || string.IsNullOrWhiteSpace(parsed.Subject) || string.IsNullOrWhiteSpace(parsed.Body))
             return null;
 
+        var subject = NormalizeSingleLine(parsed.Subject);
+        var preview = NormalizeSingleLine(parsed.Preview);
+        var body = NormalizeBody(parsed.Body, request);
         return new GeneratedDonorEmailDto(
-            NormalizeSingleLine(parsed.Subject),
-            NormalizeSingleLine(parsed.Preview),
-            NormalizeBody(parsed.Body),
+            subject,
+            preview,
+            body,
+            BuildHtmlEmail(subject, preview, body, request),
             UsedAi: true,
             Strategy: "AI-generated from donor history");
     }
@@ -165,10 +173,14 @@ public sealed class DonorEmailComposer(
         body.AppendLine();
         AppendSignature(body, request);
 
+        var normalizedSubject = NormalizeSingleLine(subject);
+        var normalizedPreview = NormalizeSingleLine(preview);
+        var normalizedBody = NormalizeBody(body.ToString(), request);
         return new GeneratedDonorEmailDto(
-            NormalizeSingleLine(subject),
-            NormalizeSingleLine(preview),
-            NormalizeBody(body.ToString()),
+            normalizedSubject,
+            normalizedPreview,
+            normalizedBody,
+            BuildHtmlEmail(normalizedSubject, normalizedPreview, normalizedBody, request),
             UsedAi: false,
             Strategy: "Template generated from donor history");
     }
@@ -316,7 +328,7 @@ public sealed class DonorEmailComposer(
         return normalized;
     }
 
-    private static string NormalizeBody(string? value)
+    private static string NormalizeBody(string? value, GenerateDonorEmailRequest request)
     {
         if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 
@@ -331,22 +343,133 @@ public sealed class DonorEmailComposer(
         normalized = Regex.Replace(normalized, @"\n{3,}", "\n\n");
         normalized = Regex.Replace(normalized, @"[ \t]{2,}", " ");
 
-        var bannedPlaceholders = new[]
-        {
-            "[Your Name]",
-            "[Your Title]",
-            "[Organization Name]",
-            "[Contact Information]",
-            "[Your+Name]",
-            "[Your+Title]",
-            "[Organization+Name]",
-            "[Contact+Information]"
-        };
+        normalized = Regex.Replace(
+            normalized,
+            @"(?im)^\s*\[(your|sender|organization|contact)[^\]]*\]\s*$",
+            string.Empty);
+        normalized = Regex.Replace(
+            normalized,
+            @"(?im)^\s*\[.*?(name|title|organization|contact).*?\]\s*$",
+            string.Empty);
+        normalized = Regex.Replace(normalized, @"\n{3,}", "\n\n");
 
-        foreach (var placeholder in bannedPlaceholders)
-            normalized = normalized.Replace(placeholder, string.Empty, StringComparison.OrdinalIgnoreCase);
+        var signatureLines = new[]
+        {
+            request.SenderName?.Trim(),
+            request.SenderTitle?.Trim(),
+            request.SenderOrganization?.Trim(),
+            request.SenderContact?.Trim()
+        }
+        .Where(static line => !string.IsNullOrWhiteSpace(line))
+        .ToArray();
+
+        if (signatureLines.Length > 0)
+        {
+            var signatureBlock = string.Join("\n", signatureLines);
+            if (!normalized.Contains(signatureBlock, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized.TrimEnd();
+                normalized += "\n\nWith gratitude,\n" + signatureBlock;
+            }
+        }
+        else if (!normalized.Contains("The Eban Haven Team", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized.TrimEnd() + "\n\nWith gratitude,\nThe Eban Haven Team";
+        }
 
         return normalized.Trim();
+    }
+
+    private static string BuildHtmlEmail(
+        string subject,
+        string preview,
+        string body,
+        GenerateDonorEmailRequest request)
+    {
+        var signatureLines = new[]
+        {
+            request.SenderName?.Trim(),
+            request.SenderTitle?.Trim(),
+            request.SenderOrganization?.Trim(),
+            request.SenderContact?.Trim()
+        }
+        .Where(static line => !string.IsNullOrWhiteSpace(line))
+        .Select(static line => line!)
+        .DefaultIfEmpty("The Eban Haven Team")
+        .ToArray();
+
+        var bodyWithoutSignature = RemoveSignatureBlock(body, signatureLines);
+        var paragraphs = bodyWithoutSignature
+            .Split("\n\n", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(paragraph => EscapeHtml(paragraph).Replace("\n", "<br/>"))
+            .ToArray();
+
+        var paragraphHtml = string.Join(
+            "\n",
+            paragraphs.Select(static paragraph => $"<p style=\"margin:0 0 18px;color:#30434a;font-size:16px;line-height:1.7;\">{paragraph}</p>"));
+
+        var signatureHtml = string.Join(
+            "<br/>",
+            signatureLines.Select(EscapeHtml));
+
+        var heroImageUrl = $"{PublicSiteUrl}/logo_transparent.png";
+
+        return $"""
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f4efe8;font-family:Georgia,'Times New Roman',serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{EscapeHtml(preview)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4efe8;padding:24px 0;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#fffdf9;border-radius:24px;overflow:hidden;box-shadow:0 18px 50px rgba(61,47,32,.12);">
+            <tr>
+              <td style="background:linear-gradient(135deg,#114b5f 0%,#1f7a8c 55%,#f2c14e 100%);padding:28px 36px;">
+                <img src="{heroImageUrl}" alt="Eban Haven" style="display:block;width:120px;max-width:120px;height:auto;margin-bottom:18px;" />
+                <div style="color:#fff7ec;font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-family:Arial,sans-serif;">Eban Haven</div>
+                <h1 style="margin:10px 0 0;color:white;font-size:30px;line-height:1.2;font-weight:700;">{EscapeHtml(subject)}</h1>
+                <p style="margin:12px 0 0;color:rgba(255,247,236,.9);font-size:15px;line-height:1.6;font-family:Arial,sans-serif;">{EscapeHtml(preview)}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px;">
+                {paragraphHtml}
+                <div style="margin:28px 0 0;padding:24px;border-radius:18px;background:#f7f3ed;border:1px solid #eadfce;">
+                  <p style="margin:0 0 14px;color:#7a5c2e;font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-family:Arial,sans-serif;">Stay Connected</p>
+                  <p style="margin:0 0 18px;color:#30434a;font-size:15px;line-height:1.7;">Learn more about the programs and impact your support helps sustain.</p>
+                  <a href="{ImpactUrl}" style="display:inline-block;background:#114b5f;color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:999px;font-size:14px;font-weight:700;font-family:Arial,sans-serif;">View Our Impact</a>
+                  <p style="margin:16px 0 0;color:#6a7b80;font-size:13px;line-height:1.6;font-family:Arial,sans-serif;">Website: <a href="{PublicSiteUrl}" style="color:#114b5f;">{PublicSiteUrl}</a><br/>Contact: <a href="mailto:{InfoEmail}" style="color:#114b5f;">{InfoEmail}</a></p>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 36px 36px;">
+                <div style="padding-top:22px;border-top:1px solid #eadfce;color:#5f6d72;font-size:14px;line-height:1.7;font-family:Arial,sans-serif;">
+                  {signatureHtml}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+""";
+    }
+
+    private static string EscapeHtml(string? value)
+    {
+        return System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
+    }
+
+    private static string RemoveSignatureBlock(string body, IReadOnlyList<string> signatureLines)
+    {
+        var signatureBlock = "With gratitude,\n" + string.Join("\n", signatureLines);
+        if (body.EndsWith(signatureBlock, StringComparison.OrdinalIgnoreCase))
+            return body[..^signatureBlock.Length].TrimEnd();
+
+        return body;
     }
 
     private sealed class DonorEmailModelReply

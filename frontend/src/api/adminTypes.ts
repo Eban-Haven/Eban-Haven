@@ -148,6 +148,7 @@ export type GeneratedDonorEmail = {
   subject: string
   preview: string
   body: string
+  htmlBody: string
   usedAi: boolean
   strategy: string
 }
