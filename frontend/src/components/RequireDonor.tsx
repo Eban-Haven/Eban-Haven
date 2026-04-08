@@ -15,7 +15,8 @@ export function RequireDonor({ children }: { children: React.ReactNode }) {
       return
     }
 
-    setState(user.role === 'donor' ? 'in' : 'denied')
+    const role = user.role?.trim().toLowerCase() ?? ''
+    setState(role === 'donor' ? 'in' : 'denied')
   }, [])
 
   useEffect(() => {

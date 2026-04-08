@@ -1,20 +1,39 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Menu, X } from 'lucide-react'
+import { LayoutDashboard, LogIn, LogOut, Menu, Shield, X } from 'lucide-react'
 import { SiteLogoMark } from './SiteLogoMark'
 import { ThemeToggle } from './ThemeToggle'
 import { SITE_DISPLAY_NAME } from '../site'
+import { logout } from '../api/auth'
+import { useAuthSession } from '../hooks/useAuthSession'
 
 const links = [
   { to: '/', label: 'Home' },
   { to: '/impact', label: 'Our Impact' },
 ] as const
 
+function isDonorRole(role: string | undefined) {
+  return role?.trim().toLowerCase() === 'donor'
+}
+
+/** Matches `RequireAdmin`: only full admins use `/admin` in this app. */
+function isAdminRole(role: string | undefined) {
+  return role?.trim().toLowerCase() === 'admin'
+}
+
 export function Navigation() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
+  const session = useAuthSession()
   const isActive = (path: string) => location.pathname === path
+
+  async function onLogout() {
+    setOpen(false)
+    await logout()
+    navigate('/', { replace: true })
+  }
 
   return (
     <>
@@ -42,12 +61,73 @@ export function Navigation() {
               </Link>
             ))}
             <ThemeToggle />
-            <Link
-              to="/login"
-              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-            >
-              Login
-            </Link>
+            {session === undefined ? (
+              <span className="h-9 w-24 animate-pulse rounded-lg bg-muted" aria-hidden />
+            ) : session === null ? (
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                <LogIn className="h-4 w-4" />
+                Login
+              </Link>
+            ) : isDonorRole(session.role) ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/donor-dashboard"
+                  className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    isActive('/donor-dashboard')
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  My dashboard
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void onLogout()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </button>
+              </div>
+            ) : isAdminRole(session.role) ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/admin"
+                  className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    location.pathname.startsWith('/admin')
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'border-border text-foreground hover:bg-muted'
+                  }`}
+                >
+                  <Shield className="h-4 w-4" />
+                  Staff portal
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void onLogout()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="hidden text-sm text-muted-foreground sm:inline">Signed in</span>
+                <button
+                  type="button"
+                  onClick={() => void onLogout()}
+                  className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
 
           <button
@@ -80,13 +160,65 @@ export function Navigation() {
                   </Link>
                 ))}
                 <ThemeToggle />
-                <Link
-                  to="/login"
-                  className="block text-sm font-medium text-primary"
-                  onClick={() => setOpen(false)}
-                >
-                  Login →
-                </Link>
+                {session === undefined ? null : session === null ? (
+                  <Link
+                    to="/login"
+                    className="block text-sm font-medium text-primary"
+                    onClick={() => setOpen(false)}
+                  >
+                    Login →
+                  </Link>
+                ) : isDonorRole(session.role) ? (
+                  <div className="flex flex-col gap-2 border-t border-border pt-3">
+                    <Link
+                      to="/donor-dashboard"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-foreground"
+                      onClick={() => setOpen(false)}
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      My dashboard
+                    </Link>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 text-left text-sm font-medium text-muted-foreground"
+                      onClick={() => void onLogout()}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </button>
+                  </div>
+                ) : isAdminRole(session.role) ? (
+                  <div className="flex flex-col gap-2 border-t border-border pt-3">
+                    <Link
+                      to="/admin"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-foreground"
+                      onClick={() => setOpen(false)}
+                    >
+                      <Shield className="h-4 w-4" />
+                      Staff portal
+                    </Link>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 text-left text-sm font-medium text-muted-foreground"
+                      onClick={() => void onLogout()}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2 border-t border-border pt-3">
+                    <p className="text-sm text-muted-foreground">Signed in</p>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-2 text-left text-sm font-medium text-muted-foreground"
+                      onClick={() => void onLogout()}
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Log out
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

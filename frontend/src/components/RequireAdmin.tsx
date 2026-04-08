@@ -13,7 +13,8 @@ export function RequireAdmin({ children }: { children: React.ReactNode }) {
       return
     }
 
-    setState(user.role === 'admin' ? 'in' : 'denied')
+    const role = user.role?.trim().toLowerCase() ?? ''
+    setState(role === 'admin' ? 'in' : 'denied')
   }, [])
 
   useEffect(() => {

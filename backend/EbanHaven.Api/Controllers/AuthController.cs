@@ -112,7 +112,10 @@ public sealed class AuthController(HavenDbContext db, IConfiguration config) : C
         var display = User.Claims.FirstOrDefault(c => c.Type == "email")?.Value
             ?? User.FindFirst(ClaimTypes.Email)?.Value
             ?? User.Identity.Name;
-        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "staff";
+        // Prefer semantic role from JWT ("role" claim). ClaimTypes.Role is mapped to "Staff" for staff accounts.
+        var role = User.FindFirst("role")?.Value
+            ?? User.FindFirst(ClaimTypes.Role)?.Value
+            ?? "staff";
         return Ok(new { user = display, role });
     }
 
