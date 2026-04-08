@@ -277,9 +277,11 @@ export function ProcessRecordingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className={pageTitle}>Counseling sessions</h2>
+        <h2 className={pageTitle}>Process recordings</h2>
         <p className={pageDesc}>
-          Counseling session log — open a row for the resident case file. Filters support ranges and multi-select.
+          Each entry documents a dated interaction between a social worker and a resident, including observations,
+          interventions, and follow-up actions. Open a row for the resident case file. Filters support ranges and
+          multi-select.
         </p>
       </div>
 
@@ -292,12 +294,12 @@ export function ProcessRecordingsPage() {
         filterOpen={filterOpen}
         onFilterToggle={() => setFilterOpen((o) => !o)}
         onAddClick={openAdd}
-        addLabel="Add session"
+        addLabel="Add recording"
       />
 
       <AdminBulkActionsBar
         count={selected.size}
-        recordLabel="session"
+        recordLabel="recording"
         onDeleteClick={openDeleteModal}
         onClearSelection={() => setSelected(new Set())}
         disabled={saving}
@@ -358,7 +360,7 @@ export function ProcessRecordingsPage() {
       {showNew && (
         <form id="admin-add-process" onSubmit={onSubmit} className={`${cardForm} scroll-mt-28`}>
           <div className="flex items-center justify-between">
-            <p className={sectionFormTitle}>New counseling session</p>
+            <p className={sectionFormTitle}>New process recording</p>
             <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={() => setShowNew(false)}>
               Close
             </button>
@@ -421,7 +423,7 @@ export function ProcessRecordingsPage() {
             <textarea className={input} rows={4} value={narrative} onChange={(e) => setNarrative(e.target.value)} required />
           </label>
           <button type="submit" disabled={saving || residents.length === 0} className={btnPrimary}>
-            {saving ? 'Saving…' : 'Save session'}
+            {saving ? 'Saving…' : 'Save recording'}
           </button>
         </form>
       )}
@@ -459,7 +461,7 @@ export function ProcessRecordingsPage() {
             ) : filteredSorted.length === 0 ? (
               <tr>
                 <td colSpan={colCount} className={emptyCell}>
-                  No sessions for this view.
+                  No recordings for this view.
                 </td>
               </tr>
             ) : (
@@ -499,12 +501,12 @@ export function ProcessRecordingsPage() {
 
       <AdminDeleteModal
         open={deleteModal != null}
-        title={deleteModal && deleteModal.ids.length === 1 ? 'Delete session?' : 'Delete sessions?'}
+        title={deleteModal && deleteModal.ids.length === 1 ? 'Delete recording?' : 'Delete recordings?'}
         body={
           deleteModal
             ? deleteModal.ids.length === 1
-              ? 'You are about to delete one counseling session.'
-              : `You are about to delete ${deleteModal.ids.length} counseling sessions.`
+              ? 'You are about to delete one process recording.'
+              : `You are about to delete ${deleteModal.ids.length} process recordings.`
             : ''
         }
         previewLines={deleteModal && deleteModal.labels.length > 1 ? deleteModal.labels : deleteModal?.labels.slice(0, 1)}

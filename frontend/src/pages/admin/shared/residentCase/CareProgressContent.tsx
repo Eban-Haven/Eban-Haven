@@ -136,9 +136,9 @@ function CounselingSection({
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
       <SectionHeader
-        title="Counseling sessions"
-        description="Counseling sessions for this resident — open a row for full notes and follow-up."
-        actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add session</QuickActionButton>}
+        title="Process recordings"
+        description="Each entry documents a dated interaction between a social worker and this resident, including observations, interventions, and follow-up actions. Open a row below for full notes and follow-up."
+        actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add recording</QuickActionButton>}
       />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <SearchField value={q} onChange={setQ} placeholder="Worker, type, emotional state…" />
@@ -154,9 +154,9 @@ function CounselingSection({
       <div className="space-y-2">
         {filtered.length === 0 ? (
           <EmptyState
-            title="No counseling sessions yet"
-            hint="Document sessions to track emotional state, interventions, and follow-up."
-            action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add session</QuickActionButton>}
+            title="No process recordings yet"
+            hint="Each recording captures a dated worker–resident interaction: observations, interventions, and follow-up."
+            action={<QuickActionButton onClick={() => setCreateOpen(true)}>Add recording</QuickActionButton>}
           />
         ) : (
           filtered.map((r) => (
@@ -198,8 +198,8 @@ function CounselingSection({
 
       <AdminDeleteModal
         open={deleteId != null}
-        title="Delete counseling session?"
-        body="This session record will be permanently removed."
+        title="Delete process recording?"
+        body="This process recording will be permanently removed."
         loading={saving}
         onCancel={() => setDeleteId(null)}
         onConfirm={async () => {
@@ -319,7 +319,7 @@ function CounselingDrawer({
 
   return (
     <CaseDrawer
-      title={mode === 'create' ? 'New counseling session' : 'Counseling session'}
+      title={mode === 'create' ? 'New process recording' : 'Process recording'}
       onClose={onClose}
       footer={
         readOnly && initial ? (

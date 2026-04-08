@@ -151,7 +151,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
     for (const r of proc) {
       rows.push({
         sort: new Date(r.sessionDate).getTime(),
-        line: `Counseling · ${r.sessionType} · ${formatAdminDate(r.sessionDate)}`,
+        line: `Process recording · ${r.sessionType} · ${formatAdminDate(r.sessionDate)}`,
         tab: 'care',
         care: 'counseling',
       })
@@ -239,7 +239,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   ]
 
   const careTabs: { k: CareSub; label: string }[] = [
-    { k: 'counseling', label: 'Counseling sessions' },
+    { k: 'counseling', label: 'Process recordings' },
     { k: 'visits', label: 'Home visitations' },
     { k: 'education', label: 'Education' },
     { k: 'health', label: 'Health & wellbeing' },
@@ -271,7 +271,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           </div>
           <div className="flex flex-wrap gap-2">
             <QuickActionButton onClick={() => setIncidentInfoOpen(true)}>Add incident</QuickActionButton>
-            <QuickActionButton onClick={() => bumpCreate('care', 'counseling', 'counseling')}>Add session</QuickActionButton>
+            <QuickActionButton onClick={() => bumpCreate('care', 'counseling', 'counseling')}>Add recording</QuickActionButton>
             <QuickActionButton onClick={() => bumpCreate('care', 'visits', 'visit')}>Add visit</QuickActionButton>
             <QuickActionButton onClick={() => bumpCreate('plans', null, 'plan')}>Add plan</QuickActionButton>
             <QuickActionButton onClick={() => bumpCreate('care', 'education', 'education')}>Add education</QuickActionButton>
@@ -473,7 +473,7 @@ function OverviewPanel({
         <h3 className="mb-3 text-base font-semibold text-foreground">Quick stats</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile label="Incidents (list)" value={stats.incidents} />
-          <StatTile label="Sessions (30d)" value={stats.sessions30} />
+          <StatTile label="Process recordings (30d)" value={stats.sessions30} />
           <StatTile label="Visits (30d / 60d)" value={`${stats.visits30} / ${stats.visits60}`} />
           <StatTile label="Active plans" value={stats.activePlans} />
           <StatTile label="Overdue plans" value={stats.overduePlans} />

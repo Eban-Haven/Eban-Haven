@@ -94,9 +94,9 @@ export function AdminDashboardPage() {
           value={moneyPhp.format(data.monetaryDonationsLast30DaysPhp)}
         />
         <StatCard
-          label="Counseling sessions (all time)"
+          label="Process recordings (all time)"
           value={String(data.processRecordingsCount)}
-          sub="Session documentation"
+          sub="Worker–resident interactions, notes, follow-up"
         />
         <StatCard
           label="Home & field visits (90 days)"
@@ -231,7 +231,7 @@ export function AdminDashboardPage() {
         </Link>
         <Link to="/admin/process-recordings" className={linkTile}>
           <span className="flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Counseling sessions
+            <FileText className="h-4 w-4" /> Process recordings
           </span>
           <ArrowRight className="h-4 w-4 opacity-70" />
         </Link>
