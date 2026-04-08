@@ -264,6 +264,12 @@ export async function requestSchedulePlannedSocialPost(id: number): Promise<T.Pl
   )
 }
 
+export async function schedulePlannedSocialPostToFacebook(id: number): Promise<T.PlannedSocialPost> {
+  return parseJson<T.PlannedSocialPost>(
+    await apiFetch(`${base}/social-planner/posts/${id}/schedule-facebook`, { method: 'POST' }),
+  )
+}
+
 export async function patchPlannedSocialPostStatus(id: number, status: string): Promise<T.PlannedSocialPost> {
   return parseJson<T.PlannedSocialPost>(
     await apiFetch(`${base}/social-planner/posts/${id}/status`, {

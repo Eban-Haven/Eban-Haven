@@ -7,7 +7,9 @@ namespace EbanHaven.Api.Controllers;
 [ApiController]
 [Route("api/admin/social-planner")]
 [Authorize]
-public sealed class SocialPlannerController(IPlannedSocialPostStore store) : ControllerBase
+public sealed class SocialPlannerController(
+    IPlannedSocialPostStore store,
+    IMetaSchedulingService metaSchedulingService) : ControllerBase
 {
     [HttpGet("posts")]
     [ProducesResponseType(typeof(IReadOnlyList<PlannedSocialPostDto>), StatusCodes.Status200OK)]
@@ -47,6 +49,19 @@ public sealed class SocialPlannerController(IPlannedSocialPostStore store) : Con
     public async Task<IActionResult> ScheduleRequest(int id, CancellationToken cancellationToken)
     {
         var updated = await store.UpdateStatusAsync(id, "Schedule Requested", cancellationToken);
+        return updated is null ? NotFound() : Ok(updated);
+    }
+
+    [HttpPost("posts/{id:int}/schedule-facebook")]
+    [ProducesResponseType(typeof(PlannedSocialPostDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ScheduleFacebook(int id, CancellationToken cancellationToken)
+    {
+        var post = await store.GetAsync(id, cancellationToken);
+        if (post is null)
+            return NotFound();
+
+        var result = await metaSchedulingService.ScheduleAsync(post, cancellationToken);
+        var updated = await store.UpdateSchedulingAsync(id, result, cancellationToken);
         return updated is null ? NotFound() : Ok(updated);
     }
 

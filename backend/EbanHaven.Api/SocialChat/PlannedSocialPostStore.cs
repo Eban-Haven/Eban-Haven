@@ -45,10 +45,15 @@ public sealed record CreatePlannedSocialPostCommand(
 public interface IPlannedSocialPostStore
 {
     Task<IReadOnlyList<PlannedSocialPostDto>> ListAsync(CancellationToken cancellationToken);
+    Task<PlannedSocialPostDto?> GetAsync(int id, CancellationToken cancellationToken);
     Task<IReadOnlyList<PlannedSocialPostDto>> CreateAsync(
         IReadOnlyList<CreatePlannedSocialPostCommand> posts,
         CancellationToken cancellationToken);
     Task<PlannedSocialPostDto?> UpdateStatusAsync(int id, string status, CancellationToken cancellationToken);
+    Task<PlannedSocialPostDto?> UpdateSchedulingAsync(
+        int id,
+        MetaScheduleResult result,
+        CancellationToken cancellationToken);
 }
 
 public sealed class DbPlannedSocialPostStore(HavenDbContext db) : IPlannedSocialPostStore
@@ -62,6 +67,14 @@ public sealed class DbPlannedSocialPostStore(HavenDbContext db) : IPlannedSocial
             .ToListAsync(cancellationToken);
 
         return rows.Select(Map).ToArray();
+    }
+
+    public async Task<PlannedSocialPostDto?> GetAsync(int id, CancellationToken cancellationToken)
+    {
+        var row = await db.PlannedSocialPosts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.PlannedSocialPostId == id, cancellationToken);
+        return row is null ? null : Map(row);
     }
 
     public async Task<IReadOnlyList<PlannedSocialPostDto>> CreateAsync(
@@ -112,6 +125,25 @@ public sealed class DbPlannedSocialPostStore(HavenDbContext db) : IPlannedSocial
             return null;
 
         row.Status = string.IsNullOrWhiteSpace(status) ? row.Status : status.Trim();
+        row.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return Map(row);
+    }
+
+    public async Task<PlannedSocialPostDto?> UpdateSchedulingAsync(
+        int id,
+        MetaScheduleResult result,
+        CancellationToken cancellationToken)
+    {
+        var row = await db.PlannedSocialPosts.FirstOrDefaultAsync(x => x.PlannedSocialPostId == id, cancellationToken);
+        if (row is null)
+            return null;
+
+        row.Status = result.Status;
+        row.FacebookPostId = result.FacebookPostId;
+        row.FacebookPageId = result.FacebookPageId;
+        row.FacebookMediaUrl = result.FacebookMediaUrl ?? row.FacebookMediaUrl;
+        row.SchedulingError = result.SchedulingError;
         row.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return Map(row);
@@ -185,6 +217,15 @@ public sealed class InMemoryPlannedSocialPostStore : IPlannedSocialPostStore
         }
     }
 
+    public Task<PlannedSocialPostDto?> GetAsync(int id, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            return Task.FromResult<PlannedSocialPostDto?>(_posts.FirstOrDefault(x => x.Id == id));
+        }
+    }
+
     public Task<IReadOnlyList<PlannedSocialPostDto>> CreateAsync(
         IReadOnlyList<CreatePlannedSocialPostCommand> posts,
         CancellationToken cancellationToken)
@@ -247,6 +288,33 @@ public sealed class InMemoryPlannedSocialPostStore : IPlannedSocialPostStore
             var updated = current with
             {
                 Status = string.IsNullOrWhiteSpace(status) ? current.Status : status.Trim(),
+                UpdatedAtUtc = DateTimeOffset.UtcNow,
+            };
+            _posts[index] = updated;
+            return Task.FromResult<PlannedSocialPostDto?>(updated);
+        }
+    }
+
+    public Task<PlannedSocialPostDto?> UpdateSchedulingAsync(
+        int id,
+        MetaScheduleResult result,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_lock)
+        {
+            var index = _posts.FindIndex(x => x.Id == id);
+            if (index < 0)
+                return Task.FromResult<PlannedSocialPostDto?>(null);
+
+            var current = _posts[index];
+            var updated = current with
+            {
+                Status = result.Status,
+                FacebookPageId = result.FacebookPageId,
+                FacebookPostId = result.FacebookPostId,
+                FacebookMediaUrl = result.FacebookMediaUrl ?? current.FacebookMediaUrl,
+                SchedulingError = result.SchedulingError,
                 UpdatedAtUtc = DateTimeOffset.UtcNow,
             };
             _posts[index] = updated;

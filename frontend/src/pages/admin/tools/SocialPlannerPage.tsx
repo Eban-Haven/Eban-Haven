@@ -5,6 +5,7 @@ import {
   getPlannedSocialPosts,
   patchPlannedSocialPostStatus,
   requestSchedulePlannedSocialPost,
+  schedulePlannedSocialPostToFacebook,
   type PlannedSocialPost,
 } from '../../../api/admin'
 import { type SocialChatMessage, type SocialChatResponse, sendSocialChat } from '../../../api/socialChat'
@@ -205,6 +206,24 @@ export function SocialPlannerPage() {
       setPlannedPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to request scheduling.')
+    } finally {
+      setSavingIds((current) => {
+        const next = new Set(current)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
+  async function sendToFacebook(post: PlannedSocialPost) {
+    const key = `facebook-${post.id}`
+    setSavingIds((current) => new Set(current).add(key))
+    setError(null)
+    try {
+      const updated = await schedulePlannedSocialPostToFacebook(post.id)
+      setPlannedPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to schedule to Facebook.')
     } finally {
       setSavingIds((current) => {
         const next = new Set(current)
@@ -491,6 +510,15 @@ export function SocialPlannerPage() {
                       >
                         {savingIds.has(`schedule-${post.id}`) ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
                         Plan post
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
+                        onClick={() => void sendToFacebook(post)}
+                        disabled={savingIds.has(`facebook-${post.id}`)}
+                      >
+                        {savingIds.has(`facebook-${post.id}`) ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+                        Send to Facebook
                       </button>
                     </div>
                   </article>
