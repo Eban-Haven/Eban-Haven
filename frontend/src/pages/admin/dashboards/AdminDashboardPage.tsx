@@ -134,7 +134,7 @@ export function AdminDashboardPage() {
       }
     })()
     // Non-critical supplementary data — load silently
-    getResidents()
+    getResidents({})
       .then((r) => { if (!cancelled) { setResidents(r); setResidentsLoading(false) } })
       .catch(() => { if (!cancelled) setResidentsLoading(false) })
     getAtRiskDonors(0.55, 10)
