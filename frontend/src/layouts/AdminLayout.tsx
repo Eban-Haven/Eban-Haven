@@ -8,7 +8,6 @@ import {
   FileText,
   Gift,
   Heart,
-  Home,
   LayoutDashboard,
   LineChart,
   LogOut,
