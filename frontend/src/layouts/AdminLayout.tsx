@@ -145,9 +145,7 @@ export function AdminLayout() {
             onClick={() => setSidebarOpen(false)}
             title={SITE_DISPLAY_NAME}
           >
-            <span className="flex shrink-0 rounded-lg bg-white p-1 shadow-sm ring-1 ring-sidebar-border/40">
-              <SiteLogoMark className="h-7 max-h-7 max-w-[8.5rem] sm:h-8 sm:max-h-8 sm:max-w-[9.5rem]" />
-            </span>
+            <SiteLogoMark className="h-7 max-h-7 max-w-[8.5rem] sm:h-8 sm:max-h-8 sm:max-w-[9.5rem]" />
             <span className="truncate">{SITE_DISPLAY_NAME}</span>
           </Link>
           <div className="flex items-center gap-1">
