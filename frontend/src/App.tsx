@@ -44,7 +44,14 @@ export default function App() {
           }
         />
       </Route>
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route
+        path="/admin"
+        element={
+          <RequireAuth>
+            <AdminLayout />
+          </RequireAuth>
+        }
+      >
         <Route index element={<AdminDashboardPage />} />
         <Route path="social-worker-dashboard" element={<SocialWorkerDashboardPage />} />
         <Route path="donor-dashboard" element={<DonorDashboardPage />} />
