@@ -77,7 +77,7 @@ public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
 
         try
         {
-            var dt = body.DonationDate ?? DateTime.UtcNow.Date;
+            var dt = body.DonationDate ?? DateTime.UtcNow;
             var created = repo.CreateDonation(
                 supporter.Id,
                 body.DonationType.Trim(),

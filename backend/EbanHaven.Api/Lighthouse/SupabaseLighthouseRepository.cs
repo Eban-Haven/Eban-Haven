@@ -12,6 +12,20 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
 {
     private static readonly ConcurrentDictionary<string, HashSet<string>> ColumnCache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Coerce incoming instants to UTC before persisting (JSON often uses <see cref="DateTimeKind.Unspecified"/>).</summary>
+    private static DateTime NormalizeDonationUtc(DateTime value) =>
+        value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
+
+    private static DateTime DonationDbToUtc(DateTime value) =>
+        value.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(value, DateTimeKind.Utc)
+            : value.ToUniversalTime();
+
     public AdminDashboardDto GetAdminDashboard()
     {
         var today = DateTime.UtcNow.Date;
@@ -50,7 +64,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 d.DonationType,
                 d.Amount,
                 string.IsNullOrWhiteSpace(d.CurrencyCode) ? null : d.CurrencyCode,
-                d.DonationDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                DonationDbToUtc(d.DonationDate),
                 string.IsNullOrWhiteSpace(d.CampaignName) ? null : d.CampaignName))
             .ToList();
 
@@ -70,10 +84,10 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 string.IsNullOrWhiteSpace(p.PlanDescription) ? null : p.PlanDescription))
             .ToList();
 
-        var thirtyDaysAgo = DateOnly.FromDateTime(today.AddDays(-30));
+        var cutoff30 = DateTime.UtcNow.AddDays(-30);
         var monetary30 = db.Donations
             .Where(d => d.DonationType.ToLower() == "monetary")
-            .Where(d => d.DonationDate >= thirtyDaysAgo)
+            .Where(d => d.DonationDate >= cutoff30)
             .Sum(d => d.Amount ?? 0m);
 
         var visit90 = db.HomeVisitations.Count(v => v.VisitDate >= DateOnly.FromDateTime(today.AddDays(-90)));
@@ -168,7 +182,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 d.SupporterId,
                 supporterNames.TryGetValue(d.SupporterId, out var n) ? n : $"Supporter #{d.SupporterId}",
                 d.DonationType,
-                d.DonationDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc),
+                DonationDbToUtc(d.DonationDate),
                 d.IsRecurring,
                 NullIfEmpty(d.CampaignName),
                 NullIfEmpty(d.ChannelSource),
@@ -190,7 +204,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         {
             SupporterId = supporterId,
             DonationType = donationType,
-            DonationDate = DateOnly.FromDateTime(donationDate),
+            DonationDate = NormalizeDonationUtc(donationDate),
             IsRecurring = false,
             CampaignName = campaignName,
             ChannelSource = "Direct",

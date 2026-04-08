@@ -419,7 +419,7 @@ public sealed class LighthouseDataStore
                 ["donation_id"] = next.ToString(CultureInfo.InvariantCulture),
                 ["supporter_id"] = supporterId.ToString(CultureInfo.InvariantCulture),
                 ["donation_type"] = donationType,
-                ["donation_date"] = donationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                ["donation_date"] = donationDate.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture),
                 ["is_recurring"] = "False",
                 ["campaign_name"] = campaignName ?? string.Empty,
                 ["channel_source"] = "Direct",

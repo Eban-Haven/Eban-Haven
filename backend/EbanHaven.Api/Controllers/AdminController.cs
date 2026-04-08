@@ -63,7 +63,7 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
             return BadRequest(new { error = "DonationType is required." });
         try
         {
-            var dt = body.DonationDate ?? DateTime.UtcNow.Date;
+            var dt = body.DonationDate ?? DateTime.UtcNow;
             var created = repo.CreateDonation(
                 body.SupporterId,
                 body.DonationType.Trim(),
