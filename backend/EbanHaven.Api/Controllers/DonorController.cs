@@ -1,4 +1,5 @@
-using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using EbanHaven.Api.Auth;
 using EbanHaven.Api.Lighthouse;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,88 +8,50 @@ namespace EbanHaven.Api.Controllers;
 
 [ApiController]
 [Route("api/donor")]
-[Authorize]
+[Authorize(Policy = DonorOnlyPolicy.Name)]
 public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
 {
-    private string? EmailFromToken()
+    [HttpGet("dashboard")]
+    public IActionResult Dashboard()
     {
-        // Tokens are issued with `sub` = email (see AuthController.IssueToken).
-        return User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value?.Trim().ToLowerInvariant();
-    }
+        var email =
+            User.FindFirst(ClaimTypes.Email)?.Value
+            ?? User.FindFirst("email")?.Value
+            ?? User.FindFirst("sub")?.Value;
 
-    [HttpGet("me")]
-    public IActionResult Me()
-    {
-        var email = EmailFromToken();
         if (string.IsNullOrWhiteSpace(email))
-            return Unauthorized(new { error = "Missing user identity." });
+            return Unauthorized(new { error = "A valid donor email claim is required." });
 
-        var supporter = repo
-            .ListSupporters()
-            .FirstOrDefault(s => (s.Email ?? "").Trim().ToLowerInvariant() == email);
-
-        return Ok(new { email, supporter });
-    }
-
-    [HttpGet("donations")]
-    public IActionResult Donations()
-    {
-        var email = EmailFromToken();
-        if (string.IsNullOrWhiteSpace(email))
-            return Unauthorized(new { error = "Missing user identity." });
-
-        var supporter = repo
-            .ListSupporters()
-            .FirstOrDefault(s => (s.Email ?? "").Trim().ToLowerInvariant() == email);
+        var supporter = repo.ListSupporters()
+            .FirstOrDefault(s => string.Equals(s.Email, email, StringComparison.OrdinalIgnoreCase));
 
         if (supporter is null)
-            return Ok(Array.Empty<object>());
-
-        return Ok(repo.ListDonations(supporter.Id));
-    }
-
-    [HttpPost("donations")]
-    public IActionResult CreateDonation([FromBody] DonorCreateDonationRequest body)
-    {
-        if (string.IsNullOrWhiteSpace(body.DonationType))
-            return BadRequest(new { error = "DonationType is required." });
-
-        var email = EmailFromToken();
-        if (string.IsNullOrWhiteSpace(email))
-            return Unauthorized(new { error = "Missing user identity." });
-
-        var supporter = repo
-            .ListSupporters()
-            .FirstOrDefault(s => (s.Email ?? "").Trim().ToLowerInvariant() == email);
-
-        if (supporter is null)
-            return BadRequest(new { error = "No supporter profile is linked to this account email." });
-
-        try
         {
-            var dt = body.DonationDate ?? DateTime.UtcNow.Date;
-            var created = repo.CreateDonation(
-                supporter.Id,
-                body.DonationType.Trim(),
-                dt,
-                body.Amount,
-                body.CurrencyCode,
-                body.Notes,
-                body.CampaignName);
-            return Created($"/api/donor/donations/{created.Id}", created);
+            return Ok(new
+            {
+                email,
+                supporter = (object?)null,
+                donations = Array.Empty<DonationDto>(),
+                allocations = Array.Empty<DonationAllocationDto>(),
+            });
         }
-        catch (InvalidOperationException ex)
+
+        var donations = repo.ListDonations(supporter.Id)
+            .OrderByDescending(d => d.DonationDate)
+            .ToArray();
+
+        var donationIds = donations.Select(d => d.Id).ToHashSet();
+        var allocations = repo.ListAllocations(null, null)
+            .Where(a => donationIds.Contains(a.DonationId))
+            .OrderByDescending(a => a.AllocationDate)
+            .ToArray();
+
+        return Ok(new
         {
-            return BadRequest(new { error = ex.Message });
-        }
+            email,
+            supporter,
+            donations,
+            allocations,
+        });
     }
 }
-
-public sealed record DonorCreateDonationRequest(
-    string DonationType,
-    DateTime? DonationDate,
-    decimal? Amount,
-    string? CurrencyCode,
-    string? Notes,
-    string? CampaignName);
-

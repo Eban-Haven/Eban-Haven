@@ -1,4 +1,5 @@
 using EbanHaven.Api.Admin;
+using EbanHaven.Api.Auth;
 using EbanHaven.Api.Lighthouse;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +8,7 @@ namespace EbanHaven.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/email-hub")]
-[Authorize]
+[Authorize(Policy = AdminOnlyPolicy.Name)]
 public sealed class DonorEmailHubController(
     ILighthouseRepository repo,
     IDonorEmailComposer composer,
@@ -49,7 +50,15 @@ public sealed class DonorEmailHubController(
         if (string.IsNullOrWhiteSpace(request.Body) || string.IsNullOrWhiteSpace(request.HtmlBody))
             return BadRequest(new { error = "Email content is required." });
 
-        var sent = await deliveryService.SendAsync(request, cancellationToken);
+        SentDonorEmailDto sent;
+        try
+        {
+            sent = await deliveryService.SendAsync(request, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Problem(detail: ex.Message, statusCode: StatusCodes.Status422UnprocessableEntity, title: "Email delivery failed");
+        }
         return Ok(sent);
     }
 
