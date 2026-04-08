@@ -191,6 +191,122 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
     [HttpGet("intervention-plans")]
     public IActionResult InterventionPlans([FromQuery] int? residentId) => Ok(repo.ListInterventionPlans(residentId));
 
+    [HttpPost("intervention-plans")]
+    public IActionResult CreateInterventionPlan([FromBody] CreateInterventionPlanRequest body)
+    {
+        if (body.ResidentId <= 0) return BadRequest(new { error = "ResidentId is required." });
+        if (string.IsNullOrWhiteSpace(body.PlanCategory)) return BadRequest(new { error = "PlanCategory is required." });
+        if (string.IsNullOrWhiteSpace(body.PlanDescription)) return BadRequest(new { error = "PlanDescription is required." });
+        try
+        {
+            var targetDate = body.TargetDate != null ? DateOnly.Parse(body.TargetDate) : (DateOnly?)null;
+            var confDate   = body.CaseConferenceDate != null ? DateOnly.Parse(body.CaseConferenceDate) : (DateOnly?)null;
+            var created = repo.CreateInterventionPlan(body.ResidentId, body.PlanCategory.Trim(), body.PlanDescription.Trim(),
+                body.Status?.Trim(), targetDate, confDate);
+            return Created($"/api/admin/intervention-plans/{created.Id}", created);
+        }
+        catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpDelete("intervention-plans/{id:int}")]
+    public IActionResult DeleteInterventionPlan(int id) =>
+        repo.DeleteInterventionPlan(id) ? NoContent() : NotFound();
+
+    [HttpDelete("supporters/{id:int}")]
+    public IActionResult DeleteSupporter(int id) =>
+        repo.DeleteSupporter(id) ? NoContent() : NotFound();
+
+    [HttpPatch("supporters/{id:int}/fields")]
+    public IActionResult PatchSupporterFields(int id, [FromBody] Dictionary<string, string?> body)
+    {
+        var u = repo.PatchSupporterFields(id, body);
+        return u is null ? NotFound() : Ok(u);
+    }
+
+    [HttpDelete("donations/{id:int}")]
+    public IActionResult DeleteDonation(int id) =>
+        repo.DeleteDonation(id) ? NoContent() : NotFound();
+
+    [HttpPatch("donations/{id:int}/fields")]
+    public IActionResult PatchDonationFields(int id, [FromBody] Dictionary<string, string?> body)
+    {
+        var u = repo.PatchDonationFields(id, body);
+        return u is null ? NotFound() : Ok(u);
+    }
+
+    [HttpPost("donation-allocations")]
+    public IActionResult CreateAllocation([FromBody] CreateAllocationRequest body)
+    {
+        if (body.DonationId <= 0) return BadRequest(new { error = "DonationId is required." });
+        if (body.SafehouseId <= 0) return BadRequest(new { error = "SafehouseId is required." });
+        try
+        {
+            var created = repo.CreateAllocation(body.DonationId, body.SafehouseId, body.Amount, body.Notes);
+            return Created($"/api/admin/donation-allocations/{created.Id}", created);
+        }
+        catch (Exception ex) { return BadRequest(new { error = ex.Message }); }
+    }
+
+    [HttpPatch("donation-allocations/{id:int}")]
+    public IActionResult PatchAllocationFields(int id, [FromBody] Dictionary<string, string?> body)
+    {
+        var u = repo.PatchAllocationFields(id, body);
+        return u is null ? NotFound() : Ok(u);
+    }
+
+    [HttpDelete("donation-allocations/{id:int}")]
+    public IActionResult DeleteAllocation(int id) =>
+        repo.DeleteAllocation(id) ? NoContent() : NotFound();
+
+    [HttpDelete("residents/{id:int}")]
+    public IActionResult DeleteResident(int id) =>
+        repo.DeleteResident(id) ? NoContent() : NotFound();
+
+    [HttpDelete("process-recordings/{id:int}")]
+    public IActionResult DeleteProcessRecording(int id) =>
+        repo.DeleteProcessRecording(id) ? NoContent() : NotFound();
+
+    [HttpDelete("home-visitations/{id:int}")]
+    public IActionResult DeleteHomeVisitation(int id) =>
+        repo.DeleteHomeVisitation(id) ? NoContent() : NotFound();
+
+    [HttpGet("education-records")]
+    public IActionResult EducationRecords([FromQuery] int? residentId) => Ok(repo.ListEducationRecords(residentId));
+
+    [HttpPost("education-records")]
+    public IActionResult CreateEducationRecord([FromBody] CreateEducationRecordRequest body)
+    {
+        var date = body.RecordDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var created = repo.CreateEducationRecord(body.ResidentId, date, body.ProgressPercent);
+        return Created($"/api/admin/education-records/{created.Id}", created);
+    }
+
+    [HttpPatch("education-records/{id:int}")]
+    public IActionResult PatchEducationRecord(int id, [FromBody] PatchEducationRecordRequest body)
+    {
+        var date = body.RecordDate;
+        var u = repo.PatchEducationRecord(id, body.ProgressPercent, date);
+        return u is null ? NotFound() : Ok(u);
+    }
+
+    [HttpGet("health-records")]
+    public IActionResult HealthRecords([FromQuery] int? residentId) => Ok(repo.ListHealthRecords(residentId));
+
+    [HttpPost("health-records")]
+    public IActionResult CreateHealthRecord([FromBody] CreateHealthRecordRequest body)
+    {
+        var date = body.RecordDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var created = repo.CreateHealthRecord(body.ResidentId, date, body.HealthScore);
+        return Created($"/api/admin/health-records/{created.Id}", created);
+    }
+
+    [HttpPatch("health-records/{id:int}")]
+    public IActionResult PatchHealthRecord(int id, [FromBody] PatchHealthRecordRequest body)
+    {
+        var u = repo.PatchHealthRecord(id, body.HealthScore, body.RecordDate);
+        return u is null ? NotFound() : Ok(u);
+    }
+
     [HttpGet("reports/summary")]
     public IActionResult ReportsSummary() => Ok(repo.GetReportsSummary());
 
@@ -249,6 +365,14 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    // Request records for new endpoints
+    public sealed record CreateInterventionPlanRequest(int ResidentId, string PlanCategory, string PlanDescription, string? Status, string? TargetDate, string? CaseConferenceDate);
+    public sealed record CreateAllocationRequest(int DonationId, int SafehouseId, decimal? Amount, string? Notes);
+    public sealed record CreateEducationRecordRequest(int ResidentId, DateOnly? RecordDate, double? ProgressPercent);
+    public sealed record PatchEducationRecordRequest(double? ProgressPercent, DateOnly? RecordDate);
+    public sealed record CreateHealthRecordRequest(int ResidentId, DateOnly? RecordDate, double? HealthScore);
+    public sealed record PatchHealthRecordRequest(double? HealthScore, DateOnly? RecordDate);
 
     private static object LegacyCaseFromSummary(ResidentSummaryDto r) => new
     {
