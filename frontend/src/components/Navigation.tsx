@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { LayoutDashboard, LogIn, LogOut, Menu, Shield, X } from 'lucide-react'
 import { SiteLogoMark } from './SiteLogoMark'
-import { ThemeToggle } from './ThemeToggle'
 import { SITE_DISPLAY_NAME } from '../site'
 import { logout } from '../api/auth'
 import { useAuthSession } from '../hooks/useAuthSession'
@@ -60,7 +59,6 @@ export function Navigation() {
                 {item.label}
               </Link>
             ))}
-            <ThemeToggle />
             {session === undefined ? (
               <span className="h-9 w-24 animate-pulse rounded-lg bg-muted" aria-hidden />
             ) : session === null ? (
@@ -159,7 +157,6 @@ export function Navigation() {
                     {item.label}
                   </Link>
                 ))}
-                <ThemeToggle />
                 {session === undefined ? null : session === null ? (
                   <Link
                     to="/login"
