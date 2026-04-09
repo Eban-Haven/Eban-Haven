@@ -97,33 +97,29 @@ function parseMetricBars(metrics: Record<string, string | undefined>, prefix: 'w
   return rows.sort((a, b) => b.value - a.value)
 }
 
-type GrowthPoint = { month: string; label: string; value: number }
-
-function parseGrowthPoints(snapshots: PublicImpactSnapshot[]) {
-  return snapshots
-    .map((snapshot) => {
-      const month = snapshot.metrics.month ?? snapshot.snapshotDate.slice(0, 7)
-      const raw = snapshot.metrics.total_residents
-      const value = raw ? Number(raw) : Number.NaN
-      if (!Number.isFinite(value)) return null
-      const date = new Date(`${month}-01`)
-      const label = date.getFullYear().toString()
-      return { month, label, value }
-    })
-    .filter((point): point is GrowthPoint => point != null)
-    .sort((a, b) => a.month.localeCompare(b.month))
-}
-
-/** One point per calendar year (latest snapshot value per year) for a YoY-style line like the reference. */
-function growthPointsByYear(snapshots: PublicImpactSnapshot[]) {
-  const points = parseGrowthPoints(snapshots)
-  const byYear = new Map<string, GrowthPoint>()
-  for (const p of points) {
-    const y = p.month.slice(0, 4)
-    const prev = byYear.get(y)
-    if (!prev || p.month > prev.month) byYear.set(y, { ...p, label: y })
+/** Published snapshots with `total_residents`, one row per calendar month (latest snapshot wins). */
+function publishedResidentSeries(snapshots: PublicImpactSnapshot[]) {
+  const rows: { month: string; value: number; snapshotDate: string }[] = []
+  for (const snapshot of snapshots) {
+    if (!snapshot.isPublished) continue
+    const month = snapshot.metrics.month ?? snapshot.snapshotDate.slice(0, 7)
+    const raw = snapshot.metrics.total_residents
+    const value = raw ? Number(raw) : Number.NaN
+    if (!Number.isFinite(value)) continue
+    rows.push({ month, value, snapshotDate: snapshot.snapshotDate })
   }
-  return [...byYear.values()].sort((a, b) => a.month.localeCompare(b.month))
+  const byMonth = new Map<string, { month: string; value: number; snapshotDate: string }>()
+  for (const r of rows) {
+    const prev = byMonth.get(r.month)
+    if (!prev || r.snapshotDate > prev.snapshotDate) byMonth.set(r.month, r)
+  }
+  return [...byMonth.values()]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((r) => {
+      const d = new Date(`${r.month}-01T12:00:00`)
+      const period = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      return { period, month: r.month, girls: r.value }
+    })
 }
 
 export function ImpactPage() {
@@ -169,32 +165,30 @@ export function ImpactPage() {
 
   const usingWhoFallback = whoRows.length < 2
 
-  const yearlyGrowth = useMemo(() => growthPointsByYear(snapshots), [snapshots])
+  const growthSeries = useMemo(() => publishedResidentSeries(snapshots), [snapshots])
 
-  const girlsHelpedData = useMemo(() => {
-    if (yearlyGrowth.length > 0) return yearlyGrowth.map((p) => ({ year: p.label, girls: p.value }))
-    return [
-      { year: '2019', girls: 18 },
-      { year: '2020', girls: 31 },
-      { year: '2021', girls: 47 },
-      { year: '2022', girls: 68 },
-      { year: '2023', girls: 102 },
-      { year: '2024', girls: 138 },
-      { year: '2025', girls: 156 },
-    ]
-  }, [yearlyGrowth])
-
-  const usingGrowthFallback = yearlyGrowth.length === 0
+  const growthRangeLabel = useMemo(() => {
+    if (growthSeries.length === 0) return null
+    const a = growthSeries[0].period
+    const b = growthSeries[growthSeries.length - 1].period
+    return growthSeries.length === 1 ? a : `${a} – ${b}`
+  }, [growthSeries])
 
   const growthNarrative = useMemo(() => {
-    const pts = yearlyGrowth
+    const pts = growthSeries
     if (pts.length < 2) return null
-    const first = pts[0].value
-    const last = pts[pts.length - 1].value
+    const first = pts[0].girls
+    const last = pts[pts.length - 1].girls
     if (first <= 0) return null
     const pct = Math.round(((last - first) / first) * 100)
-    return { first, last, pct, fromY: pts[0].label, toY: pts[pts.length - 1].label }
-  }, [yearlyGrowth])
+    return {
+      first,
+      last,
+      pct,
+      fromLabel: pts[0].period,
+      toLabel: pts[pts.length - 1].period,
+    }
+  }, [growthSeries])
 
 
 
@@ -242,7 +236,12 @@ export function ImpactPage() {
       {/* ── HERO (wording: current product hero; layout: reference) ── */}
       <section className="relative overflow-hidden py-28 lg:py-40">
         <div className="absolute inset-0">
-          <img src={IMPACT_PAGE_IMAGES.hero} alt="Children" className="h-full w-full object-cover" />
+          <img
+            src={IMPACT_PAGE_IMAGES.hero}
+            alt="Children"
+            className="h-full w-full object-cover"
+            referrerPolicy="no-referrer"
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/65 to-foreground/20" />
         </div>
         <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
@@ -363,6 +362,7 @@ export function ImpactPage() {
           src={IMPACT_PAGE_IMAGES.quoteBreak}
           alt="Girls studying together"
           className="h-full w-full object-cover object-center"
+          referrerPolicy="no-referrer"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 via-foreground/20 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-7xl p-8 lg:p-12">
@@ -391,16 +391,21 @@ export function ImpactPage() {
             variants={fadeUp}
             className="mb-10 text-center"
           >
-            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Year-over-Year Growth</span>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">Girls reached since 2019</h2>
+            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Growth over time</span>
+            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
+              Total residents in published snapshots
+            </h2>
+            {growthRangeLabel ? (
+              <p className="mx-auto mt-2 text-sm font-medium text-foreground/80">{growthRangeLabel}</p>
+            ) : null}
             {growthNarrative ? (
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-                From <strong className="text-foreground">{growthNarrative.first}</strong> in {growthNarrative.fromY} to{' '}
-                <strong className="text-foreground">{growthNarrative.last}</strong> in {growthNarrative.toY}
+                From <strong className="text-foreground">{growthNarrative.first}</strong> ({growthNarrative.fromLabel}) to{' '}
+                <strong className="text-foreground">{growthNarrative.last}</strong> ({growthNarrative.toLabel})
                 {growthNarrative.pct > 0 ? (
                   <>
                     {' '}
-                    — a <strong>{growthNarrative.pct}%</strong> increase in lives touched (published data).
+                    — a <strong>{growthNarrative.pct}%</strong> change in total residents (published data).
                   </>
                 ) : (
                   '.'
@@ -408,9 +413,11 @@ export function ImpactPage() {
               </p>
             ) : (
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-                {usingGrowthFallback
-                  ? 'Illustrative trend shown — connect published snapshots with total_residents in metrics for your live curve.'
-                  : 'Add more yearly snapshot points to show growth narrative.'}
+                {growthSeries.length === 0
+                  ? 'When published impact snapshots include total_residents, the chart will show the real timeline here.'
+                  : growthSeries.length === 1
+                    ? 'Add another month with total_residents to compare change over time.'
+                    : 'Each point is the latest published total_residents for that month.'}
               </p>
             )}
           </motion.div>
@@ -422,32 +429,44 @@ export function ImpactPage() {
             className="rounded-2xl border border-border bg-card p-6 lg:p-10"
           >
             <div className="h-80 w-full min-w-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={girlsHelpedData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="year" tick={{ fontSize: 13, fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis tick={{ fontSize: 13, fill: 'hsl(var(--muted-foreground))' }} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(v: number | string) => [`${v} girls`, 'Girls helped']}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="girls"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={3}
-                    dot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
-                    activeDot={{ r: 7 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {growthSeries.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 px-6 text-center text-sm text-muted-foreground">
+                  <p>No chart data yet.</p>
+                  <p className="max-w-md text-xs">
+                    Publish snapshots whose metrics include <code className="rounded bg-muted px-1">total_residents</code>{' '}
+                    (and optionally <code className="rounded bg-muted px-1">month</code>) to plot this line.
+                  </p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={growthSeries} margin={{ top: 10, right: 20, left: 0, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="period"
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      interval="preserveStartEnd"
+                      minTickGap={28}
+                    />
+                    <YAxis tick={{ fontSize: 13, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number | string) => [`${v}`, 'Total residents']} />
+                    <Line
+                      type="monotone"
+                      dataKey="girls"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={3}
+                      dot={{ r: 5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+                      activeDot={{ r: 7 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </motion.div>
         </div>
       </section>
 
       {/* ── WHO WE SERVE ── */}
-      <section className="bg-muted/30 py-20 lg:py-28">
+      <section className="bg-[color-mix(in_oklch,hsl(var(--primary))_14%,hsl(var(--background)))] py-20 lg:py-28 dark:bg-[color-mix(in_oklch,hsl(var(--primary))_22%,hsl(var(--background)))]">
         <div className="mx-auto max-w-5xl px-6 lg:px-8">
           <motion.div
             initial="hidden"
@@ -533,6 +552,7 @@ export function ImpactPage() {
                 src={IMPACT_PAGE_IMAGES.lifeA}
                 alt="Caregiver with child"
                 className="h-52 w-full rounded-2xl object-cover lg:h-64"
+                referrerPolicy="no-referrer"
               />
               <motion.img
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -542,6 +562,7 @@ export function ImpactPage() {
                 src={IMPACT_PAGE_IMAGES.lifeB}
                 alt="Girls together"
                 className="mt-6 h-52 w-full rounded-2xl object-cover lg:h-64"
+                referrerPolicy="no-referrer"
               />
             </div>
             <motion.div
@@ -647,7 +668,12 @@ export function ImpactPage() {
       {/* ── FINAL CTA ── */}
       <section className="relative overflow-hidden py-24 lg:py-36">
         <div className="absolute inset-0">
-          <img src={IMPACT_PAGE_IMAGES.finalCta} alt="" className="h-full w-full object-cover" />
+          <img
+            src={IMPACT_PAGE_IMAGES.finalCta}
+            alt=""
+            className="h-full w-full object-cover"
+            referrerPolicy="no-referrer"
+          />
           <div className="absolute inset-0 bg-foreground/80" />
         </div>
         <div className="relative mx-auto max-w-4xl px-6 text-center lg:px-8">
