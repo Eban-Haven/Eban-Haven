@@ -8,7 +8,7 @@ import {
   ExternalLink,
   Image,
   LoaderCircle,
-  MessageSquare,
+  MessageCircle,
   Pencil,
   Plus,
   RotateCcw,
@@ -16,6 +16,7 @@ import {
   SendHorizonal,
   Sparkles,
   Square,
+  Target,
   Trash2,
   X,
   Zap,
@@ -45,12 +46,13 @@ type ChatBubble = {
 
 type StartMode = 'pick' | 'quick' | 'brief' | 'chat'
 
-type UnsplashPhoto = {
-  id: string
-  urls: { small: string; regular: string; full: string; thumb: string }
-  alt_description: string | null
-  user: { name: string }
-  links: { html: string }
+type PexelsPhoto = {
+  id: number
+  src: { medium: string; large: string; small: string; original: string }
+  alt: string
+  photographer: string
+  photographer_url: string
+  url: string
 }
 
 type EditDraft = {
@@ -65,7 +67,7 @@ type EditDraft = {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const UNSPLASH_KEY = (import.meta.env.VITE_UNSPLASH_ACCESS_KEY as string | undefined) ?? ''
+const PEXELS_KEY = (import.meta.env.VITE_PEXELS_API_KEY as string | undefined) ?? ''
 
 const starterPrompts = [
   {
@@ -126,14 +128,14 @@ function normalizeHashtag(tag: string) {
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`
 }
 
-async function fetchUnsplashImages(query: string): Promise<UnsplashPhoto[]> {
+async function fetchPexelsImages(query: string): Promise<PexelsPhoto[]> {
   const res = await fetch(
-    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=9&orientation=landscape`,
-    { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } },
+    `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=9&orientation=landscape`,
+    { headers: { Authorization: PEXELS_KEY } },
   )
-  if (!res.ok) throw new Error('Unsplash search failed')
-  const data = (await res.json()) as { results: UnsplashPhoto[] }
-  return data.results
+  if (!res.ok) throw new Error('Pexels search failed')
+  const data = (await res.json()) as { photos: PexelsPhoto[] }
+  return data.photos ?? []
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -152,7 +154,7 @@ function StepBadge({ n, label, active }: { n: number; label: string; active?: bo
 // ── Image search panel ────────────────────────────────────────────────────────
 
 function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => void }) {
-  const [photos, setPhotos] = useState<UnsplashPhoto[]>([])
+  const [photos, setPhotos] = useState<PexelsPhoto[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
@@ -163,9 +165,9 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
     setLoading(true)
     setError(null)
     try {
-      setPhotos(await fetchUnsplashImages(q))
+      setPhotos(await fetchPexelsImages(q))
     } catch {
-      setError('Image search failed. Check your Unsplash key or try again.')
+      setError('Image search failed. Check your Pexels API key or try again.')
     } finally {
       setLoading(false)
     }
@@ -173,9 +175,9 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
 
   useEffect(() => { void search(query) }, [query, search])
 
-  function copyUrl(url: string, id: string) {
+  function copyUrl(url: string, id: number) {
     void navigator.clipboard.writeText(url)
-    setCopied(id)
+    setCopied(String(id))
     setTimeout(() => setCopied(null), 2000)
   }
 
@@ -211,33 +213,21 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
             {photos.map((p) => (
               <div key={p.id} className="group relative h-24 overflow-hidden rounded-lg bg-muted">
                 <img
-                  src={p.urls.small}
-                  alt={p.alt_description ?? 'Unsplash photo'}
+                  src={p.src.medium}
+                  alt={p.alt || 'Pexels photo'}
                   className="h-full w-full object-cover"
-                  crossOrigin="anonymous"
-                  referrerPolicy="no-referrer-when-downgrade"
                   loading="lazy"
-                  onError={(e) => {
-                    // Small URL failed — try thumb as fallback
-                    const img = e.currentTarget
-                    if (!img.dataset.fallback) {
-                      img.dataset.fallback = '1'
-                      img.src = p.urls.thumb ?? p.urls.regular
-                    } else {
-                      img.style.display = 'none'
-                    }
-                  }}
                 />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
-                    onClick={() => copyUrl(p.urls.regular, p.id)}
+                    onClick={() => copyUrl(p.src.large, p.id)}
                     className="rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-black"
                   >
-                    {copied === p.id ? '✓ Copied!' : 'Copy URL'}
+                    {copied === String(p.id) ? '✓ Copied!' : 'Copy URL'}
                   </button>
                   <a
-                    href={`${p.links.html}?utm_source=eban_haven&utm_medium=referral`}
+                    href={p.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-semibold text-black"
@@ -245,13 +235,16 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
                     View
                   </a>
                 </div>
+                <p className="absolute bottom-0 left-0 right-0 truncate bg-black/40 px-1.5 py-0.5 text-[9px] text-white/80">
+                  {p.photographer}
+                </p>
               </div>
             ))}
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground/60">
             Photos from{' '}
-            <a href="https://unsplash.com?utm_source=eban_haven&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">
-              Unsplash
+            <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer" className="underline">
+              Pexels
             </a>
             . Hover to copy URL.
           </p>
@@ -701,7 +694,7 @@ export function SocialPlannerPage() {
                         className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
                       >
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
-                          <Sparkles className="h-4 w-4" />
+                          <Target className="h-4 w-4" />
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-foreground">Targeted Plan</p>
@@ -718,7 +711,7 @@ export function SocialPlannerPage() {
                         className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
                       >
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                          <MessageSquare className="h-4 w-4" />
+                          <MessageCircle className="h-4 w-4" />
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-foreground">Just Chat</p>
@@ -969,7 +962,7 @@ export function SocialPlannerPage() {
                                     {idea.imageIdea && (
                                       <div className="mt-2 flex items-center gap-2">
                                         <p className="text-xs text-muted-foreground">📷 {idea.imageIdea}</p>
-                                        {UNSPLASH_KEY ? (
+                                        {PEXELS_KEY ? (
                                           <button
                                             type="button"
                                             onClick={() => setImageSearchKey(imageSearchKey === ideaKey ? null : ideaKey)}
@@ -980,13 +973,13 @@ export function SocialPlannerPage() {
                                           </button>
                                         ) : (
                                           <a
-                                            href={`https://unsplash.com/s/photos/${encodeURIComponent(idea.imageIdea)}`}
+                                            href={`https://www.pexels.com/search/${encodeURIComponent(idea.imageIdea)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                                           >
                                             <ExternalLink className="h-3 w-3" />
-                                            Search Unsplash
+                                            Search Pexels
                                           </a>
                                         )}
                                       </div>
@@ -1228,7 +1221,7 @@ export function SocialPlannerPage() {
                     {post.imageIdea && (
                       <div className="mt-2 flex items-center gap-2">
                         <p className="text-xs text-muted-foreground/70">📷 {post.imageIdea}</p>
-                        {UNSPLASH_KEY ? (
+                        {PEXELS_KEY ? (
                           <button
                             type="button"
                             onClick={() => {
@@ -1242,7 +1235,7 @@ export function SocialPlannerPage() {
                           </button>
                         ) : (
                           <a
-                            href={`https://unsplash.com/s/photos/${encodeURIComponent(post.imageIdea)}`}
+                            href={`https://www.pexels.com/search/${encodeURIComponent(post.imageIdea)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
