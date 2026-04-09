@@ -8,7 +8,6 @@ import type {
   MarketingAnalyticsSummary,
   CampaignPerformance,
   ChannelAttribution,
-  CausalEstimate,
 } from '../../../api/adminTypes'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -336,74 +335,44 @@ function CampaignRevenueChart({ campaigns }: { campaigns: CampaignPerformance[] 
   )
 }
 
-// ── Channel Attribution Table ─────────────────────────────────────────────────
+// ── Channel Attribution Bar Chart ────────────────────────────────────────────
 
-function ChannelTable({
-  channels,
-  channelEffects,
-}: {
-  channels: ChannelAttribution[]
-  channelEffects?: Array<{ channel: string } & CausalEstimate>
-}) {
-  const effectMap = Object.fromEntries((channelEffects ?? []).map(e => [e.channel, e]))
+function ChannelRevenueChart({ channels }: { channels: ChannelAttribution[] }) {
+  const sorted   = [...channels].sort((a, b) => b.totalPhp - a.totalPhp)
+  const maxTotal = sorted[0]?.totalPhp ?? 1
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <th className="pb-2 pr-4">Channel</th>
-            <th className="pb-2 pr-4 text-right">Donors</th>
-            <th className="pb-2 pr-4 text-right">Donations</th>
-            <th className="pb-2 pr-4 text-right">Avg LTV</th>
-            <th className="pb-2 pr-4 text-right">Avg / Gift</th>
-            <th className="pb-2 pr-4 text-right">Recurring</th>
-            <th className="pb-2">vs. Direct (causal)</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {channels.map(ch => {
-            const effect = effectMap[ch.channelSource]
-            return (
-              <tr key={ch.channelSource}>
-                <td className="py-2.5 pr-4 font-medium text-foreground">{ch.channelSource}</td>
-                <td className="py-2.5 pr-4 text-right tabular-nums">{ch.uniqueDonors}</td>
-                <td className="py-2.5 pr-4 text-right tabular-nums">{ch.totalDonations}</td>
-                <td className="py-2.5 pr-4 text-right tabular-nums font-medium">{php(ch.avgDonorLtv)}</td>
-                <td className="py-2.5 pr-4 text-right tabular-nums text-muted-foreground">
-                  {php(ch.avgDonationAmount)}
-                </td>
-                <td className="py-2.5 pr-4 text-right tabular-nums">
-                  <span className={`font-medium ${ch.pctRecurringDonors >= 30 ? 'text-green-700' : ''}`}>
-                    {pct(ch.pctRecurringDonors)}
-                  </span>
-                </td>
-                <td className="py-2.5">
-                  {effect ? (
-                    <span className="flex items-center gap-1.5">
-                      <span
-                        className={`font-medium tabular-nums ${
-                          effect.pct_effect >= 0 ? 'text-green-700' : 'text-red-600'
-                        }`}
-                      >
-                        {effect.pct_effect >= 0 ? '+' : ''}
-                        {effect.pct_effect.toFixed(1)}%
-                      </span>
-                      {sigBadge(effect.significant)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">baseline</span>
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      <p className="mt-2 text-xs text-muted-foreground">
-        "vs. Direct" shows estimated % difference in donation amount relative to the Direct channel,
-        controlling for campaign exposure, recurring status, and donor tenure. Run the notebook to populate.
-      </p>
+    <div className="space-y-2">
+      {sorted.map((ch, i) => (
+        <div key={ch.channelSource} className="group flex items-center gap-4">
+          {/* Label */}
+          <div className="w-36 shrink-0 text-right">
+            <span className="text-sm text-foreground">{ch.channelSource}</span>
+            <span className="block text-xs text-muted-foreground">{ch.uniqueDonors} donors</span>
+          </div>
+
+          {/* Bar + value */}
+          <div className="flex flex-1 items-center gap-3">
+            <div className="relative h-9 flex-1 overflow-hidden rounded-md bg-primary/10">
+              <motion.div
+                className="h-full rounded-md bg-primary/80 group-hover:bg-primary"
+                style={{ originX: 0 }}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: ch.totalPhp / maxTotal }}
+                transition={{ duration: 0.6, delay: i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+              />
+            </div>
+            <motion.span
+              className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: i * 0.08 + 0.3 }}
+            >
+              {php(ch.totalPhp)}
+            </motion.span>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -524,14 +493,12 @@ export function MarketingAnalyticsPage() {
 
           {/* Channel Attribution */}
           <div className={card}>
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-5 flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold text-foreground">Channel Attribution</h3>
+              <span className="ml-auto text-xs text-muted-foreground">total raised per channel</span>
             </div>
-            <ChannelTable
-              channels={data.channels}
-              channelEffects={data.causalEstimates?.channel_effects}
-            />
+            <ChannelRevenueChart channels={data.channels} />
           </div>
 
           {/* Social Media Spotlight */}
