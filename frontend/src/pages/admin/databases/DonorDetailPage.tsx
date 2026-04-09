@@ -200,7 +200,7 @@ export function DonorDetailPage() {
         <>
           {error ? <div className={alertError}>{error}</div> : null}
 
-          <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,1fr)] lg:items-start">
             <div className="min-w-0">
               <DonorProfileCard
                 supporter={supporter}
@@ -233,6 +233,8 @@ export function DonorDetailPage() {
             supporterId={supporter.id}
             saving={savingDonation}
             onAddDonation={onAddContribution}
+            onDonationsUpdated={() => void load()}
+            onError={setError}
             dType={dType}
             setDType={setDType}
             dAmount={dAmount}

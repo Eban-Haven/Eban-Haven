@@ -35,13 +35,10 @@ export function DonorStatusCard({ supporter, donationCount, churn, churnLoading,
   const showPotential = churn != null && isDonateMorePotential(churn, donationCount)
 
   return (
-    <div className={`${card} flex h-full flex-col gap-4`}>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <StatusBadge status={supporter.status} />
-          <span className="text-sm text-muted-foreground">Supporter record status</span>
-        </div>
+    <div className={`${card} flex flex-col gap-4`}>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+        <span className="font-medium text-muted-foreground">Status:</span>
+        <StatusBadge status={supporter.status} />
       </div>
 
       <div className="border-t border-border pt-3">
@@ -100,7 +97,6 @@ export function DonorStatusCard({ supporter, donationCount, churn, churnLoading,
         <Link to={outreachHref} className={`${btnPrimary} block w-full text-center`}>
           Donor outreach
         </Link>
-        <p className="mt-2 text-center text-xs text-muted-foreground">Open email workspace for this donor</p>
       </div>
     </div>
   )
