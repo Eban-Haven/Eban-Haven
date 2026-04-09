@@ -21,10 +21,6 @@ function pct(n: number) {
   return `${n.toFixed(1)}%`
 }
 
-function fmtScore(n: number) {
-  return `${n.toFixed(1)}`
-}
-
 // ── Campaign Revenue Bar Chart ────────────────────────────────────────────────
 
 function CampaignRevenueChart({ campaigns }: { campaigns: CampaignPerformance[] }) {
@@ -168,7 +164,7 @@ function EffectivenessChart({
   rows: EffectivenessRanking[]
   emptyLabel: string
 }) {
-  const maxScore = rows[0]?.effectivenessScore ?? 1
+  const maxRevenue = rows[0]?.medianRevenuePerPostPhp ?? 1
 
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>
@@ -189,17 +185,17 @@ function EffectivenessChart({
                 className="h-full rounded-md bg-primary/80 group-hover:bg-primary"
                 style={{ originX: 0 }}
                 initial={{ scaleX: 0 }}
-                animate={{ scaleX: row.effectivenessScore / maxScore }}
+                animate={{ scaleX: row.medianRevenuePerPostPhp / maxRevenue }}
                 transition={{ duration: 0.6, delay: i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
               />
             </div>
             <motion.span
-              className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground"
+              className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: i * 0.08 + 0.3 }}
             >
-              {fmtScore(row.effectivenessScore)}
+              {php(row.medianRevenuePerPostPhp)}
             </motion.span>
           </div>
         </div>
@@ -231,8 +227,7 @@ function EffectivenessCard({
       <EffectivenessChart rows={rows} emptyLabel="No ranking data available yet." />
       {leader && (
         <p className="mt-4 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{leader.label}</span> currently leads with score{' '}
-          <span className="font-medium text-foreground">{fmtScore(leader.effectivenessScore)}</span>, with a typical post generating{' '}
+          <span className="font-medium text-foreground">{leader.label}</span> currently leads, with a typical post generating{' '}
           <span className="font-medium text-foreground">{php(leader.medianRevenuePerPostPhp)}</span> and{' '}
           <span className="font-medium text-foreground">{leader.medianDonationReferrals.toFixed(1)}</span> donation referrals.
         </p>
@@ -330,8 +325,8 @@ export function MarketingAnalyticsPage() {
             </div>
             <SocialSpotlight data={data.socialMediaSpotlight} />
             <p className="mt-4 text-xs text-muted-foreground">
-              Effectiveness rankings below use the live `social_media_posts` table and blend median revenue,
-              median referrals, median revenue efficiency, and median click-through rate into a single score to reduce outlier distortion.
+              Rankings below use the live `social_media_posts` table and are ordered by median donation value per post,
+              with median donation referrals shown as supporting context.
             </p>
           </div>
 
@@ -343,19 +338,19 @@ export function MarketingAnalyticsPage() {
             <div className="grid gap-4 xl:grid-cols-2">
               <EffectivenessCard
                 title="Top Platforms"
-                subtitle="effectiveness score"
+                subtitle="ranked by median revenue/post"
                 rows={data.effectiveness.platforms}
                 icon={<TrendingUp className="h-4 w-4 text-primary" />}
               />
               <EffectivenessCard
                 title="Best Days To Post"
-                subtitle="effectiveness score"
+                subtitle="ranked by median revenue/post"
                 rows={data.effectiveness.daysOfWeek}
                 icon={<CalendarDays className="h-4 w-4 text-primary" />}
               />
               <EffectivenessCard
                 title="Top Content Topics"
-                subtitle="effectiveness score"
+                subtitle="ranked by median revenue/post"
                 rows={data.effectiveness.contentTopics}
                 icon={<Megaphone className="h-4 w-4 text-primary" />}
               />

@@ -50,8 +50,7 @@ record EffectivenessRankingRow(
     [property: JsonPropertyName("medianRevenuePerPostPhp")]   decimal MedianRevenuePerPostPhp,
     [property: JsonPropertyName("medianDonationReferrals")]   decimal MedianDonationReferrals,
     [property: JsonPropertyName("medianRevenuePerThousandReachPhp")] decimal MedianRevenuePerThousandReachPhp,
-    [property: JsonPropertyName("medianClickThroughRatePct")] decimal MedianClickThroughRatePct,
-    [property: JsonPropertyName("effectivenessScore")]        double  EffectivenessScore
+    [property: JsonPropertyName("medianClickThroughRatePct")] decimal MedianClickThroughRatePct
 );
 
 record MarketingEffectivenessSummary(
@@ -307,40 +306,18 @@ public sealed class MarketingAnalyticsController(
         if (raw.Count == 0)
             return [];
 
-        var maxRevenue = Math.Max(raw.Max(x => ToDouble(x.MedianRevenuePerPostPhp)), 1d);
-        var maxReferrals = Math.Max(raw.Max(x => ToDouble(x.MedianDonationReferrals)), 1d);
-        var maxRevenueEfficiency = Math.Max(raw.Max(x => ToDouble(x.MedianRevenuePerThousandReachPhp)), 1d);
-        var maxCtr = Math.Max(raw.Max(x => ToDouble(x.MedianClickThroughRatePct)), 1d);
-
         return raw
             .Select(x =>
-            {
-                var revenueScore = ToDouble(x.MedianRevenuePerPostPhp) / maxRevenue;
-                var referralScore = ToDouble(x.MedianDonationReferrals) / maxReferrals;
-                var revenueEfficiencyScore = ToDouble(x.MedianRevenuePerThousandReachPhp) / maxRevenueEfficiency;
-                var ctrScore = ToDouble(x.MedianClickThroughRatePct) / maxCtr;
-                var effectivenessScore = Math.Round(
-                    100 * (
-                        0.45 * revenueScore +
-                        0.25 * referralScore +
-                        0.20 * revenueEfficiencyScore +
-                        0.10 * ctrScore
-                    ),
-                    1
-                );
-
-                return new EffectivenessRankingRow(
+                new EffectivenessRankingRow(
                     Label: x.Label,
                     PostCount: x.PostCount,
                     MedianRevenuePerPostPhp: x.MedianRevenuePerPostPhp,
                     MedianDonationReferrals: x.MedianDonationReferrals,
                     MedianRevenuePerThousandReachPhp: x.MedianRevenuePerThousandReachPhp,
-                    MedianClickThroughRatePct: x.MedianClickThroughRatePct,
-                    EffectivenessScore: effectivenessScore
-                );
-            })
-            .OrderByDescending(x => x.EffectivenessScore)
-            .ThenByDescending(x => x.MedianRevenuePerPostPhp)
+                    MedianClickThroughRatePct: x.MedianClickThroughRatePct
+                ))
+            .OrderByDescending(x => x.MedianRevenuePerPostPhp)
+            .ThenByDescending(x => x.MedianDonationReferrals)
             .ThenByDescending(x => x.PostCount)
             .Take(take)
             .ToArray();

@@ -361,7 +361,6 @@ export type EffectivenessRanking = {
   medianDonationReferrals: number
   medianRevenuePerThousandReachPhp: number
   medianClickThroughRatePct: number
-  effectivenessScore: number
 }
 
 export type CausalEstimate = {
