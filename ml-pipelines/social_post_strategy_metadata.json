@@ -1,32 +1,35 @@
 {
-  "pipeline_version": "0.1.0",
-  "last_run": null,
-  "analysis_mode": "explanatory",
-  "unit_of_analysis": "published social media post",
-  "outcome_metric": "Attributed donation revenue within 7 days (PHP)",
-  "evidence_strength": "Scaffold only. The post-level explanatory pipeline has not been run on attributed production data yet.",
-  "n_observations": 0,
+  "pipeline_version": "0.2.0",
+  "last_run": "2026-04-09",
+  "analysis_mode": "bootstrap_explanatory",
+  "unit_of_analysis": "social-media-influenced donation channel and campaign summary",
+  "outcome_metric": "Donation revenue and donor quality from existing marketing attribution tables",
+  "evidence_strength": "Directional guidance derived from current donation channel and campaign analysis. Useful for planning content strategy now, but not yet a true post-level causal model.",
+  "n_observations": 238,
   "validated_findings": [],
   "directional_findings": [
-    "Platform, content theme, CTA style, and posting window should be tested together against attributed 7-day donation revenue.",
-    "Without post-level attribution, any content advice should be treated as directional rather than causal."
+    "Social media-attributed giving already accounts for 43 donations totaling PHP 43,590.98 from 29 unique donors, so the channel is materially important enough to prioritize.",
+    "Donors acquired via social media show higher average lifetime value (PHP 5,610.78) than the overall donor base (PHP 4,185.11), a directional lift of about 34.1%, though the current comparison is not statistically significant.",
+    "Named campaigns are associated with about 7.9% higher donation amounts than non-campaign giving, which suggests themed campaign bursts may outperform sporadic standalone posts even though the estimate is not yet significant.",
+    "The SocialMedia channel shows an estimated +14.6% effect on donation amounts versus baseline, which is directional evidence to keep social content tied to fundraising outcomes and not just engagement."
   ],
   "recommendations": [
     {
-      "title": "Instrument every post",
-      "detail": "Store platform, content theme, CTA type, scheduled time, actual publish time, and a tracked donation link for every post so the pipeline can compare post characteristics to real donation outcomes."
+      "title": "Keep social posts donor-focused",
+      "detail": "Because social media already contributes meaningful donation value and 48.8% of those gifts are recurring, the chatbot should favor posts with a clear fundraising purpose instead of optimizing only for likes or awareness."
     },
     {
-      "title": "Use a fixed attribution window",
-      "detail": "Measure donation count and revenue in a consistent 7-day follow-up window after each post to keep comparisons fair across platforms and campaigns."
+      "title": "Generate content in campaign bursts",
+      "detail": "Because named campaigns show a positive estimated lift relative to no-campaign giving, the chatbot should package ideas as short themed campaigns rather than unrelated one-off posts."
     },
     {
-      "title": "Separate evidence from instinct",
-      "detail": "Keep broad campaign/channel analysis separate from post-level content analysis so the chatbot can clearly distinguish validated findings from hypotheses."
+      "title": "Use specific asks with mission clarity",
+      "detail": "Current data is strongest at the channel and campaign level, so the chatbot should emphasize concrete donation CTAs, trust-building language, and clear connection to impact while avoiding overconfident claims about exact timing or platform superiority."
     }
   ],
   "data_gaps": [
-    "No post-level attributed revenue dataset has been supplied to the analysis yet.",
-    "The current donation tables summarize channels and campaigns, but do not yet identify which individual post drove a donation."
+    "Current evidence is channel-level and campaign-level, not individual post-level.",
+    "Platform-specific comparisons such as Facebook versus Instagram are not directly observed in the current data.",
+    "Timing effects, content-theme effects, and CTA-level effects are still directional hypotheses until post-level attribution becomes available."
   ]
 }

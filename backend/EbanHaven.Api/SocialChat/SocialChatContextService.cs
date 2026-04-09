@@ -383,24 +383,25 @@ public sealed class SocialChatContextService(
     }
 
     private static PostStrategyInsightsSnapshot FallbackPostStrategyInsights(string reason) => new(
-        EvidenceStrength: $"Scaffold only — {reason}",
+        EvidenceStrength: $"Directional guidance only — {reason}",
         ValidatedFindings:
         [
             "No validated post-level findings available yet."
         ],
         DirectionalFindings:
         [
-            "Direct donation CTAs, content theme, platform, and timing are the first post characteristics worth testing against revenue once attribution data is captured."
+            "Social media already contributes meaningful donor revenue, so content should stay tied to donation outcomes instead of being optimized only for reach or likes.",
+            "Structured campaign-style posting is directionally stronger than sporadic standalone content in the current marketing analysis."
         ],
         Recommendations:
         [
             new StrategyRecommendation(
-                "Instrument every post",
-                "Store a platform, content theme, CTA type, publish time, and tracked donation link for each post so the notebook can estimate which post characteristics align with stronger revenue."
+                "Generate donor-focused campaign content",
+                "Use clear fundraising asks, short campaign arcs, and trust-building mission language so the chatbot reflects what current channel and campaign data already suggest is working."
             )
         ],
         DataGaps:
         [
-            "Post-level revenue attribution is not yet available in the current pipeline output."
+            "Current evidence is still broader than individual post-level attribution."
         ]);
 }
