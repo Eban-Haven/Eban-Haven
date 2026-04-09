@@ -209,11 +209,24 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
         <>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {photos.map((p) => (
-              <div key={p.id} className="group relative overflow-hidden rounded-lg">
+              <div key={p.id} className="group relative h-24 overflow-hidden rounded-lg bg-muted">
                 <img
                   src={p.urls.small}
                   alt={p.alt_description ?? 'Unsplash photo'}
-                  className="h-20 w-full object-cover"
+                  className="h-full w-full object-cover"
+                  crossOrigin="anonymous"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  loading="lazy"
+                  onError={(e) => {
+                    // Small URL failed — try thumb as fallback
+                    const img = e.currentTarget
+                    if (!img.dataset.fallback) {
+                      img.dataset.fallback = '1'
+                      img.src = p.urls.thumb ?? p.urls.regular
+                    } else {
+                      img.style.display = 'none'
+                    }
+                  }}
                 />
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
@@ -224,7 +237,7 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
                     {copied === p.id ? '✓ Copied!' : 'Copy URL'}
                   </button>
                   <a
-                    href={p.links.html}
+                    href={`${p.links.html}?utm_source=eban_haven&utm_medium=referral`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-semibold text-black"
@@ -237,10 +250,10 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground/60">
             Photos from{' '}
-            <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="underline">
+            <a href="https://unsplash.com?utm_source=eban_haven&utm_medium=referral" target="_blank" rel="noopener noreferrer" className="underline">
               Unsplash
             </a>
-            . Click to copy image URL.
+            . Hover to copy URL.
           </p>
         </>
       )}
