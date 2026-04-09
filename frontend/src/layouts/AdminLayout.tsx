@@ -7,10 +7,10 @@ import {
   LayoutDashboard,
   LineChart,
   LogOut,
+  Mail,
   Menu,
   PanelLeftClose,
   PanelLeft,
-  RefreshCcw,
   TrendingUp,
   UserCheck,
   X,
@@ -55,7 +55,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/admin/donor-dashboard', label: 'Donor Dashboard', icon: TrendingUp },
       { to: '/admin/donor-all', label: 'Donor Information', icon: Layers },
-      { to: '/admin/email-hub', label: 'Donor Outreach', icon: RefreshCcw },
+      { to: '/admin/email-hub', label: 'Donor Outreach', icon: Mail },
     ],
   },
   {

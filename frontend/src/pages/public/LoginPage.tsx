@@ -325,7 +325,7 @@ export function LoginPage() {
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
                 {tab === 'login'
                   ? `Access your ${SITE_DISPLAY_NAME} portal.`
-                  : 'Join the donor community with a cleaner setup flow for your contact details, giving preferences, and supporter profile.'}
+                  : ''}
               </p>
             </div>
           </div>
