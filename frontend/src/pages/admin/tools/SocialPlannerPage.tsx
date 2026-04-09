@@ -47,7 +47,7 @@ type StartMode = 'pick' | 'quick' | 'brief' | 'chat'
 
 type UnsplashPhoto = {
   id: string
-  urls: { small: string; regular: string; full: string }
+  urls: { small: string; regular: string; full: string; thumb: string }
   alt_description: string | null
   user: { name: string }
   links: { html: string }
