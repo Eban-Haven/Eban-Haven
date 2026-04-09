@@ -28,6 +28,7 @@ import { BooleanBadge, CategoryBadge } from '../adminDataTable/AdminBadges'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 import { CASE_STATUSES, RISK_LEVELS, SEX_OPTIONS } from './caseConstants'
 import { CaseDrawer, EmptyState, QuickActionButton, SectionHeader, StatTile, ToggleField } from './caseUi'
+import { ReintegrationReadiness } from '../../../../components/ml/ReintegrationReadiness'
 import {
   CounselingSection,
   EducationSection,
@@ -906,6 +907,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       {mainTab === 'insights' && (
         <div className="space-y-6">
           <p className="text-sm text-muted-foreground">Derived signals from this resident&apos;s records to support supervision and case review.</p>
+          <ReintegrationReadiness residentId={residentId} />
           <div className="grid gap-4 lg:grid-cols-2">
             <div className={`${card} space-y-2`}>
               <h3 className="text-sm font-semibold">Concerns in last windows</h3>
