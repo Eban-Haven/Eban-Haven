@@ -4,7 +4,6 @@ import { motion } from 'framer-motion'
 import {
   AlertTriangle,
   ArrowRight,
-  BarChart2,
   GraduationCap,
   HandHeart,
   Heart,
@@ -15,8 +14,6 @@ import {
   Users,
 } from 'lucide-react'
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Line,
@@ -210,19 +207,7 @@ export function ImpactPage() {
     return { first, last, pct, fromY: pts[0].label, toY: pts[pts.length - 1].label }
   }, [yearlyGrowth])
 
-  const outcomeData = useMemo(() => {
-    if (outcomeRows.length > 0) return outcomeRows.map((r) => ({ category: r.label, pct: r.value }))
-    if (summary) {
-      const r = Math.min(100, Math.max(0, summary.reintegrationSuccessRatePercent))
-      return [
-        { category: 'Successful reintegration (program)', pct: r },
-        { category: 'Ongoing / other pathways', pct: Math.max(0, 100 - r) },
-      ]
-    }
-    return outcomeFallback.map((x) => ({ ...x }))
-  }, [outcomeRows, summary])
 
-  const usingOutcomeFallback = outcomeRows.length === 0
 
   const healthPct = summary
     ? Math.min(100, Math.round((summary.avgHealthScore / 5) * 100))
