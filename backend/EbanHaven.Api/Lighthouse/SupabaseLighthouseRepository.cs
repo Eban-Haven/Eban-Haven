@@ -712,6 +712,12 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 case "status": row.Status = v; break;
                 case "supporter_type": row.SupporterType = v; break;
                 case "country": row.Country = v; break;
+                case "organization_name": row.OrganizationName = v; break;
+                case "first_name": row.FirstName = v; break;
+                case "last_name": row.LastName = v; break;
+                case "phone": row.Phone = v; break;
+                case "acquisition_channel": row.AcquisitionChannel = v; break;
+                case "relationship_type": row.RelationshipType = v; break;
             }
         }
         db.SaveChanges();

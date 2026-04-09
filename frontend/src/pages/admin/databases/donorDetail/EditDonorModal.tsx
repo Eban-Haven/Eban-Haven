@@ -19,13 +19,13 @@ type Props = {
 export function EditDonorModal({ edit, setEdit, saving, onSave, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4">
-      <div className={`${card} max-h-[90vh] w-full max-w-md overflow-y-auto`}>
-        <p className={sectionFormTitle}>Edit donor</p>
+      <div className={`${card} max-h-[90vh] w-full max-w-2xl overflow-y-auto`}>
+        <p className={sectionFormTitle}>Edit donor profile</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Changes are saved via the admin supporter fields API (display name, type, status, email, region, country).
+          All fields below map to supporter columns in the database. First donation date is read-only from records.
         </p>
-        <div className="mt-4 grid gap-3">
-          <label className={label}>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className={`${label} sm:col-span-2`}>
             Display name
             <input
               className={input}
@@ -51,12 +51,60 @@ export function EditDonorModal({ edit, setEdit, saving, onSave, onClose }: Props
             Status
             <input className={input} value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })} />
           </label>
-          <label className={label}>
+          <label className={`${label} sm:col-span-2`}>
             Email
             <input
               className={input}
               value={edit.email ?? ''}
               onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Phone
+            <input
+              className={input}
+              value={edit.phone ?? ''}
+              onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Organization
+            <input
+              className={input}
+              value={edit.organizationName ?? ''}
+              onChange={(e) => setEdit({ ...edit, organizationName: e.target.value })}
+            />
+          </label>
+          <label className={label}>
+            First name
+            <input
+              className={input}
+              value={edit.firstName ?? ''}
+              onChange={(e) => setEdit({ ...edit, firstName: e.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Last name
+            <input
+              className={input}
+              value={edit.lastName ?? ''}
+              onChange={(e) => setEdit({ ...edit, lastName: e.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Relationship
+            <input
+              className={input}
+              value={edit.relationshipType ?? ''}
+              onChange={(e) => setEdit({ ...edit, relationshipType: e.target.value })}
+            />
+          </label>
+          <label className={label}>
+            Acquisition channel
+            <input
+              className={input}
+              value={edit.acquisitionChannel ?? ''}
+              onChange={(e) => setEdit({ ...edit, acquisitionChannel: e.target.value })}
             />
           </label>
           <label className={label}>

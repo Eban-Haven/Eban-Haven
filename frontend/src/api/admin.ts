@@ -15,6 +15,7 @@ export {
   getAllocations,
   getAtRiskDonors,
   getUpgradeCandidates,
+  getDonorChurnRisk,
   getDonorEmailProfile,
   generateDonorEmail,
   sendDonorEmail,

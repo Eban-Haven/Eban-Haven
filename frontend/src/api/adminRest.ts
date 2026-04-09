@@ -83,6 +83,17 @@ export async function getUpgradeCandidates(threshold = 0.4, limit = 100): Promis
   )
 }
 
+/** Single-donor churn pipeline (ML service). Returns null if unavailable or error. */
+export async function getDonorChurnRisk(supporterId: number): Promise<T.AtRiskDonorInfo | null> {
+  try {
+    const res = await apiFetch(`/api/donors/${supporterId}/churn-risk`)
+    if (!res.ok) return null
+    return parseJson<T.AtRiskDonorInfo>(res)
+  } catch {
+    return null
+  }
+}
+
 export async function getDonorEmailProfile(supporterId: number): Promise<T.DonorEmailProfile> {
   return parseJson<T.DonorEmailProfile>(await apiFetch(`${base}/email-hub/supporters/${supporterId}`))
 }

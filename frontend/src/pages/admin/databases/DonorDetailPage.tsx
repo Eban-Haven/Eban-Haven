@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { alertError } from '../shared/adminStyles'
 import {
   createDonation,
-  getAtRiskDonors,
   getDonations,
+  getDonorChurnRisk,
   getSupporters,
   patchSupporterFields,
   type AtRiskDonorInfo,
@@ -12,16 +12,15 @@ import {
   type Supporter,
 } from '../../../api/admin'
 import { DonationPanel } from './donorDetail/DonationPanel'
-import { DonorAlerts } from './donorDetail/DonorAlerts'
-import { DonorHeader } from './donorDetail/DonorHeader'
+import { DonorProfileCard } from './donorDetail/DonorProfileCard'
 import { DonorMetricsRow } from './donorDetail/DonorMetricsRow'
+import { DonorStatusCard } from './donorDetail/DonorStatusCard'
 import { EditDonorModal } from './donorDetail/EditDonorModal'
 
 export function DonorDetailPage() {
   const navigate = useNavigate()
   const { id: idParam } = useParams()
   const id = Number(idParam)
-  const addAnchorRef = useRef<HTMLDivElement | null>(null)
 
   const [supporter, setSupporter] = useState<Supporter | null>(null)
   const [donations, setDonations] = useState<Donation[]>([])
@@ -30,7 +29,8 @@ export function DonorDetailPage() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [edit, setEdit] = useState<Supporter | null>(null)
-  const [atRiskById, setAtRiskById] = useState<Map<number, AtRiskDonorInfo>>(new Map())
+  const [churn, setChurn] = useState<AtRiskDonorInfo | null>(null)
+  const [churnLoading, setChurnLoading] = useState(false)
 
   const [dType, setDType] = useState('Monetary')
   const [dAmount, setDAmount] = useState('')
@@ -63,17 +63,26 @@ export function DonorDetailPage() {
     void load()
   }, [load])
 
+  const supporterId = supporter?.id
   useEffect(() => {
-    getAtRiskDonors(0.55, 200)
-      .then((rows) => {
-        setAtRiskById(
-          new Map(rows.filter((r) => r.supporter_id != null).map((r) => [r.supporter_id!, r])),
-        )
-      })
-      .catch(() => setAtRiskById(new Map()))
-  }, [])
-
-  const atRiskForDonor = id > 0 ? atRiskById.get(id) : undefined
+    if (supporterId == null) {
+      setChurn(null)
+      setChurnLoading(false)
+      return
+    }
+    let cancelled = false
+    setChurn(null)
+    setChurnLoading(true)
+    void getDonorChurnRisk(supporterId).then((c) => {
+      if (!cancelled) {
+        setChurn(c)
+        setChurnLoading(false)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [supporterId])
 
   const metrics = useMemo(() => {
     const totalMonetary = donations.reduce((sum, donation) => sum + (donation.amount ?? 0), 0)
@@ -96,11 +105,13 @@ export function DonorDetailPage() {
     }
   }, [donations])
 
-  async function onAddContribution(e: FormEvent) {
-    e.preventDefault()
-    if (!Number.isFinite(id)) return
+  async function onAddContribution(): Promise<boolean> {
+    if (!Number.isFinite(id)) return false
     const amt = parseFloat(dAmount)
-    if (!Number.isFinite(amt) || amt <= 0) return
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError('Enter a valid amount greater than zero.')
+      return false
+    }
     setSavingDonation(true)
     setError(null)
     try {
@@ -117,8 +128,10 @@ export function DonorDetailPage() {
       setDNotes('')
       setDCampaign('')
       await load()
+      return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed')
+      return false
     } finally {
       setSavingDonation(false)
     }
@@ -136,6 +149,12 @@ export function DonorDetailPage() {
         country: edit.country ?? '',
         email: edit.email ?? '',
         status: edit.status,
+        organization_name: edit.organizationName ?? '',
+        first_name: edit.firstName ?? '',
+        last_name: edit.lastName ?? '',
+        phone: edit.phone ?? '',
+        acquisition_channel: edit.acquisitionChannel ?? '',
+        relationship_type: edit.relationshipType ?? '',
       })
       setSupporter(updated)
       setEditOpen(false)
@@ -152,10 +171,6 @@ export function DonorDetailPage() {
     if (!supporter) return
     setEdit({ ...supporter })
     setEditOpen(true)
-  }
-
-  function scrollToAddDonation() {
-    addAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   if (!Number.isFinite(id) || id <= 0) return <p className="text-destructive">Invalid donor.</p>
@@ -181,15 +196,20 @@ export function DonorDetailPage() {
         <>
           {error ? <div className={alertError}>{error}</div> : null}
 
-          <DonorHeader
-            supporter={supporter}
-            detailsOpen={detailsOpen}
-            onToggleDetails={() => setDetailsOpen((o) => !o)}
-            onEditClick={openEdit}
-            onAddDonationClick={scrollToAddDonation}
-          />
-
-          <DonorAlerts supporterId={supporter.id} atRisk={atRiskForDonor} upgradeInsight={null} />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,20rem)] lg:items-start">
+            <DonorProfileCard
+              supporter={supporter}
+              detailsOpen={detailsOpen}
+              onToggleDetails={() => setDetailsOpen((o) => !o)}
+              onEditClick={openEdit}
+            />
+            <DonorStatusCard
+              supporter={supporter}
+              donationCount={metrics.donationCount}
+              churn={churn}
+              churnLoading={churnLoading}
+            />
+          </div>
 
           <DonorMetricsRow
             lifetimeTotal={metrics.totalMonetary}
@@ -199,24 +219,22 @@ export function DonorDetailPage() {
             lastDonationType={metrics.last?.donationType ?? ''}
           />
 
-          <div ref={addAnchorRef}>
-            <DonationPanel
-              donations={donations}
-              supporterId={supporter.id}
-              saving={savingDonation}
-              onAddDonation={onAddContribution}
-              dType={dType}
-              setDType={setDType}
-              dAmount={dAmount}
-              setDAmount={setDAmount}
-              dDate={dDate}
-              setDDate={setDDate}
-              dNotes={dNotes}
-              setDNotes={setDNotes}
-              dCampaign={dCampaign}
-              setDCampaign={setDCampaign}
-            />
-          </div>
+          <DonationPanel
+            donations={donations}
+            supporterId={supporter.id}
+            saving={savingDonation}
+            onAddDonation={onAddContribution}
+            dType={dType}
+            setDType={setDType}
+            dAmount={dAmount}
+            setDAmount={setDAmount}
+            dDate={dDate}
+            setDDate={setDDate}
+            dNotes={dNotes}
+            setDNotes={setDNotes}
+            dCampaign={dCampaign}
+            setDCampaign={setDCampaign}
+          />
 
           {editOpen && edit ? (
             <EditDonorModal
