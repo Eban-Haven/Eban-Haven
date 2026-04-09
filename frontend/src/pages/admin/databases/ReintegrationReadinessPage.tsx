@@ -6,7 +6,6 @@ import {
   deriveReadinessPrediction,
   deriveReadinessTier,
   formatFeatureValue,
-  READINESS_READY_THRESHOLD,
   type ReintegrationResult,
   TIER_CONFIG,
   topImprovementLabel,
@@ -18,7 +17,6 @@ import {
   emptyCell,
   input,
   label,
-  pageDesc,
   pageTitle,
   statCardInner,
   statCardSub,
@@ -165,9 +163,6 @@ function CohortOverviewCard({
     <div className={`${card} space-y-4`}>
       <div>
         <h3 className="text-base font-semibold text-foreground">Cohort Overview</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Current readiness mix across residents with a live prediction score. Click a card to filter the worklist.
-        </p>
       </div>
       <div className="grid gap-3 md:grid-cols-4">
         <button
@@ -177,9 +172,9 @@ function CohortOverviewCard({
             activeTier === 'all' ? 'border-primary bg-primary/5 ring-2 ring-primary/15' : 'border-border hover:bg-muted/40'
           }`}
         >
-          <p className={statCardInner}>All scored</p>
+          <p className={statCardInner}>All Residents</p>
           <p className={statCardValue}>{total}</p>
-          <p className={statCardSub}>Reset tier filter</p>
+          <p className={statCardSub}>Total Number of Current Residents</p>
         </button>
         {segments.map((tier) => {
           const percent = total > 0 ? Math.round((counts[tier] / total) * 100) : 0
@@ -213,6 +208,68 @@ function CohortOverviewCard({
         })}
       </div>
       <p className="text-xs text-muted-foreground">{total} residents currently scored.</p>
+    </div>
+  )
+}
+
+function ReadinessShortlistCard({
+  title,
+  emptyMessage,
+  residents,
+}: {
+  title: string
+  emptyMessage: string
+  residents: CohortResident[]
+}) {
+  return (
+    <div className={`${card} space-y-4`}>
+      <div>
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Quick shortlist for case review and planning.</p>
+      </div>
+      {residents.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      ) : (
+        <div className="space-y-3">
+          {residents.map((resident) => {
+            const readinessPct = Math.round(resident.readiness.reintegration_probability * 100)
+            const tier = deriveReadinessTier(resident.readiness.reintegration_probability)
+            const prediction = deriveReadinessPrediction(resident.readiness.reintegration_probability)
+            const tierConfig = TIER_CONFIG[tier]
+            const topArea = resident.readiness.top_improvements[0]
+            return (
+              <div key={resident.id} className="rounded-xl border border-border bg-background px-4 py-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <Link to={`/admin/residents/${resident.id}`} className="font-medium text-primary hover:underline">
+                      {resident.internalCode}
+                    </Link>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {resident.safehouseName ?? 'No safehouse'} · {resident.assignedSocialWorker ?? 'No assigned worker'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold text-foreground">{readinessPct}%</p>
+                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${tierConfig.badge}`}>
+                      {prediction}
+                    </span>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-foreground">
+                  {topArea ? (
+                    <>
+                      <span className="font-medium">{topArea.label}:</span> {formatFeatureValue(topArea.feature, topArea.resident_value)} vs{' '}
+                      {formatFeatureValue(topArea.feature, topArea.benchmark_value)}
+                    </>
+                  ) : (
+                    'No immediate improvement gaps surfaced by the current model run.'
+                  )}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -485,68 +542,6 @@ function ResidentActionDrawer({
   )
 }
 
-function PriorityCard({
-  title,
-  emptyMessage,
-  residents,
-}: {
-  title: string
-  emptyMessage: string
-  residents: CohortResident[]
-}) {
-  return (
-    <div className={`${card} space-y-4`}>
-      <div>
-        <h3 className="text-base font-semibold text-foreground">{title}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">Quick shortlist for case review and planning.</p>
-      </div>
-      {residents.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-      ) : (
-        <div className="space-y-3">
-          {residents.map((resident) => {
-            const readinessPct = Math.round(resident.readiness.reintegration_probability * 100)
-            const tier = deriveReadinessTier(resident.readiness.reintegration_probability)
-            const prediction = deriveReadinessPrediction(resident.readiness.reintegration_probability)
-            const tierConfig = TIER_CONFIG[tier]
-            const topArea = resident.readiness.top_improvements[0]
-            return (
-              <div key={resident.id} className="rounded-xl border border-border bg-background px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <Link to={`/admin/residents/${resident.id}`} className="font-medium text-primary hover:underline">
-                      {resident.internalCode}
-                    </Link>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {resident.safehouseName ?? 'No safehouse'} · {resident.assignedSocialWorker ?? 'No assigned worker'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-foreground">{readinessPct}%</p>
-                    <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${tierConfig.badge}`}>
-                      {prediction}
-                    </span>
-                  </div>
-                </div>
-                <p className="mt-3 text-sm text-foreground">
-                  {topArea ? (
-                    <>
-                      <span className="font-medium">{topArea.label}:</span> {formatFeatureValue(topArea.feature, topArea.resident_value)} vs{' '}
-                      {formatFeatureValue(topArea.feature, topArea.benchmark_value)}
-                    </>
-                  ) : (
-                    'No immediate improvement gaps surfaced by the current model run.'
-                  )}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function ReintegrationReadinessPage() {
   const [rows, setRows] = useState<CohortResident[]>([])
   const [safehouseFilter, setSafehouseFilter] = useState('all')
@@ -689,9 +684,6 @@ export function ReintegrationReadinessPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className={pageTitle}>Reintigration Readiness</h2>
-          <p className={pageDesc}>
-            Population view of resident readiness predictions using the 70% / 50% cohort thresholds for quick triage and transition planning.
-          </p>
         </div>
         <button type="button" className={btnPrimary} onClick={() => void load()}>
           Refresh readiness
@@ -778,9 +770,6 @@ export function ReintegrationReadinessPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-semibold text-foreground">Readiness Rankings</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Ranked active residents using these thresholds: high readiness at {Math.round(READINESS_READY_THRESHOLD * 100)}%+, medium at 50% to under 70%, and low below 50%.
-                </p>
               </div>
               {lastUpdated && <p className="text-xs text-muted-foreground">Updated {lastUpdated.toLocaleTimeString()}</p>}
             </div>
@@ -872,13 +861,13 @@ export function ReintegrationReadinessPage() {
             </div>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <PriorityCard
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ReadinessShortlistCard
               title="Ready to transition"
               emptyMessage="No residents in the current filtered cohort are over the readiness threshold yet."
               residents={readyToTransition}
             />
-            <PriorityCard
+            <ReadinessShortlistCard
               title="Needs attention"
               emptyMessage="No low-readiness residents matched the current filters."
               residents={needsAttention}
