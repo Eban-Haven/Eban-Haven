@@ -157,23 +157,53 @@ function StepBadge({ n, label, active }: { n: number; label: string; active?: bo
 
 function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => void }) {
   const [photos, setPhotos] = useState<PexelsPhoto[]>([])
+  const [blobUrls, setBlobUrls] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(query)
+  const blobUrlsRef = useRef<Record<number, string>>({})
+
+  // Revoke all blob URLs when component unmounts to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL)
+    }
+  }, [])
+
+  const fetchBlobForPhoto = useCallback(async (photo: PexelsPhoto) => {
+    try {
+      const proxyUrl = proxyImageUrl(photo.src.medium)
+      const res = await apiFetch(proxyUrl)
+      if (!res.ok) return
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      blobUrlsRef.current[photo.id] = blobUrl
+      setBlobUrls((prev) => ({ ...prev, [photo.id]: blobUrl }))
+    } catch {
+      // silently skip broken individual images
+    }
+  }, [])
 
   const search = useCallback(async (q: string) => {
     if (!q.trim()) return
     setLoading(true)
     setError(null)
+    // Revoke previous blob URLs
+    Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL)
+    blobUrlsRef.current = {}
+    setBlobUrls({})
     try {
-      setPhotos(await fetchPexelsImages(q))
+      const results = await fetchPexelsImages(q)
+      setPhotos(results)
+      // Fetch images as blobs in parallel so they show up quickly
+      void Promise.all(results.map(fetchBlobForPhoto))
     } catch {
-      setError('Image search failed. Check your Pexels API key or try again.')
+      setError('Image search failed. Check that the API is configured or try again.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchBlobForPhoto])
 
   useEffect(() => { void search(query) }, [query, search])
 
@@ -214,12 +244,17 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
           <div className="mt-3 grid grid-cols-3 gap-2">
             {photos.map((p) => (
               <div key={p.id} className="group relative h-24 overflow-hidden rounded-lg bg-muted">
-                <img
-                  src={proxyImageUrl(p.src.medium)}
-                  alt={p.alt || 'Pexels photo'}
-                  className="h-full w-full object-cover"
-                  loading="lazy"
-                />
+                {blobUrls[p.id] ? (
+                  <img
+                    src={blobUrls[p.id]}
+                    alt={p.alt || 'Pexels photo'}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground/50" />
+                  </div>
+                )}
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
@@ -236,11 +271,7 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
             ))}
           </div>
           <p className="mt-2 text-[10px] text-muted-foreground/60">
-            Photos from{' '}
-            <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer" className="underline">
-              Pexels
-            </a>
-            . Hover to copy URL.
+            Photos from Pexels. Hover to copy URL.
           </p>
         </>
       )}
