@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, CalendarClock, CheckCheck, LoaderCircle, Save, SendHorizonal, Sparkles } from 'lucide-react'
+import {
+  Bot,
+  CalendarClock,
+  CheckCheck,
+  ChevronDown,
+  ChevronUp,
+  LoaderCircle,
+  Plus,
+  RotateCcw,
+  Save,
+  SendHorizonal,
+  Sparkles,
+} from 'lucide-react'
 import {
   createPlannedSocialPosts,
   getPlannedSocialPosts,
@@ -9,8 +21,10 @@ import {
   type PlannedSocialPost,
 } from '../../../api/admin'
 import { type SocialChatMessage, type SocialChatResponse, sendSocialChat } from '../../../api/socialChat'
-import { alertError, btnPrimary, card, input, pageDesc, pageTitle, sectionFormTitle } from '../shared/adminStyles'
-import { Badge, BooleanBadge, CategoryBadge, StatusBadge } from '../shared/adminDataTable/AdminBadges'
+import { alertError, btnPrimary, card, input, pageDesc, pageTitle } from '../shared/adminStyles'
+import { Badge, CategoryBadge, StatusBadge } from '../shared/adminDataTable/AdminBadges'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type ChatBubble = {
   id: string
@@ -19,17 +33,33 @@ type ChatBubble = {
   response?: SocialChatResponse
 }
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+
 const starterPrompts = [
-  'Create 3 Facebook posts about safe shelter and reintegration support this week.',
-  'Plan 4 Facebook content ideas for Sexual Assault Awareness Month with captions and best posting times.',
-  'Draft a short Facebook campaign for donor education with post, story, and video options.',
+  {
+    title: 'Shelter awareness',
+    description: 'Create 3 Facebook posts about safe shelter and reintegration support this week.',
+    icon: '🏠',
+  },
+  {
+    title: 'Awareness campaign',
+    description: 'Plan 4 Facebook content ideas for Sexual Assault Awareness Month with captions and best posting times.',
+    icon: '📣',
+  },
+  {
+    title: 'Donor education',
+    description: 'Draft a short Facebook campaign for donor education with post, story, and video options.',
+    icon: '❤️',
+  },
 ] as const
 
 const contentTypeOptions = ['Post', 'Story', 'Video'] as const
 const platformOptions = ['Facebook', 'Instagram'] as const
 
 const initialAssistantMessage =
-  'Tell me the goal, platform, and how many posts you want. I will keep questions brief, make reasonable assumptions when possible, and turn the result into saveable planned posts.'
+  "Hi! Tell me your goal, which platform you're targeting, and how many posts you need. I'll keep follow-up questions brief and generate a ready-to-save content plan."
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function composePromptFromBrief(brief: {
   goal: string
@@ -46,11 +76,9 @@ function composePromptFromBrief(brief: {
     `Content types: ${brief.contentTypes.length > 0 ? brief.contentTypes.join(', ') : 'Post'}`,
     `Number of posts: ${brief.postCount || '3'}`,
   ]
-
   if (brief.timeframe.trim()) lines.push(`Timeframe: ${brief.timeframe.trim()}`)
   if (brief.audience.trim()) lines.push(`Audience: ${brief.audience.trim()}`)
   if (brief.notes.trim()) lines.push(`Context: ${brief.notes.trim()}`)
-
   lines.push('Please keep questions to only what is necessary, and if enough info is present, generate the post plan now.')
   return lines.join('\n')
 }
@@ -66,25 +94,20 @@ function normalizeHashtag(tag: string) {
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`
 }
 
-function renderRecommendationList(
-  title: string,
-  items: { recommendation: string; rationale: string }[],
-) {
-  if (items.length === 0) return null
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StepBadge({ n, label, active }: { n: number; label: string; active?: boolean }) {
   return (
-    <section>
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h4>
-      <div className="mt-2 space-y-2">
-        {items.map((item) => (
-          <div key={`${title}-${item.recommendation}`} className="rounded-lg border border-border/70 bg-background p-3">
-            <p className="text-sm font-medium text-foreground">{item.recommendation}</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.rationale}</p>
-          </div>
-        ))}
-      </div>
-    </section>
+    <div className={`flex items-center gap-2 text-xs font-medium ${active ? 'text-foreground' : 'text-muted-foreground'}`}>
+      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+        {n}
+      </span>
+      {label}
+    </div>
   )
 }
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function SocialPlannerPage() {
   const [messages, setMessages] = useState<ChatBubble[]>([
@@ -96,16 +119,21 @@ export function SocialPlannerPage() {
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
   const [loadingPlanned, setLoadingPlanned] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [briefOpen, setBriefOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<string>('All')
   const [brief, setBrief] = useState({
     goal: '',
-    platforms: ['Facebook'],
-    contentTypes: ['Post'],
+    platforms: ['Facebook'] as string[],
+    contentTypes: ['Post'] as string[],
     postCount: '3',
     timeframe: '',
     audience: '',
     notes: '',
   })
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const hasStarted = messages.length > 1
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -122,16 +150,14 @@ export function SocialPlannerPage() {
     }
   }, [])
 
-  useEffect(() => {
-    void loadPlannedPosts()
-  }, [loadPlannedPosts])
+  useEffect(() => { void loadPlannedPosts() }, [loadPlannedPosts])
 
   const conversation = useMemo<SocialChatMessage[]>(
-    () => messages.map((message) => ({ role: message.role, content: message.content })),
+    () => messages.map((m) => ({ role: m.role, content: m.content })),
     [messages],
   )
 
-  const latestStructured = [...messages].reverse().find((message) => message.response)?.response?.structured
+  // ── Actions ──
 
   async function submitPrompt(rawPrompt?: string) {
     const content = (rawPrompt ?? draft).trim()
@@ -140,15 +166,16 @@ export function SocialPlannerPage() {
     const userMessage: ChatBubble = { id: crypto.randomUUID(), role: 'user', content }
     const nextConversation = [...conversation, { role: 'user' as const, content }]
 
-    setMessages((current) => [...current, userMessage])
+    setMessages((c) => [...c, userMessage])
     setDraft('')
+    setBriefOpen(false)
     setError(null)
     setLoading(true)
 
     try {
       const response = await sendSocialChat(nextConversation)
-      setMessages((current) => [
-        ...current,
+      setMessages((c) => [
+        ...c,
         {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -160,17 +187,21 @@ export function SocialPlannerPage() {
       setError(err instanceof Error ? err.message : 'Failed to generate social plan.')
     } finally {
       setLoading(false)
+      setTimeout(() => inputRef.current?.focus(), 100)
     }
   }
 
   async function saveIdeasFromResponse(response: SocialChatResponse) {
     if (response.structured.postIdeas.length === 0) return
     const key = `bulk-${response.generatedAtUtc}`
-    setSavingIds((current) => new Set(current).add(key))
+    setSavingIds((c) => new Set(c).add(key))
     setError(null)
     try {
       await createPlannedSocialPosts({
-        sourcePrompt: conversation.filter((message) => message.role === 'user').map((message) => message.content).join('\n\n'),
+        sourcePrompt: conversation
+          .filter((m) => m.role === 'user')
+          .map((m) => m.content)
+          .join('\n\n'),
         posts: response.structured.postIdeas.map((idea) => ({
           title: idea.title,
           platform: idea.platform || 'Facebook',
@@ -189,489 +220,540 @@ export function SocialPlannerPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save planned posts.')
     } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
-      })
+      setSavingIds((c) => { const n = new Set(c); n.delete(key); return n })
     }
   }
 
   async function requestSchedule(post: PlannedSocialPost) {
     const key = `schedule-${post.id}`
-    setSavingIds((current) => new Set(current).add(key))
-    setError(null)
+    setSavingIds((c) => new Set(c).add(key))
     try {
       const updated = await requestSchedulePlannedSocialPost(post.id)
-      setPlannedPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+      setPlannedPosts((c) => c.map((p) => (p.id === updated.id ? updated : p)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to request scheduling.')
     } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
-      })
+      setSavingIds((c) => { const n = new Set(c); n.delete(key); return n })
     }
   }
 
   async function sendToFacebook(post: PlannedSocialPost) {
     const key = `facebook-${post.id}`
-    setSavingIds((current) => new Set(current).add(key))
-    setError(null)
+    setSavingIds((c) => new Set(c).add(key))
     try {
       const updated = await schedulePlannedSocialPostToFacebook(post.id)
-      setPlannedPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+      setPlannedPosts((c) => c.map((p) => (p.id === updated.id ? updated : p)))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to schedule to Facebook.')
     } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
-      })
+      setSavingIds((c) => { const n = new Set(c); n.delete(key); return n })
     }
   }
 
   async function markReady(post: PlannedSocialPost) {
     const key = `ready-${post.id}`
-    setSavingIds((current) => new Set(current).add(key))
-    setError(null)
+    setSavingIds((c) => new Set(c).add(key))
     try {
       const updated = await patchPlannedSocialPostStatus(post.id, 'Ready')
-      setPlannedPosts((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+      setPlannedPosts((c) => c.map((p) => (p.id === updated.id ? updated : p)))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update post status.')
+      setError(err instanceof Error ? err.message : 'Failed to update status.')
     } finally {
-      setSavingIds((current) => {
-        const next = new Set(current)
-        next.delete(key)
-        return next
-      })
+      setSavingIds((c) => { const n = new Set(c); n.delete(key); return n })
     }
   }
 
   function toggleBriefArray(field: 'platforms' | 'contentTypes', value: string) {
-    setBrief((current) => {
-      const exists = current[field].includes(value)
-      const nextValues = exists ? current[field].filter((item) => item !== value) : [...current[field], value]
-      return {
-        ...current,
-        [field]: nextValues.length > 0 ? nextValues : [value],
-      }
+    setBrief((c) => {
+      const exists = c[field].includes(value)
+      const next = exists ? c[field].filter((v) => v !== value) : [...c[field], value]
+      return { ...c, [field]: next.length > 0 ? next : [value] }
     })
   }
 
+  function resetConversation() {
+    setMessages([{ id: crypto.randomUUID(), role: 'assistant', content: initialAssistantMessage }])
+    setDraft('')
+    setError(null)
+    setBriefOpen(false)
+  }
+
+  const statusOptions = ['All', ...Array.from(new Set(plannedPosts.map((p) => p.status)))]
+  const filteredPosts = statusFilter === 'All'
+    ? plannedPosts
+    : plannedPosts.filter((p) => p.status === statusFilter)
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h2 className={pageTitle}>Marketing tools</h2>
-          <p className={pageDesc}>
-            Plan Facebook-first social content with a lightweight AI copilot, save each plan, and queue posts for manual
-            Facebook scheduling integration.
-          </p>
-        </div>
-        <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-xs text-muted-foreground lg:max-w-sm">
-          Current MVP: plans and saves posts internally, then marks them as schedule requests for the future Facebook connector.
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className={pageTitle}>Marketing Support</h2>
+        <p className={pageDesc}>
+          Use the AI copilot to plan social media content, then save and schedule posts.
+        </p>
+        {/* Step strip */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-4 py-3">
+          <StepBadge n={1} label="Describe your goal" active={!hasStarted} />
+          <span className="text-muted-foreground/40">→</span>
+          <StepBadge n={2} label="Review AI-generated posts" active={hasStarted && loading === false} />
+          <span className="text-muted-foreground/40">→</span>
+          <StepBadge n={3} label="Save & schedule" active={plannedPosts.length > 0} />
         </div>
       </div>
 
       {error && <div className={alertError}>{error}</div>}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(22rem,1fr)]">
-        <section className="space-y-6">
-          <section className={`${card} flex min-h-[34rem] flex-col p-0`}>
-            <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Bot className="h-5 w-5" />
+        {/* ── Left: AI Planner ── */}
+        <div className="space-y-4">
+          <div className={`${card} flex min-h-[36rem] flex-col p-0`}>
+            {/* Card header */}
+            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Bot className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">AI Content Planner</h3>
+                  <p className="text-xs text-muted-foreground">Describe your goal and get a ready-to-post content plan.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Social planning copilot</h3>
-                <p className="text-xs text-muted-foreground">Brief questions, trauma-informed recommendations, saveable plans.</p>
-              </div>
-            </div>
-
-            <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`max-w-3xl rounded-2xl px-4 py-3 ${
-                    message.role === 'user'
-                      ? 'ml-auto bg-primary text-primary-foreground'
-                      : 'border border-border bg-muted/40 text-foreground'
-                  }`}
+              {hasStarted && (
+                <button
+                  type="button"
+                  onClick={resetConversation}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 >
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-
-                  {message.role === 'assistant' && message.response && (
-                    <div className="mt-4 space-y-4 border-t border-border/70 pt-4">
-                      {message.response.structured.clarifyingQuestions.length > 0 && (
-                        <section>
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick questions</h4>
-                          <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                            {message.response.structured.clarifyingQuestions.map((question) => (
-                              <li key={question} className="rounded-lg border border-border/70 bg-background p-3">
-                                {question}
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      )}
-
-                      {message.response.structured.planningSummary && (
-                        <section className="rounded-xl border border-border/70 bg-background p-4">
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Planning summary</h4>
-                          <p className="mt-2 text-sm text-muted-foreground">{message.response.structured.planningSummary}</p>
-                        </section>
-                      )}
-
-                      {message.response.structured.postIdeas.length > 0 && (
-                        <section>
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Generated post plans</h4>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
-                              onClick={() => void saveIdeasFromResponse(message.response!)}
-                              disabled={savingIds.has(`bulk-${message.response.generatedAtUtc}`)}
-                            >
-                              {savingIds.has(`bulk-${message.response.generatedAtUtc}`) ? (
-                                <LoaderCircle className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Save className="h-4 w-4" />
-                              )}
-                              Save all plans
-                            </button>
-                          </div>
-                          <div className="mt-2 space-y-3">
-                            {message.response.structured.postIdeas.map((idea) => (
-                              <article key={`${idea.title}-${idea.platform}-${idea.contentType}`} className="rounded-xl border border-border/70 bg-background p-4">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-sm font-semibold text-foreground">{idea.title}</p>
-                                  <CategoryBadge>{idea.platform}</CategoryBadge>
-                                  <Badge variant="info">{idea.contentType}</Badge>
-                                  <Badge variant="category">{idea.format}</Badge>
-                                </div>
-                                {idea.imageIdea ? <p className="mt-2 text-sm text-muted-foreground">Visual: {idea.imageIdea}</p> : null}
-                                <div className="mt-3 grid gap-3 text-xs text-muted-foreground md:grid-cols-2">
-                                  <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-foreground">Caption</dt>
-                                    <dd className="mt-1 whitespace-pre-wrap leading-relaxed">{idea.caption}</dd>
-                                  </div>
-                                  <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-foreground">Best time</dt>
-                                    <dd className="mt-1 leading-relaxed">{idea.bestTime || '—'}</dd>
-                                  </div>
-                                  <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-foreground">CTA</dt>
-                                    <dd className="mt-1 leading-relaxed">{idea.cta || '—'}</dd>
-                                  </div>
-                                  <div>
-                                    <dt className="font-semibold uppercase tracking-wide text-foreground">Hashtags</dt>
-                                    <dd className="mt-1 leading-relaxed">
-                                      {idea.hashtags.length > 0 ? idea.hashtags.map(normalizeHashtag).join(' ') : '—'}
-                                    </dd>
-                                  </div>
-                                </div>
-                                {idea.notes ? <p className="mt-3 text-xs text-muted-foreground">Notes: {idea.notes}</p> : null}
-                                {idea.whyItFits ? <p className="mt-2 text-sm text-muted-foreground">{idea.whyItFits}</p> : null}
-                              </article>
-                            ))}
-                          </div>
-                        </section>
-                      )}
-
-                      {message.response.structured.captions.length > 0 && (
-                        <section>
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Extra captions</h4>
-                          <div className="mt-2 space-y-2">
-                            {message.response.structured.captions.map((caption) => (
-                              <div key={caption} className="rounded-lg border border-border/70 bg-background p-3 text-sm">
-                                {caption}
-                              </div>
-                            ))}
-                          </div>
-                        </section>
-                      )}
-
-                      {renderRecommendationList('Timing recommendations', message.response.structured.timingRecommendations)}
-                      {renderRecommendationList('CTA recommendations', message.response.structured.ctaRecommendations)}
-
-                      {message.response.structured.confidenceNotes.length > 0 && (
-                        <section>
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confidence notes</h4>
-                          <div className="mt-2 space-y-2">
-                            {message.response.structured.confidenceNotes.map((note) => (
-                              <div key={`${note.label}-${note.detail}`} className="rounded-lg border border-border/70 bg-background p-3">
-                                <p className="text-sm font-medium text-foreground">{note.label}</p>
-                                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{note.detail}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </section>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {loading && (
-                <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                  Generating a social plan…
-                </div>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  New session
+                </button>
               )}
             </div>
 
-            <div className="border-t border-border px-5 py-4">
-              <div className="flex flex-col gap-3">
-                <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground" htmlFor="social-planner-input">
-                  Additional prompt
-                </label>
-                <textarea
-                  id="social-planner-input"
-                  className={`${input} min-h-28 resize-y`}
-                  placeholder="Add any extra instructions or answer the assistant's quick questions."
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                      event.preventDefault()
-                      void submitPrompt()
-                    }
-                  }}
-                />
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <p className="text-xs text-muted-foreground">Press Ctrl/Cmd + Enter to send.</p>
+            {/* Chat / starter area */}
+            {!hasStarted ? (
+              /* ── First visit: starter prompts + brief form ── */
+              <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Start with a quick prompt
+                  </p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    {starterPrompts.map((p) => (
+                      <button
+                        key={p.title}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => void submitPrompt(p.description)}
+                        className="flex flex-col gap-2 rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+                      >
+                        <span className="text-xl">{p.icon}</span>
+                        <span className="text-sm font-semibold text-foreground">{p.title}</span>
+                        <span className="text-xs leading-relaxed text-muted-foreground">{p.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs text-muted-foreground">or describe your own goal</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+
+                {/* Quick brief (collapsible) */}
+                <div className="rounded-xl border border-border bg-background">
                   <button
                     type="button"
-                    className={`${btnPrimary} inline-flex items-center gap-2`}
+                    className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground"
+                    onClick={() => setBriefOpen((o) => !o)}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Fill a brief for a more targeted plan
+                    </span>
+                    {briefOpen
+                      ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </button>
+
+                  {briefOpen && (
+                    <div className="space-y-4 border-t border-border px-4 pb-4 pt-4">
+                      <label className="block text-xs font-medium text-muted-foreground">
+                        Goal *
+                        <textarea
+                          className={`${input} mt-1 min-h-20 resize-y`}
+                          placeholder="e.g. raise awareness about our safe shelter programme and invite supporters to donate."
+                          value={brief.goal}
+                          onChange={(e) => setBrief((c) => ({ ...c, goal: e.target.value }))}
+                        />
+                      </label>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Platforms</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {platformOptions.map((pl) => (
+                              <button
+                                key={pl}
+                                type="button"
+                                onClick={() => toggleBriefArray('platforms', pl)}
+                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                  brief.platforms.includes(pl)
+                                    ? 'border-primary/40 bg-primary/10 text-primary'
+                                    : 'border-border bg-card text-foreground hover:bg-muted/50'
+                                }`}
+                              >
+                                {pl}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Content types</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {contentTypeOptions.map((ct) => (
+                              <button
+                                key={ct}
+                                type="button"
+                                onClick={() => toggleBriefArray('contentTypes', ct)}
+                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                  brief.contentTypes.includes(ct)
+                                    ? 'border-primary/40 bg-primary/10 text-primary'
+                                    : 'border-border bg-card text-foreground hover:bg-muted/50'
+                                }`}
+                              >
+                                {ct}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <label className="block text-xs font-medium text-muted-foreground">
+                          # of posts
+                          <input className={`${input} mt-1`} value={brief.postCount} placeholder="3"
+                            onChange={(e) => setBrief((c) => ({ ...c, postCount: e.target.value }))} />
+                        </label>
+                        <label className="block text-xs font-medium text-muted-foreground">
+                          Timeframe
+                          <input className={`${input} mt-1`} value={brief.timeframe} placeholder="This week"
+                            onChange={(e) => setBrief((c) => ({ ...c, timeframe: e.target.value }))} />
+                        </label>
+                        <label className="block text-xs font-medium text-muted-foreground">
+                          Audience
+                          <input className={`${input} mt-1`} value={brief.audience} placeholder="Donors, volunteers"
+                            onChange={(e) => setBrief((c) => ({ ...c, audience: e.target.value }))} />
+                        </label>
+                      </div>
+
+                      <label className="block text-xs font-medium text-muted-foreground">
+                        Extra context
+                        <textarea className={`${input} mt-1 min-h-16 resize-y`} value={brief.notes}
+                          placeholder="Photos available, themes to avoid, key message…"
+                          onChange={(e) => setBrief((c) => ({ ...c, notes: e.target.value }))} />
+                      </label>
+
+                      <button
+                        type="button"
+                        className={`${btnPrimary} inline-flex w-full items-center justify-center gap-2`}
+                        disabled={loading || !brief.goal.trim()}
+                        onClick={() => void submitPrompt(composePromptFromBrief(brief))}
+                      >
+                        {loading
+                          ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                          : <Sparkles className="h-4 w-4" />}
+                        Generate content plan
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* ── Active conversation ── */
+              <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`max-w-3xl rounded-2xl px-4 py-3 ${
+                      msg.role === 'user'
+                        ? 'ml-auto bg-primary text-primary-foreground'
+                        : 'border border-border bg-muted/40 text-foreground'
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+
+                    {msg.role === 'assistant' && msg.response && (
+                      <div className="mt-4 space-y-4 border-t border-border/70 pt-4">
+                        {/* Clarifying questions */}
+                        {msg.response.structured.clarifyingQuestions.length > 0 && (
+                          <section>
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick questions</h4>
+                            <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                              {msg.response.structured.clarifyingQuestions.map((q) => (
+                                <li key={q} className="rounded-lg border border-border/70 bg-background p-3">{q}</li>
+                              ))}
+                            </ul>
+                          </section>
+                        )}
+
+                        {/* Planning summary */}
+                        {msg.response.structured.planningSummary && (
+                          <section className="rounded-xl border border-border/70 bg-background p-4">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plan summary</h4>
+                            <p className="mt-2 text-sm text-muted-foreground">{msg.response.structured.planningSummary}</p>
+                          </section>
+                        )}
+
+                        {/* Post ideas */}
+                        {msg.response.structured.postIdeas.length > 0 && (
+                          <section>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Generated posts ({msg.response.structured.postIdeas.length})
+                              </h4>
+                              <button
+                                type="button"
+                                className={`${btnPrimary} inline-flex items-center gap-2 px-3 py-2 text-xs`}
+                                onClick={() => void saveIdeasFromResponse(msg.response!)}
+                                disabled={savingIds.has(`bulk-${msg.response.generatedAtUtc}`)}
+                              >
+                                {savingIds.has(`bulk-${msg.response.generatedAtUtc}`)
+                                  ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                                  : <Save className="h-3.5 w-3.5" />}
+                                Save all to queue
+                              </button>
+                            </div>
+                            <div className="mt-3 space-y-3">
+                              {msg.response.structured.postIdeas.map((idea) => (
+                                <article
+                                  key={`${idea.title}-${idea.platform}-${idea.contentType}`}
+                                  className="rounded-xl border border-border/70 bg-background p-4"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-semibold text-foreground">{idea.title}</p>
+                                    <CategoryBadge>{idea.platform}</CategoryBadge>
+                                    <Badge variant="info">{idea.contentType}</Badge>
+                                    {idea.format && <Badge variant="category">{idea.format}</Badge>}
+                                  </div>
+                                  {idea.imageIdea && (
+                                    <p className="mt-2 text-xs text-muted-foreground">📷 {idea.imageIdea}</p>
+                                  )}
+                                  <div className="mt-3 grid gap-3 text-xs md:grid-cols-2">
+                                    <div>
+                                      <p className="font-semibold uppercase tracking-wide text-foreground">Caption</p>
+                                      <p className="mt-1 whitespace-pre-wrap leading-relaxed text-muted-foreground">{idea.caption}</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div>
+                                        <p className="font-semibold uppercase tracking-wide text-foreground">Best time</p>
+                                        <p className="mt-1 text-muted-foreground">{idea.bestTime || '—'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-semibold uppercase tracking-wide text-foreground">CTA</p>
+                                        <p className="mt-1 text-muted-foreground">{idea.cta || '—'}</p>
+                                      </div>
+                                      {idea.hashtags.length > 0 && (
+                                        <div>
+                                          <p className="font-semibold uppercase tracking-wide text-foreground">Hashtags</p>
+                                          <p className="mt-1 text-muted-foreground">{idea.hashtags.map(normalizeHashtag).join(' ')}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {idea.whyItFits && (
+                                    <p className="mt-3 text-xs italic text-muted-foreground">{idea.whyItFits}</p>
+                                  )}
+                                </article>
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {loading && (
+                  <div className="flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Generating your content plan…
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Input bar — shown once conversation started */}
+            {hasStarted && (
+              <div className="border-t border-border px-5 py-4">
+                <div className="flex gap-3">
+                  <textarea
+                    ref={inputRef}
+                    className={`${input} min-h-[2.75rem] flex-1 resize-none`}
+                    rows={2}
+                    placeholder="Ask a follow-up, refine the plan, or request more posts… (Ctrl/Cmd + Enter to send)"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault()
+                        void submitPrompt()
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={`${btnPrimary} self-end inline-flex items-center gap-2 px-3 py-2.5`}
                     onClick={() => void submitPrompt()}
                     disabled={loading || draft.trim().length === 0}
                   >
-                    <SendHorizonal className="h-4 w-4" />
+                    {loading
+                      ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                      : <SendHorizonal className="h-4 w-4" />}
                     Send
                   </button>
                 </div>
               </div>
-            </div>
-          </section>
+            )}
+          </div>
+        </div>
 
-          <section className={card}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <CalendarClock className="h-4 w-4 text-primary" />
-              Planned posts
+        {/* ── Right: Saved queue ── */}
+        <aside>
+          <div className={`${card} space-y-4`}>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <CalendarClock className="h-4 w-4 text-primary" />
+                  Saved queue
+                </h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Generated posts saved here. Mark ready, then schedule to Facebook.
+                </p>
+              </div>
+              {plannedPosts.length > 0 && (
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                  {plannedPosts.length}
+                </span>
+              )}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Saved plans that can be reviewed, marked ready, or queued for Facebook scheduling.</p>
-            <div className="mt-4 space-y-3">
-              {loadingPlanned ? (
-                <div className="text-sm text-muted-foreground">Loading planned posts…</div>
-              ) : plannedPosts.length === 0 ? (
-                <div className="rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground">
-                  No planned posts saved yet.
+
+            {/* Status filter pills */}
+            {statusOptions.length > 1 && (
+              <div className="flex flex-wrap gap-1.5">
+                {statusOptions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setStatusFilter(s)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      statusFilter === s
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Post list */}
+            {loadingPlanned ? (
+              <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                Loading saved posts…
+              </div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-10 text-center">
+                <Plus className="h-7 w-7 text-muted-foreground/40" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">No saved posts yet</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Generate a content plan and click <strong>Save all to queue</strong>.
+                  </p>
                 </div>
-              ) : (
-                plannedPosts.map((post) => (
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredPosts.map((post) => (
                   <article key={post.id} className="rounded-xl border border-border bg-background p-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-foreground">{post.title}</p>
-                      <CategoryBadge>{post.platform}</CategoryBadge>
-                      <Badge variant="info">{post.contentType}</Badge>
-                      <Badge variant="category">{post.format}</Badge>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="text-sm font-semibold leading-snug text-foreground">{post.title}</p>
                       <StatusBadge status={post.status} />
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{post.caption}</p>
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span>Suggested time: {post.suggestedTime ?? '—'}</span>
-                      <span>Scheduled for: {toUserFacingDate(post.scheduledForUtc)}</span>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <CategoryBadge>{post.platform}</CategoryBadge>
+                      <Badge variant="info">{post.contentType}</Badge>
                     </div>
-                    {post.hashtags.length > 0 ? (
-                      <p className="mt-2 text-xs text-muted-foreground">{post.hashtags.join(' ')}</p>
-                    ) : null}
-                    {post.schedulingError ? (
-                      <p className="mt-2 text-xs text-destructive">Scheduling error: {post.schedulingError}</p>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap gap-2">
+
+                    {post.caption && (
+                      <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                        {post.caption}
+                      </p>
+                    )}
+
+                    <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                      {post.suggestedTime && <p>⏰ Suggested: {post.suggestedTime}</p>}
+                      {post.scheduledForUtc && <p>📅 Scheduled: {toUserFacingDate(post.scheduledForUtc)}</p>}
+                    </div>
+
+                    {post.hashtags.length > 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground/70">{post.hashtags.join(' ')}</p>
+                    )}
+
+                    {post.schedulingError && (
+                      <p className="mt-2 rounded-lg bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
+                        ⚠ {post.schedulingError}
+                      </p>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-border/50 pt-3">
                       <button
                         type="button"
-                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
+                        title="Mark as ready to publish"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
                         onClick={() => void markReady(post)}
-                        disabled={savingIds.has(`ready-${post.id}`)}
+                        disabled={savingIds.has(`ready-${post.id}`) || post.status === 'Ready'}
                       >
-                        {savingIds.has(`ready-${post.id}`) ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4" />}
+                        {savingIds.has(`ready-${post.id}`)
+                          ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          : <CheckCheck className="h-3.5 w-3.5" />}
                         Mark ready
                       </button>
                       <button
                         type="button"
-                        className={`${btnPrimary} inline-flex items-center gap-2 px-3 py-2 text-xs`}
+                        title="Add to schedule queue"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/50 disabled:opacity-50"
                         onClick={() => void requestSchedule(post)}
                         disabled={savingIds.has(`schedule-${post.id}`)}
                       >
-                        {savingIds.has(`schedule-${post.id}`) ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
-                        Plan post
+                        {savingIds.has(`schedule-${post.id}`)
+                          ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          : <CalendarClock className="h-3.5 w-3.5" />}
+                        Queue
                       </button>
                       <button
                         type="button"
-                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/50"
+                        title="Publish to Facebook now"
+                        className={`${btnPrimary} inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs disabled:opacity-50`}
                         onClick={() => void sendToFacebook(post)}
                         disabled={savingIds.has(`facebook-${post.id}`)}
                       >
-                        {savingIds.has(`facebook-${post.id}`) ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
-                        Send to Facebook
+                        {savingIds.has(`facebook-${post.id}`)
+                          ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          : <SendHorizonal className="h-3.5 w-3.5" />}
+                        Publish
                       </button>
                     </div>
                   </article>
-                ))
-              )}
-            </div>
-          </section>
-        </section>
-
-        <aside className="space-y-6">
-          <section className={card}>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Quick planner
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">Set the essentials and generate a plan without lots of back-and-forth.</p>
-
-            <div className="mt-4 space-y-4">
-              <label className="block text-xs font-medium text-muted-foreground">
-                Goal
-                <textarea
-                  className={`${input} min-h-24 resize-y`}
-                  placeholder="Example: raise awareness about safe shelter and invite supporters to learn more."
-                  value={brief.goal}
-                  onChange={(event) => setBrief((current) => ({ ...current, goal: event.target.value }))}
-                />
-              </label>
-
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Platforms</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {platformOptions.map((platform) => (
-                    <button
-                      key={platform}
-                      type="button"
-                      className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                        brief.platforms.includes(platform)
-                          ? 'border-primary/40 bg-primary/10 text-primary'
-                          : 'border-border bg-background text-foreground hover:bg-muted/50'
-                      }`}
-                      onClick={() => toggleBriefArray('platforms', platform)}
-                    >
-                      {platform}
-                    </button>
-                  ))}
-                </div>
+                ))}
               </div>
-
-              <div>
-                <p className="text-xs font-medium text-muted-foreground">Content types</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {contentTypeOptions.map((contentType) => (
-                    <button
-                      key={contentType}
-                      type="button"
-                      className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                        brief.contentTypes.includes(contentType)
-                          ? 'border-primary/40 bg-primary/10 text-primary'
-                          : 'border-border bg-background text-foreground hover:bg-muted/50'
-                      }`}
-                      onClick={() => toggleBriefArray('contentTypes', contentType)}
-                    >
-                      {contentType}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <label className="block text-xs font-medium text-muted-foreground">
-                Number of posts
-                <input
-                  className={input}
-                  value={brief.postCount}
-                  onChange={(event) => setBrief((current) => ({ ...current, postCount: event.target.value }))}
-                  placeholder="3"
-                />
-              </label>
-
-              <label className="block text-xs font-medium text-muted-foreground">
-                Timeframe
-                <input
-                  className={input}
-                  value={brief.timeframe}
-                  onChange={(event) => setBrief((current) => ({ ...current, timeframe: event.target.value }))}
-                  placeholder="This week, next month, Giving Tuesday, etc."
-                />
-              </label>
-
-              <label className="block text-xs font-medium text-muted-foreground">
-                Audience
-                <input
-                  className={input}
-                  value={brief.audience}
-                  onChange={(event) => setBrief((current) => ({ ...current, audience: event.target.value }))}
-                  placeholder="Donors, volunteers, local supporters, general public"
-                />
-              </label>
-
-              <label className="block text-xs font-medium text-muted-foreground">
-                Optional notes or asset ideas
-                <textarea
-                  className={`${input} min-h-24 resize-y`}
-                  value={brief.notes}
-                  onChange={(event) => setBrief((current) => ({ ...current, notes: event.target.value }))}
-                  placeholder="Photos available, campaign context, themes to avoid, key message, etc."
-                />
-              </label>
-
-              <button
-                type="button"
-                className={`${btnPrimary} inline-flex w-full items-center justify-center gap-2`}
-                disabled={loading}
-                onClick={() => void submitPrompt(composePromptFromBrief(brief))}
-              >
-                {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                Generate plan
-              </button>
-            </div>
-          </section>
-
-          <section className={card}>
-            <p className={sectionFormTitle}>Starter prompts</p>
-            <div className="mt-4 space-y-3">
-              {starterPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  className="w-full rounded-xl border border-border bg-background px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-                  onClick={() => void submitPrompt(prompt)}
-                  disabled={loading}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className={card}>
-            <p className={sectionFormTitle}>Current workflow</p>
-            <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
-              <li>The copilot should ask only a few clarifying questions when details are missing.</li>
-              <li>Generated ideas include platform and content type like Facebook post, story, or video.</li>
-              <li>Saved plans appear in the queue and can be marked ready or submitted as schedule requests.</li>
-              <li>The Facebook publish connector can later promote `Schedule Requested` items into live scheduled posts.</li>
-            </ul>
-            {latestStructured ? (
-              <div className="mt-4 rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">Latest plan at a glance</p>
-                <p className="mt-1">Ideas: {latestStructured.postIdeas.length}</p>
-                <p>Needs follow-up questions: <BooleanBadge value={latestStructured.clarifyingQuestions.length > 0} /></p>
-              </div>
-            ) : null}
-          </section>
+            )}
+          </div>
         </aside>
       </div>
     </div>
