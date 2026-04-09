@@ -254,7 +254,7 @@ public sealed class MarketingAnalyticsController(
                 ELSE 0 END)::numeric, 2) AS median_click_through_rate_pct
         FROM exploded
         GROUP BY label
-        HAVING COUNT(*) >= 3
+        HAVING COUNT(*) >= 20
         ORDER BY median_revenue_per_post_php DESC, post_count DESC
         LIMIT 12
         """;

@@ -361,7 +361,7 @@ export function MarketingAnalyticsPage() {
               />
               <EffectivenessCard
                 title="Top Hashtags"
-                subtitle="minimum 3 posts"
+                subtitle="minimum 20 posts"
                 rows={data.effectiveness.hashtags}
                 icon={<Hash className="h-4 w-4 text-primary" />}
               />
