@@ -97,7 +97,7 @@ public sealed class ReintegrationReadinessController(HavenDbContext db, IHttpCli
           )
         SELECT
           r.resident_id,
-          COALESCE(s.code, 'Unknown')                                                          AS safehouse_code,
+          COALESCE(s.safehouse_code, 'Unknown')                                                  AS safehouse_code,
           CASE
             WHEN r.present_age ~ '^\d+$'
               THEN LEAST(25, GREATEST(10, r.present_age::int))
