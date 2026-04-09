@@ -58,6 +58,13 @@ export type SocialChatContextSnapshot = {
     insights: string[]
     hypotheses: string[]
   }
+  postStrategyInsights: {
+    evidenceStrength: string
+    validatedFindings: string[]
+    directionalFindings: string[]
+    recommendations: { title: string; detail: string }[]
+    dataGaps: string[]
+  }
 }
 
 export type SocialChatResponse = {

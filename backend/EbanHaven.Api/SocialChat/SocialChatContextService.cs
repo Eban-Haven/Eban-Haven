@@ -76,12 +76,14 @@ public sealed class SocialChatContextService(
         var brandGuidelines  = GetBrandGuidelines();
         var socialMetrics    = await GetRecentSocialMetricsAsync(cancellationToken);
         var causalInsights   = await GetCausalInsightsAsync(cancellationToken);
+        var postStrategyInsights = await GetPostStrategyInsightsAsync(cancellationToken);
 
         return new SocialChatContextSnapshot(
             websiteSummary,
             brandGuidelines,
             socialMetrics,
-            causalInsights);
+            causalInsights,
+            postStrategyInsights);
     }
 
     // ── Website + brand (static) ───────────────────────────────────────────────
@@ -290,5 +292,115 @@ public sealed class SocialChatContextService(
         [
             "Educational storytelling may outperform generic appeals when paired with a concrete next step.",
             "Mission-trust content may support future conversion more effectively than urgent donation asks alone."
+        ]);
+
+    // ── Post-strategy insights from ML pipeline ──────────────────────────────
+
+    private async Task<PostStrategyInsightsSnapshot> GetPostStrategyInsightsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var client = httpFactory.CreateClient("MlService");
+            var response = await client.GetAsync("/marketing/post-strategy-analysis", cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+                return FallbackPostStrategyInsights("Post-strategy pipeline returned a non-success status.");
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var evidenceStrength = root.TryGetProperty("evidence_strength", out var ev)
+                ? ev.GetString() ?? "Live post-level analysis from ML pipeline."
+                : "Live post-level analysis from ML pipeline.";
+
+            var validated = ReadStringArray(root, "validated_findings");
+            var directional = ReadStringArray(root, "directional_findings");
+            var dataGaps = ReadStringArray(root, "data_gaps");
+
+            var recommendations = new List<StrategyRecommendation>();
+            if (root.TryGetProperty("recommendations", out var recs) &&
+                recs.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var rec in recs.EnumerateArray())
+                {
+                    if (rec.ValueKind != JsonValueKind.Object) continue;
+                    var title = rec.TryGetProperty("title", out var titleProp)
+                        ? titleProp.GetString() ?? "Recommendation"
+                        : "Recommendation";
+                    var detail = rec.TryGetProperty("detail", out var detailProp)
+                        ? detailProp.GetString() ?? string.Empty
+                        : string.Empty;
+                    if (string.IsNullOrWhiteSpace(detail)) continue;
+                    recommendations.Add(new StrategyRecommendation(title, detail));
+                }
+            }
+
+            if (validated.Count == 0)
+                validated.Add("No post-level findings are validated yet. Treat content guidance as directional until the pipeline is run on attributed post outcomes.");
+
+            if (directional.Count == 0)
+                directional.Add("Track platform, CTA, timing, and attributed revenue per post so the analysis can move from hypothesis to evidence.");
+
+            if (recommendations.Count == 0)
+            {
+                recommendations.Add(new StrategyRecommendation(
+                    "Improve attribution",
+                    "Attach a campaign tag or tracked donation link to every published post so future runs can compare post characteristics against real revenue outcomes."
+                ));
+            }
+
+            if (dataGaps.Count == 0)
+                dataGaps.Add("No explicit data gaps were returned by the post-strategy pipeline.");
+
+            return new PostStrategyInsightsSnapshot(
+                EvidenceStrength: evidenceStrength,
+                ValidatedFindings: validated,
+                DirectionalFindings: directional,
+                Recommendations: recommendations,
+                DataGaps: dataGaps);
+        }
+        catch
+        {
+            return FallbackPostStrategyInsights("Post-strategy pipeline is currently unavailable.");
+        }
+    }
+
+    private static List<string> ReadStringArray(JsonElement root, string propertyName)
+    {
+        var values = new List<string>();
+        if (!root.TryGetProperty(propertyName, out var prop) || prop.ValueKind != JsonValueKind.Array)
+            return values;
+
+        foreach (var item in prop.EnumerateArray())
+        {
+            var value = item.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+                values.Add(value);
+        }
+
+        return values;
+    }
+
+    private static PostStrategyInsightsSnapshot FallbackPostStrategyInsights(string reason) => new(
+        EvidenceStrength: $"Scaffold only — {reason}",
+        ValidatedFindings:
+        [
+            "No validated post-level findings available yet."
+        ],
+        DirectionalFindings:
+        [
+            "Direct donation CTAs, content theme, platform, and timing are the first post characteristics worth testing against revenue once attribution data is captured."
+        ],
+        Recommendations:
+        [
+            new StrategyRecommendation(
+                "Instrument every post",
+                "Store a platform, content theme, CTA type, publish time, and tracked donation link for each post so the notebook can estimate which post characteristics align with stronger revenue."
+            )
+        ],
+        DataGaps:
+        [
+            "Post-level revenue attribution is not yet available in the current pipeline output."
         ]);
 }

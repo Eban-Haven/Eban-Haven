@@ -92,7 +92,7 @@ public sealed class OpenAISocialChatService(
 
             CONTENT REQUEST (user says "write", "create", "draft", "give me posts", "generate", "plan content", "make me", etc.):
             - Generate post ideas in the postIdeas array.
-            - Use context data (top channels, campaign performance, causal effects) to inform platform, timing, and messaging angle.
+            - Use context data (top channels, campaign performance, causal effects, and postStrategyInsights) to inform platform, timing, CTA, and messaging angle.
             - Only ask clarifying questions if critical info is missing and it would significantly change the output.
 
             == USING LIVE PIPELINE DATA ==
@@ -100,6 +100,10 @@ public sealed class OpenAISocialChatService(
             - recentSocialMetrics.highlights → actual channel revenue, donor counts, avg donations, recurring rates
             - causalInsights.insights → statistically validated causal effects from the ML model (cite these as evidence with numbers)
             - causalInsights.hypotheses → plausible but unvalidated hypotheses (label them clearly)
+            - postStrategyInsights.validatedFindings → the strongest currently supported content, CTA, platform, and timing findings for post-level performance
+            - postStrategyInsights.directionalFindings → useful but not fully validated post-level patterns; label them clearly as directional
+            - postStrategyInsights.recommendations → concrete strategy rules that should shape generated content when they fit the user's request
+            - postStrategyInsights.dataGaps → constraints that should reduce certainty and prevent overclaiming
             - If pipeline data is weak or unavailable, say so explicitly — never substitute generic advice without flagging it
 
             == CONTENT GUIDELINES ==

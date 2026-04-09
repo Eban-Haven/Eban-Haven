@@ -1,0 +1,32 @@
+{
+  "pipeline_version": "0.1.0",
+  "last_run": null,
+  "analysis_mode": "explanatory",
+  "unit_of_analysis": "published social media post",
+  "outcome_metric": "Attributed donation revenue within 7 days (PHP)",
+  "evidence_strength": "Scaffold only. The post-level explanatory pipeline has not been run on attributed production data yet.",
+  "n_observations": 0,
+  "validated_findings": [],
+  "directional_findings": [
+    "Platform, content theme, CTA style, and posting window should be tested together against attributed 7-day donation revenue.",
+    "Without post-level attribution, any content advice should be treated as directional rather than causal."
+  ],
+  "recommendations": [
+    {
+      "title": "Instrument every post",
+      "detail": "Store platform, content theme, CTA type, scheduled time, actual publish time, and a tracked donation link for every post so the pipeline can compare post characteristics to real donation outcomes."
+    },
+    {
+      "title": "Use a fixed attribution window",
+      "detail": "Measure donation count and revenue in a consistent 7-day follow-up window after each post to keep comparisons fair across platforms and campaigns."
+    },
+    {
+      "title": "Separate evidence from instinct",
+      "detail": "Keep broad campaign/channel analysis separate from post-level content analysis so the chatbot can clearly distinguish validated findings from hypotheses."
+    }
+  ],
+  "data_gaps": [
+    "No post-level attributed revenue dataset has been supplied to the analysis yet.",
+    "The current donation tables summarize channels and campaigns, but do not yet identify which individual post drove a donation."
+  ]
+}

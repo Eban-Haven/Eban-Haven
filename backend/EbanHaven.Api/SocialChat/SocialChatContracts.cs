@@ -42,7 +42,8 @@ public sealed record SocialChatContextSnapshot(
     string WebsiteSummary,
     BrandGuidelinesSnapshot BrandGuidelines,
     SocialMetricsSnapshot RecentSocialMetrics,
-    CausalInsightsSnapshot CausalInsights);
+    CausalInsightsSnapshot CausalInsights,
+    PostStrategyInsightsSnapshot PostStrategyInsights);
 
 public sealed record BrandGuidelinesSnapshot(
     string Voice,
@@ -59,3 +60,14 @@ public sealed record CausalInsightsSnapshot(
     string EvidenceStrength,
     IReadOnlyList<string> Insights,
     IReadOnlyList<string> Hypotheses);
+
+public sealed record StrategyRecommendation(
+    string Title,
+    string Detail);
+
+public sealed record PostStrategyInsightsSnapshot(
+    string EvidenceStrength,
+    IReadOnlyList<string> ValidatedFindings,
+    IReadOnlyList<string> DirectionalFindings,
+    IReadOnlyList<StrategyRecommendation> Recommendations,
+    IReadOnlyList<string> DataGaps);
