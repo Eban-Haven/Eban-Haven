@@ -1,15 +1,5 @@
 import { apiFetch, parseJson, setStaffToken } from './client'
 
-export async function googleSignIn(credential: string): Promise<string> {
-  const res = await apiFetch('/api/auth/google', {
-    method: 'POST',
-    body: JSON.stringify({ credential }),
-  })
-  const data = await parseJson<{ token: string; role: string }>(res)
-  setStaffToken(data.token)
-  return data.role
-}
-
 export async function login(username: string, password: string, rememberMe = false): Promise<void> {
   const res = await apiFetch('/api/auth/login', {
     method: 'POST',
