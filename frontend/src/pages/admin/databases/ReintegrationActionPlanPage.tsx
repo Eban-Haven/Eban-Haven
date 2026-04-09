@@ -38,7 +38,6 @@ import {
   formatFeatureValue,
   type ImprovementArea,
   type ReintegrationResult,
-  TIER_CONFIG,
 } from '../../../components/ml/reintegrationReadinessShared'
 
 type CohortResident = ResidentSummary & {
@@ -310,12 +309,12 @@ function SectionPanel({
 }) {
   const toneClass =
     tone === 'health'
-      ? 'border-emerald-200 bg-emerald-50/40'
+      ? 'border-l-4 border-l-emerald-400 border-border bg-card'
       : tone === 'education'
-        ? 'border-sky-200 bg-sky-50/40'
+        ? 'border-l-4 border-l-sky-400 border-border bg-card'
         : tone === 'risk'
-          ? 'border-amber-200 bg-amber-50/40'
-          : 'border-border bg-muted/20'
+          ? 'border-l-4 border-l-amber-400 border-border bg-card'
+          : 'border-border bg-card'
   return (
     <div className={`mt-4 rounded-xl border p-4 ${toneClass}`}>
       <div>
@@ -1194,9 +1193,7 @@ export function ReintegrationActionPlanPage() {
   }
 
   const detailFields = residentDetail?.fields ?? null
-  const tier = deriveReadinessTier(resident.readiness.reintegration_probability)
   const prediction = deriveReadinessPrediction(resident.readiness.reintegration_probability)
-  const tierConfig = TIER_CONFIG[tier]
   const completedChecklist = actionPlan.checklist.filter((item) => item.done).length
 
   return (
@@ -1219,18 +1216,17 @@ export function ReintegrationActionPlanPage() {
 
       {notice ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : null}
 
-      <section className={`${card} space-y-5 bg-gradient-to-br from-white via-white to-emerald-50/50`}>
+      <section className={`${card} space-y-5`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${tierConfig.badge}`}>{prediction}</span>
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800">{tier}</span>
-              <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-medium text-slate-700">{resident.reintegrationStatus ?? 'Not started'}</span>
-            </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Resident action plan</p>
             <div>
-              <h2 className="text-xl font-semibold text-foreground">{resident.internalCode}</h2>
+              <h2 className="font-heading text-3xl font-bold text-foreground">{resident.internalCode}</h2>
+              <p className="mt-2 text-base text-muted-foreground">
+                {resident.safehouseName ?? 'No safehouse'}{resident.assignedSocialWorker ? ` • ${resident.assignedSocialWorker}` : ''}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {resident.safehouseName ?? 'No safehouse'} · {resident.assignedSocialWorker ?? 'No assigned worker'}
+                Case {resident.caseControlNo} • {prediction} readiness
               </p>
             </div>
           </div>
@@ -1242,44 +1238,25 @@ export function ReintegrationActionPlanPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 px-4 py-4 shadow-sm">
+          <div className="rounded-xl border border-primary/20 bg-card px-4 py-4 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Readiness score</p>
             <p className="mt-2 text-3xl font-bold text-foreground">{Math.round(resident.readiness.reintegration_probability * 100)}%</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reintegration status</p>
-            <p className="mt-2 text-sm font-medium text-foreground">{resident.reintegrationStatus ?? 'Not started'}</p>
+          <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Safehouse</p>
+            <p className="mt-2 text-lg font-semibold text-foreground">{resident.safehouseName ?? 'Not assigned'}</p>
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50/50 px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current risk</p>
+          <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Length of stay</p>
+            <p className="mt-2 text-lg font-semibold text-foreground">{displayValue(residentField(detailFields, 'length_of_stay', 'lengthOfStay'))}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-card px-4 py-4 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reintegration risk</p>
             <p className="mt-2 text-sm font-medium text-foreground">{resident.currentRiskLevel ?? 'No current risk label'}</p>
           </div>
-          <div className="rounded-xl border border-sky-200 bg-sky-50/50 px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reintegration type</p>
-            <p className="mt-2 text-sm font-medium text-foreground">{resident.reintegrationType ?? 'Not recorded'}</p>
-          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-xl border border-border bg-background px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Case control</p>
-            <p className="mt-2 text-sm font-medium text-foreground">{resident.caseControlNo}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-background px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Admission date</p>
-            <p className="mt-2 text-sm font-medium text-foreground">{displayValue(residentField(detailFields, 'date_of_admission', 'dateOfAdmission'))}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-background px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Referral source</p>
-            <p className="mt-2 text-sm font-medium text-foreground">{displayValue(residentField(detailFields, 'referral_source', 'referralSource'))}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-background px-4 py-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Initial assessment</p>
-            <p className="mt-2 text-sm font-medium text-foreground">{displayValue(residentField(detailFields, 'initial_case_assessment', 'initialCaseAssessment'))}</p>
-          </div>
-        </div>
-
-        <p className="rounded-xl border border-border bg-muted/20 px-4 py-4 text-sm leading-relaxed text-muted-foreground">
+        <p className="rounded-xl border border-border bg-muted/30 px-4 py-4 text-sm leading-relaxed text-muted-foreground">
           {readinessNarrative(resident)}
         </p>
       </section>
@@ -1297,18 +1274,29 @@ export function ReintegrationActionPlanPage() {
               resident.readiness.top_improvements.map((area, index) => {
                 const themeClass =
                   area.feature.includes('health') || area.feature.includes('psych')
-                    ? 'border-emerald-200 bg-emerald-50/30'
+                    ? 'border-border bg-card'
                     : area.feature.includes('progress') || area.feature.includes('attendance')
-                      ? 'border-sky-200 bg-sky-50/30'
+                      ? 'border-border bg-card'
                       : area.feature.includes('incident')
-                        ? 'border-amber-200 bg-amber-50/30'
-                        : 'border-border bg-background'
+                        ? 'border-border bg-card'
+                        : 'border-border bg-card'
+                const priorityAccent =
+                  area.feature.includes('health') || area.feature.includes('psych')
+                    ? 'bg-emerald-500'
+                    : area.feature.includes('progress') || area.feature.includes('attendance')
+                      ? 'bg-sky-500'
+                      : area.feature.includes('incident')
+                        ? 'bg-amber-500'
+                        : 'bg-primary'
                 return (
-                  <div key={area.feature} className={`rounded-xl border px-4 py-4 ${themeClass}`}>
+                  <div key={area.feature} className={`rounded-xl border px-4 py-4 shadow-sm ${themeClass}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority {index + 1}</p>
-                        <h3 className="mt-1 text-base font-semibold text-foreground">{area.label}</h3>
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-1 h-2.5 w-2.5 rounded-full ${priorityAccent}`} />
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority {index + 1}</p>
+                          <h3 className="mt-1 text-base font-semibold text-foreground">{area.label}</h3>
+                        </div>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">
                         <div>{formatFeatureValue(area.feature, area.resident_value)} current</div>
@@ -1325,8 +1313,8 @@ export function ReintegrationActionPlanPage() {
                             type="button"
                             className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
                               isActive
-                                ? 'border-primary bg-white text-primary shadow-sm'
-                                : 'border-border bg-white text-foreground hover:bg-muted'
+                                ? 'border-primary/30 bg-muted text-foreground'
+                                : 'border-border bg-background text-foreground hover:bg-muted'
                             }`}
                             onClick={() => handlePriorityAction(area.feature, action)}
                           >
@@ -1348,22 +1336,22 @@ export function ReintegrationActionPlanPage() {
             <h2 className="text-base font-semibold text-foreground">Action checklist</h2>
             <p className="mt-1 text-sm text-muted-foreground">Keep the immediate reintegration steps visible while you work through the blockers.</p>
           </div>
-          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white px-4 py-4">
+          <div className="rounded-xl border border-border bg-muted/20 px-4 py-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Checklist progress</p>
             <p className="mt-2 text-3xl font-bold text-foreground">{completedChecklist}/{actionPlan.checklist.length}</p>
             <p className="mt-1 text-sm text-muted-foreground">Actions completed</p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <div className="rounded-xl border border-border bg-background px-4 py-3">
             <p className="text-sm text-muted-foreground">
               {actionPlan.lastReviewedAt ? `Last reviewed ${new Date(actionPlan.lastReviewedAt).toLocaleString()}` : 'No review has been logged yet.'}
             </p>
-            <button type="button" className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-foreground hover:bg-slate-50" onClick={() => updateActionPlan({ ...actionPlan, lastReviewedAt: new Date().toISOString() })}>
+            <button type="button" className="mt-3 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50" onClick={() => updateActionPlan({ ...actionPlan, lastReviewedAt: new Date().toISOString() })}>
               Mark reviewed today
             </button>
           </div>
           <ul className="space-y-2">
             {actionPlan.checklist.map((item) => (
-              <li key={item.id} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition ${item.done ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white'}`}>
+              <li key={item.id} className={`flex items-start gap-3 rounded-xl border px-4 py-3 transition ${item.done ? 'border-primary/20 bg-muted/20' : 'border-border bg-background'}`}>
                 <input
                   type="checkbox"
                   checked={item.done}
