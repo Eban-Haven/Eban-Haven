@@ -81,6 +81,7 @@ async function copyText(value: string) {
 export function EmailHubPage() {
   const [supporters, setSupporters] = useState<Supporter[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set())
   const [profile, setProfile] = useState<DonorEmailProfile | null>(null)
   const [generated, setGenerated] = useState<GeneratedDonorEmail | null>(null)
   const [search, setSearch] = useState('')
@@ -91,8 +92,10 @@ export function EmailHubPage() {
   const [loadingProfile, setLoadingProfile] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [sending, setSending] = useState(false)
+  const [bulkSending, setBulkSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sendResult, setSendResult] = useState<SentDonorEmail | null>(null)
+  const [bulkResult, setBulkResult] = useState<{ sent: number; skipped: number; failed: number; message: string } | null>(null)
   const [copyState, setCopyState] = useState<'subject' | 'body' | 'html' | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [showComposerSettings, setShowComposerSettings] = useState(false)
@@ -115,6 +118,7 @@ export function EmailHubPage() {
       const rows = await getSupporters()
       setSupporters(rows)
       setSelectedId((current) => current ?? rows[0]?.id ?? null)
+      setCheckedIds((current) => (current.size > 0 ? current : new Set(rows[0]?.id != null ? [rows[0].id] : [])))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load donors.')
@@ -130,6 +134,7 @@ export function EmailHubPage() {
       setProfile(nextProfile)
       setGenerated(null)
       setSendResult(null)
+      setBulkResult(null)
       setRecipientEmail(nextProfile.supporter.email ?? '')
       setError(null)
     } catch (err) {
@@ -180,6 +185,19 @@ export function EmailHubPage() {
     })
   }, [supporters, search, atRiskMap])
 
+  const selectedSupporters = useMemo(
+    () => supporters.filter((supporter) => checkedIds.has(supporter.id)),
+    [supporters, checkedIds],
+  )
+
+  const filteredSelectable = useMemo(
+    () => filteredSupporters.filter((supporter) => !!supporter.email?.trim()),
+    [filteredSupporters],
+  )
+
+  const allFilteredSelected =
+    filteredSelectable.length > 0 && filteredSelectable.every((supporter) => checkedIds.has(supporter.id))
+
   async function onGenerateEmail() {
     if (selectedId == null) return
     setGenerating(true)
@@ -195,6 +213,7 @@ export function EmailHubPage() {
       })
       setGenerated(result)
       setSendResult(null)
+      setBulkResult(null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate email.')
@@ -229,6 +248,7 @@ export function EmailHubPage() {
         htmlBody: generated.htmlBody,
       })
       setSendResult(result)
+      setBulkResult(null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send email.')
@@ -237,8 +257,96 @@ export function EmailHubPage() {
     }
   }
 
+  async function onBulkSend(mode: 'selected' | 'filtered') {
+    const targets = (mode === 'filtered' ? filteredSelectable : selectedSupporters.filter((supporter) => !!supporter.email?.trim()))
+      .filter((supporter, index, list) => list.findIndex((candidate) => candidate.id === supporter.id) === index)
+
+    if (targets.length === 0) {
+      setError(mode === 'filtered' ? 'No filtered donors with email addresses are available.' : 'Select at least one donor with an email address.')
+      return
+    }
+
+    setBulkSending(true)
+    setError(null)
+    setSendResult(null)
+    setBulkResult(null)
+
+    let sent = 0
+    let skipped = 0
+    let failed = 0
+    const failures: string[] = []
+
+    for (const supporter of targets) {
+      if (!supporter.email?.trim()) {
+        skipped += 1
+        continue
+      }
+
+      try {
+        const email = await generateDonorEmail(supporter.id, {
+          goal,
+          tone,
+          preferAi,
+          senderName: signature.senderName,
+          senderTitle: signature.senderTitle,
+          senderOrganization: signature.senderOrganization,
+          senderContact: signature.senderContact,
+        })
+
+        await sendDonorEmail(supporter.id, {
+          toEmail: supporter.email.trim(),
+          subject: email.subject,
+          body: email.body,
+          htmlBody: email.htmlBody,
+        })
+
+        sent += 1
+      } catch (err) {
+        failed += 1
+        failures.push(`${supporter.displayName}: ${err instanceof Error ? err.message : 'Failed'}`)
+      }
+    }
+
+    setBulkResult({
+      sent,
+      skipped,
+      failed,
+      message:
+        failed > 0
+          ? failures.slice(0, 3).join(' | ')
+          : `Sent ${sent} donor outreach email${sent === 1 ? '' : 's'}.`,
+    })
+
+    if (failed > 0) {
+      setError(`Bulk send completed with ${failed} failure${failed === 1 ? '' : 's'}. ${failures[0] ?? ''}`.trim())
+    }
+
+    setBulkSending(false)
+  }
+
   function updateSignature<K extends keyof SignatureFields>(key: K, value: SignatureFields[K]) {
     setSignature((current) => ({ ...current, [key]: value }))
+  }
+
+  function toggleChecked(id: number) {
+    setCheckedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAllFiltered() {
+    setCheckedIds((current) => {
+      const next = new Set(current)
+      if (allFilteredSelected) {
+        filteredSelectable.forEach((supporter) => next.delete(supporter.id))
+      } else {
+        filteredSelectable.forEach((supporter) => next.add(supporter.id))
+      }
+      return next
+    })
   }
 
   return (
@@ -279,6 +387,19 @@ export function EmailHubPage() {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleAllFiltered}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted/40"
+            >
+              {allFilteredSelected ? 'Clear filtered' : 'Select filtered'}
+            </button>
+            <span className="text-xs text-muted-foreground">
+              {selectedSupporters.length} selected
+            </span>
+          </div>
+
           <label className={label}>
             Search donors
             <input
@@ -297,15 +418,14 @@ export function EmailHubPage() {
             ) : (
               filteredSupporters.map((supporter) => {
                 const selected = supporter.id === selectedId
+                const checked = checkedIds.has(supporter.id)
                 const risk = atRiskMap.get(supporter.id)
                 const isHigh = risk?.risk_tier === 'High Risk'
                 const isMod = risk?.risk_tier === 'Moderate Risk'
                 return (
-                  <button
+                  <div
                     key={supporter.id}
-                    type="button"
-                    onClick={() => setSelectedId(supporter.id)}
-                    className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                    className={`rounded-xl border p-3 transition-colors ${
                       selected
                         ? 'border-primary/50 bg-primary/10'
                         : isHigh
@@ -315,26 +435,41 @@ export function EmailHubPage() {
                             : 'border-border bg-background hover:border-primary/30 hover:bg-muted/40'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`font-medium ${isHigh ? 'text-red-800' : isMod ? 'text-amber-800' : 'text-foreground'}`}>
-                        {supporter.displayName}
-                      </p>
-                      {risk && (
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                          isHigh
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {Math.round(risk.churn_probability * 100)}% churn risk
-                        </span>
-                      )}
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleChecked(supporter.id)}
+                        className="mt-1 h-4 w-4 rounded border-border"
+                        aria-label={`Select ${supporter.displayName}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(supporter.id)}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={`font-medium ${isHigh ? 'text-red-800' : isMod ? 'text-amber-800' : 'text-foreground'}`}>
+                            {supporter.displayName}
+                          </p>
+                          {risk && (
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              isHigh
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}>
+                              {Math.round(risk.churn_probability * 100)}% churn risk
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{supporter.email ?? 'No email on file'}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {supporter.supporterType}
+                          {supporter.region ? ` · ${supporter.region}` : ''}
+                        </p>
+                      </button>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{supporter.email ?? 'No email on file'}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {supporter.supporterType}
-                      {supporter.region ? ` · ${supporter.region}` : ''}
-                    </p>
-                  </button>
+                  </div>
                 )
               })
             )}
@@ -592,10 +727,34 @@ export function EmailHubPage() {
                   <button type="button" className={btnPrimary} onClick={() => void onGenerateEmail()} disabled={generating}>
                     {generating ? 'Generating email…' : 'Generate email'}
                   </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-50"
+                    onClick={() => void onBulkSend('selected')}
+                    disabled={bulkSending || selectedSupporters.filter((supporter) => supporter.email?.trim()).length === 0}
+                  >
+                    {bulkSending ? 'Sending selected…' : `Email selected (${selectedSupporters.filter((supporter) => supporter.email?.trim()).length})`}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-50"
+                    onClick={() => void onBulkSend('filtered')}
+                    disabled={bulkSending || filteredSelectable.length === 0}
+                  >
+                    {bulkSending ? 'Sending filtered…' : `Email all filtered (${filteredSelectable.length})`}
+                  </button>
                   <p className="text-xs text-muted-foreground">
                     The generated draft will use plain text formatting so it pastes cleanly into email clients.
                   </p>
                 </div>
+                {bulkResult ? (
+                  <div className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm text-foreground">
+                    <span className="font-medium">
+                      Sent {bulkResult.sent}, skipped {bulkResult.skipped}, failed {bulkResult.failed}.
+                    </span>{' '}
+                    <span className="text-muted-foreground">{bulkResult.message}</span>
+                  </div>
+                ) : null}
 
                 {generated ? (
                   <div className="space-y-4 rounded-xl border border-border bg-background p-4">
