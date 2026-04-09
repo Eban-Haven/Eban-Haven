@@ -85,7 +85,7 @@ export function DonorDetailPage() {
       const churnRes = await getDonorChurnRisk(supporterId)
       let upgrade: DonorUpgradeInfo | null = null
       try {
-        const upgrades = await getUpgradeCandidates(0.4, 400)
+        const upgrades = await getUpgradeCandidates(0.6241, 400)
         upgrade = upgrades.find((u) => u.supporter_id === supporterId) ?? null
       } catch {
         /* upgrade batch is optional */
