@@ -32,7 +32,7 @@ import {
   type PlannedSocialPost,
 } from '../../../api/admin'
 import { type SocialChatMessage, type SocialChatResponse, sendSocialChat } from '../../../api/socialChat'
-import { apiFetch, apiBaseUrl } from '../../../api/client'
+import { apiFetch } from '../../../api/client'
 import { alertError, btnPrimary, card, input, pageDesc, pageTitle } from '../shared/adminStyles'
 import { Badge, CategoryBadge, StatusBadge } from '../shared/adminDataTable/AdminBadges'
 
@@ -49,11 +49,12 @@ type StartMode = 'pick' | 'quick' | 'brief' | 'chat'
 
 type PexelsPhoto = {
   id: number
-  src: { medium: string; large: string; small: string; original: string }
+  src: { medium: string; large: string; small: string; original: string; tiny: string }
   alt: string
   photographer: string
   photographer_url: string
   url: string
+  dataUrl: string | null
 }
 
 type EditDraft = {
@@ -134,12 +135,6 @@ async function fetchPexelsImages(query: string): Promise<PexelsPhoto[]> {
   return data.photos ?? []
 }
 
-/** Rewrites a Pexels CDN URL to go through our backend proxy. */
-function proxyImageUrl(url: string): string {
-  const base = apiBaseUrl()
-  return `${base}/api/admin/social-planner/image-proxy?url=${encodeURIComponent(url)}`
-}
-
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StepBadge({ n, label, active }: { n: number; label: string; active?: boolean }) {
@@ -157,53 +152,23 @@ function StepBadge({ n, label, active }: { n: number; label: string; active?: bo
 
 function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => void }) {
   const [photos, setPhotos] = useState<PexelsPhoto[]>([])
-  const [blobUrls, setBlobUrls] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(query)
-  const blobUrlsRef = useRef<Record<number, string>>({})
-
-  // Revoke all blob URLs when component unmounts to avoid memory leaks
-  useEffect(() => {
-    return () => {
-      Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL)
-    }
-  }, [])
-
-  const fetchBlobForPhoto = useCallback(async (photo: PexelsPhoto) => {
-    try {
-      const proxyUrl = proxyImageUrl(photo.src.medium)
-      const res = await apiFetch(proxyUrl)
-      if (!res.ok) return
-      const blob = await res.blob()
-      const blobUrl = URL.createObjectURL(blob)
-      blobUrlsRef.current[photo.id] = blobUrl
-      setBlobUrls((prev) => ({ ...prev, [photo.id]: blobUrl }))
-    } catch {
-      // silently skip broken individual images
-    }
-  }, [])
 
   const search = useCallback(async (q: string) => {
     if (!q.trim()) return
     setLoading(true)
     setError(null)
-    // Revoke previous blob URLs
-    Object.values(blobUrlsRef.current).forEach(URL.revokeObjectURL)
-    blobUrlsRef.current = {}
-    setBlobUrls({})
     try {
-      const results = await fetchPexelsImages(q)
-      setPhotos(results)
-      // Fetch images as blobs in parallel so they show up quickly
-      void Promise.all(results.map(fetchBlobForPhoto))
+      setPhotos(await fetchPexelsImages(q))
     } catch {
-      setError('Image search failed. Check that the API is configured or try again.')
+      setError('Image search failed. Please try again.')
     } finally {
       setLoading(false)
     }
-  }, [fetchBlobForPhoto])
+  }, [])
 
   useEffect(() => { void search(query) }, [query, search])
 
@@ -239,23 +204,32 @@ function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => vo
         </button>
       </div>
       {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      {loading && photos.length === 0 && (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="flex h-24 items-center justify-center rounded-lg bg-muted">
+              <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground/40" />
+            </div>
+          ))}
+        </div>
+      )}
       {photos.length > 0 && (
         <>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {photos.map((p) => (
               <div key={p.id} className="group relative h-24 overflow-hidden rounded-lg bg-muted">
-                {blobUrls[p.id] ? (
+                {p.dataUrl ? (
                   <img
-                    src={blobUrls[p.id]}
+                    src={p.dataUrl}
                     alt={p.alt || 'Pexels photo'}
                     className="h-full w-full object-cover"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center">
-                    <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground/50" />
+                    <Image className="h-5 w-5 text-muted-foreground/30" />
                   </div>
                 )}
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
                     onClick={() => copyUrl(p.src.large, p.id)}

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using EbanHaven.Api.Auth;
 using EbanHaven.Api.Configuration;
 using EbanHaven.Api.SocialChat;
@@ -104,6 +106,10 @@ public sealed class SocialPlannerController(
         return deleted ? NoContent() : NotFound();
     }
 
+    /// <summary>
+    /// Searches Pexels and returns photos with thumbnails already embedded as
+    /// base64 data URIs — the browser never needs to contact pexels.com directly.
+    /// </summary>
     [HttpGet("image-search")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> ImageSearch([FromQuery] string query, CancellationToken cancellationToken)
@@ -116,6 +122,8 @@ public sealed class SocialPlannerController(
             return BadRequest(new { error = "query is required." });
 
         var client = httpFactory.CreateClient();
+
+        // 1. Search Pexels
         using var req = new HttpRequestMessage(
             HttpMethod.Get,
             $"https://api.pexels.com/v1/search?query={Uri.EscapeDataString(query)}&per_page=9&orientation=landscape");
@@ -126,37 +134,42 @@ public sealed class SocialPlannerController(
             return StatusCode((int)resp.StatusCode, new { error = "Pexels API error." });
 
         var json = await resp.Content.ReadAsStringAsync(cancellationToken);
-        return Content(json, "application/json");
-    }
 
-    /// <summary>
-    /// Proxies Pexels CDN images through the backend so clients in regions
-    /// that block pexels.com can still view the photos.
-    /// Only allows requests to *.pexels.com to prevent open-proxy abuse.
-    /// Auth is not required: browsers cannot send Bearer tokens in img src requests.
-    /// </summary>
-    [HttpGet("image-proxy")]
-    [AllowAnonymous]
-    public async Task<IActionResult> ImageProxy([FromQuery] string url, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            return BadRequest();
+        // 2. Parse the photo list and fetch each tiny thumbnail server-side
+        var root = JsonNode.Parse(json);
+        var photosArray = root?["photos"]?.AsArray();
+        if (photosArray is null)
+            return Ok(new { photos = Array.Empty<object>() });
 
-        Uri parsed;
-        try { parsed = new Uri(url); }
-        catch { return BadRequest(); }
+        // Fetch thumbnails in parallel (tiny ≈ 280×200, ~10-20 KB each)
+        var enriched = await Task.WhenAll(photosArray.Select(async photo =>
+        {
+            var tinyUrl = photo?["src"]?["tiny"]?.GetValue<string>();
+            string? dataUrl = null;
 
-        if (!parsed.Host.EndsWith("pexels.com", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { error = "Only pexels.com URLs are allowed." });
+            if (!string.IsNullOrWhiteSpace(tinyUrl))
+            {
+                try
+                {
+                    var imgResp = await client.GetAsync(tinyUrl, cancellationToken);
+                    if (imgResp.IsSuccessStatusCode)
+                    {
+                        var bytes = await imgResp.Content.ReadAsByteArrayAsync(cancellationToken);
+                        var mime  = imgResp.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
+                        dataUrl = $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+                    }
+                }
+                catch { /* leave dataUrl null */ }
+            }
 
-        var client = httpFactory.CreateClient();
-        var resp = await client.GetAsync(url, cancellationToken);
-        if (!resp.IsSuccessStatusCode)
-            return StatusCode((int)resp.StatusCode);
+            // Clone photo node and inject dataUrl
+            var clone = JsonNode.Parse(photo!.ToJsonString())!;
+            clone["dataUrl"] = dataUrl;
+            return clone;
+        }));
 
-        var contentType = resp.Content.Headers.ContentType?.MediaType ?? "image/jpeg";
-        var bytes = await resp.Content.ReadAsByteArrayAsync(cancellationToken);
-        return File(bytes, contentType);
+        var result = new JsonObject { ["photos"] = new JsonArray(enriched!) };
+        return Content(result.ToJsonString(), "application/json");
     }
 
     public sealed record CreatePlannedSocialPostsRequest(
