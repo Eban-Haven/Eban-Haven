@@ -115,8 +115,8 @@ public sealed class ReintegrationReadinessController(HavenDbContext db, IHttpCli
           END                                                                                   AS age_at_entry,
           GREATEST(0,
             CASE
-              WHEN r.date_of_admission IS NOT NULL AND r.date_of_admission ~ '^\d{4}-\d{2}-\d{2}'
-                THEN EXTRACT(EPOCH FROM (NOW() - r.date_of_admission::date))::int / 86400
+              WHEN r.date_of_admission IS NOT NULL
+                THEN EXTRACT(EPOCH FROM (NOW() - r.date_of_admission))::int / 86400
               ELSE 0
             END
           )                                                                                     AS days_in_program,
