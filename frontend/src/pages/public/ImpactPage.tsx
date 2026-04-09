@@ -26,7 +26,14 @@ import {
   YAxis,
 } from 'recharts'
 import { Button } from '../../components/ui/button'
-import { getImpactSnapshots, getImpactSummary, type PublicImpactSnapshot, type PublicImpactSummary } from '../../api/impact'
+import {
+  getImpactEnrollmentGrowth,
+  getImpactSnapshots,
+  getImpactSummary,
+  type EnrollmentGrowthPoint,
+  type PublicImpactSnapshot,
+  type PublicImpactSummary,
+} from '../../api/impact'
 import { IMPACT_PAGE_IMAGES, SITE_DISPLAY_NAME } from '../../site'
 
 /**
@@ -34,6 +41,7 @@ import { IMPACT_PAGE_IMAGES, SITE_DISPLAY_NAME } from '../../site'
  * Images: `IMPACT_PAGE_IMAGES` in `site.ts` (same Unsplash URLs as that page).
  * Hero copy preserved per product request. KPIs, growth line, and optional snapshot metrics come from
  * /api/impact/summary and published public_impact_snapshots (who_*, outcome_* keys).
+ * Growth line: /api/impact/enrollment-growth (residents.date_enrolled, cumulative from Jan 2023).
  */
 
 const fadeUp = {
@@ -97,35 +105,11 @@ function parseMetricBars(metrics: Record<string, string | undefined>, prefix: 'w
   return rows.sort((a, b) => b.value - a.value)
 }
 
-/** Published snapshots with `total_residents`, one row per calendar month (latest snapshot wins). */
-function publishedResidentSeries(snapshots: PublicImpactSnapshot[]) {
-  const rows: { month: string; value: number; snapshotDate: string }[] = []
-  for (const snapshot of snapshots) {
-    if (!snapshot.isPublished) continue
-    const month = snapshot.metrics.month ?? snapshot.snapshotDate.slice(0, 7)
-    const raw = snapshot.metrics.total_residents
-    const value = raw ? Number(raw) : Number.NaN
-    if (!Number.isFinite(value)) continue
-    rows.push({ month, value, snapshotDate: snapshot.snapshotDate })
-  }
-  const byMonth = new Map<string, { month: string; value: number; snapshotDate: string }>()
-  for (const r of rows) {
-    const prev = byMonth.get(r.month)
-    if (!prev || r.snapshotDate > prev.snapshotDate) byMonth.set(r.month, r)
-  }
-  return [...byMonth.values()]
-    .sort((a, b) => a.month.localeCompare(b.month))
-    .map((r) => {
-      const d = new Date(`${r.month}-01T12:00:00`)
-      const period = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      return { period, month: r.month, girls: r.value }
-    })
-}
-
 export function ImpactPage() {
   const navigate = useNavigate()
   const [summary, setSummary] = useState<PublicImpactSummary | null>(null)
   const [snapshots, setSnapshots] = useState<PublicImpactSnapshot[]>([])
+  const [enrollmentGrowth, setEnrollmentGrowth] = useState<EnrollmentGrowthPoint[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -140,6 +124,20 @@ export function ImpactPage() {
       })
       .catch((e: unknown) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Could not load impact data.')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void getImpactEnrollmentGrowth()
+      .then((rows) => {
+        if (!cancelled) setEnrollmentGrowth(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setEnrollmentGrowth([])
       })
     return () => {
       cancelled = true
@@ -165,7 +163,14 @@ export function ImpactPage() {
 
   const usingWhoFallback = whoRows.length < 2
 
-  const growthSeries = useMemo(() => publishedResidentSeries(snapshots), [snapshots])
+  const growthSeries = useMemo(() => {
+    if (!enrollmentGrowth || enrollmentGrowth.length === 0) return []
+    return enrollmentGrowth.map((p) => ({
+      period: p.period,
+      month: p.month,
+      girls: p.cumulativeResidents,
+    }))
+  }, [enrollmentGrowth])
 
   const growthRangeLabel = useMemo(() => {
     if (growthSeries.length === 0) return null
@@ -179,15 +184,14 @@ export function ImpactPage() {
     if (pts.length < 2) return null
     const first = pts[0].girls
     const last = pts[pts.length - 1].girls
-    if (first <= 0) return null
-    const pct = Math.round(((last - first) / first) * 100)
-    return {
-      first,
-      last,
-      pct,
-      fromLabel: pts[0].period,
-      toLabel: pts[pts.length - 1].period,
+    const fromLabel = pts[0].period
+    const toLabel = pts[pts.length - 1].period
+    if (first <= 0 && last <= 0) return null
+    if (first > 0) {
+      const pct = Math.round(((last - first) / first) * 100)
+      return { first, last, pct, fromLabel, toLabel }
     }
+    return { first, last, pct: null as number | null, fromLabel, toLabel }
   }, [growthSeries])
 
 
@@ -393,8 +397,12 @@ export function ImpactPage() {
           >
             <span className="text-xs font-semibold uppercase tracking-widest text-accent">Growth over time</span>
             <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
-              Total residents in published snapshots
+              Cumulative residents by enrollment date
             </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+              From January 2023 through today: count of residents with a program{' '}
+              <code className="rounded bg-muted px-1">date_enrolled</code> on or before each month-end.
+            </p>
             {growthRangeLabel ? (
               <p className="mx-auto mt-2 text-sm font-medium text-foreground/80">{growthRangeLabel}</p>
             ) : null}
@@ -402,22 +410,26 @@ export function ImpactPage() {
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
                 From <strong className="text-foreground">{growthNarrative.first}</strong> ({growthNarrative.fromLabel}) to{' '}
                 <strong className="text-foreground">{growthNarrative.last}</strong> ({growthNarrative.toLabel})
-                {growthNarrative.pct > 0 ? (
+                {growthNarrative.pct != null && growthNarrative.pct !== 0 ? (
                   <>
                     {' '}
-                    — a <strong>{growthNarrative.pct}%</strong> change in total residents (published data).
+                    — a <strong>{growthNarrative.pct}%</strong> change over that span.
                   </>
+                ) : growthNarrative.pct === 0 ? (
+                  ' — steady over that span.'
                 ) : (
                   '.'
                 )}
               </p>
             ) : (
               <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-                {growthSeries.length === 0
-                  ? 'When published impact snapshots include total_residents, the chart will show the real timeline here.'
-                  : growthSeries.length === 1
-                    ? 'Add another month with total_residents to compare change over time.'
-                    : 'Each point is the latest published total_residents for that month.'}
+                {enrollmentGrowth === null
+                  ? 'Loading enrollment trend…'
+                  : enrollmentGrowth.length === 0
+                    ? 'Enrollment trend could not be loaded. Deploy the latest API (GET /api/impact/enrollment-growth) and try again.'
+                    : growthSeries.length < 2
+                      ? 'At least two months of data are needed to compare change over time.'
+                      : 'Totals reflect cumulative enrollments through each month-end.'}
               </p>
             )}
           </motion.div>
@@ -429,13 +441,21 @@ export function ImpactPage() {
             className="rounded-2xl border border-border bg-card p-6 lg:p-10"
           >
             <div className="h-80 w-full min-w-0">
-              {growthSeries.length === 0 ? (
+              {enrollmentGrowth === null ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+                  Loading chart…
+                </div>
+              ) : enrollmentGrowth.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 px-6 text-center text-sm text-muted-foreground">
-                  <p>No chart data yet.</p>
+                  <p>Chart unavailable.</p>
                   <p className="max-w-md text-xs">
-                    Publish snapshots whose metrics include <code className="rounded bg-muted px-1">total_residents</code>{' '}
-                    (and optionally <code className="rounded bg-muted px-1">month</code>) to plot this line.
+                    The server must expose GET <code className="rounded bg-muted px-1">/api/impact/enrollment-growth</code> (resident{' '}
+                    <code className="rounded bg-muted px-1">date_enrolled</code>).
                   </p>
+                </div>
+              ) : growthSeries.length === 0 ? (
+                <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 text-sm text-muted-foreground">
+                  No enrollment dates in range.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">

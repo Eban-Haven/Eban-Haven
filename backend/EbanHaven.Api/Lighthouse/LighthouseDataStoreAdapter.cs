@@ -72,4 +72,5 @@ public sealed class LighthouseDataStoreAdapter(LighthouseDataStore inner) : ILig
     public ReportsSummaryDto GetReportsSummary() => inner.GetReportsSummary();
     public PublicImpactSummaryDto GetPublicImpactSummary() => inner.GetPublicImpactSummary();
     public IReadOnlyList<PublicImpactSnapshotDto> GetPublishedSnapshots() => inner.GetPublishedSnapshots();
+    public IReadOnlyList<EnrollmentGrowthPointDto> GetEnrollmentGrowthSeries() => inner.GetEnrollmentGrowthSeries();
 }

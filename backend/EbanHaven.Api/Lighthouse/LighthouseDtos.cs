@@ -194,6 +194,9 @@ public sealed record PublicImpactSnapshotDto(
     IReadOnlyDictionary<string, string?> Metrics,
     bool IsPublished);
 
+/// <summary>One point per calendar month from Jan 2023 through the current month: residents with date_enrolled on or before month-end.</summary>
+public sealed record EnrollmentGrowthPointDto(string Month, string Period, int CumulativeResidents);
+
 public sealed record SafehouseOptionDto(int Id, string Code, string Name, string Region);
 
 public sealed record EducationRecordDto(int Id, int ResidentId, string RecordDate, double? ProgressPercent, string? ExtendedJson);

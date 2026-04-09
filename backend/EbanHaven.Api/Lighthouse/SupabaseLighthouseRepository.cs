@@ -688,6 +688,32 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             .ToList();
     }
 
+    public IReadOnlyList<EnrollmentGrowthPointDto> GetEnrollmentGrowthSeries()
+    {
+        var seriesStart = new DateOnly(2023, 1, 1);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var endMonth = new DateOnly(today.Year, today.Month, 1);
+
+        var enrolledDates = db.Residents
+            .AsNoTracking()
+            .Where(r => r.DateEnrolled != null)
+            .Select(r => r.DateEnrolled!.Value)
+            .ToList();
+
+        var ci = CultureInfo.GetCultureInfo("en-US");
+        var list = new List<EnrollmentGrowthPointDto>();
+        for (var m = seriesStart; m <= endMonth; m = m.AddMonths(1))
+        {
+            var lastDay = new DateOnly(m.Year, m.Month, DateTime.DaysInMonth(m.Year, m.Month));
+            var count = enrolledDates.Count(d => d <= lastDay);
+            var key = $"{m.Year:D4}-{m.Month:D2}";
+            var period = new DateTime(m.Year, m.Month, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", ci);
+            list.Add(new EnrollmentGrowthPointDto(key, period, count));
+        }
+
+        return list;
+    }
+
     public bool DeleteSupporter(int id)
     {
         var row = db.Supporters.FirstOrDefault(x => x.SupporterId == id);

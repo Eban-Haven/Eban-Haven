@@ -918,6 +918,36 @@ public sealed class LighthouseDataStore
         }
     }
 
+    public IReadOnlyList<EnrollmentGrowthPointDto> GetEnrollmentGrowthSeries()
+    {
+        lock (_lock)
+        {
+            var enrolledDates = new List<DateOnly>();
+            foreach (var r in _residents)
+            {
+                var s = GetStr(r, "date_enrolled");
+                if (DateOnly.TryParse(s, CultureInfo.InvariantCulture, out var d))
+                    enrolledDates.Add(d);
+            }
+
+            var seriesStart = new DateOnly(2023, 1, 1);
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var endMonth = new DateOnly(today.Year, today.Month, 1);
+            var ci = CultureInfo.GetCultureInfo("en-US");
+            var list = new List<EnrollmentGrowthPointDto>();
+            for (var m = seriesStart; m <= endMonth; m = m.AddMonths(1))
+            {
+                var lastDay = new DateOnly(m.Year, m.Month, DateTime.DaysInMonth(m.Year, m.Month));
+                var count = enrolledDates.Count(d => d <= lastDay);
+                var key = $"{m.Year:D4}-{m.Month:D2}";
+                var period = new DateTime(m.Year, m.Month, 1, 0, 0, 0, DateTimeKind.Utc).ToString("MMM yyyy", ci);
+                list.Add(new EnrollmentGrowthPointDto(key, period, count));
+            }
+
+            return list;
+        }
+    }
+
     // ── ML feature extraction ─────────────────────────────────────────────────
 
     /// <summary>

@@ -12,5 +12,8 @@ public sealed class ImpactController(ILighthouseRepository repo) : ControllerBas
 
     [HttpGet("snapshots")]
     public IActionResult Snapshots() => Ok(repo.GetPublishedSnapshots());
+
+    [HttpGet("enrollment-growth")]
+    public IActionResult EnrollmentGrowth() => Ok(repo.GetEnrollmentGrowthSeries());
 }
 

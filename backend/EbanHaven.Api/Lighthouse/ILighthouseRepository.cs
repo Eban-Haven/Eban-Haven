@@ -65,4 +65,5 @@ public interface ILighthouseRepository
     ReportsSummaryDto GetReportsSummary();
     PublicImpactSummaryDto GetPublicImpactSummary();
     IReadOnlyList<PublicImpactSnapshotDto> GetPublishedSnapshots();
+    IReadOnlyList<EnrollmentGrowthPointDto> GetEnrollmentGrowthSeries();
 }
