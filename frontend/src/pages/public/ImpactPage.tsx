@@ -399,10 +399,6 @@ export function ImpactPage() {
             <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
               Cumulative residents by enrollment date
             </h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-              From January 2023 through today: count of residents with a program{' '}
-              <code className="rounded bg-muted px-1">date_enrolled</code> on or before each month-end.
-            </p>
             {growthRangeLabel ? (
               <p className="mx-auto mt-2 text-sm font-medium text-foreground/80">{growthRangeLabel}</p>
             ) : null}
@@ -501,12 +497,6 @@ export function ImpactPage() {
               Girls arrive from a range of difficult circumstances. Understanding the types of harm they&apos;ve faced
               helps us provide the right care.
             </p>
-            {usingWhoFallback ? (
-              <p className="mx-auto mt-3 max-w-lg text-xs text-muted-foreground">
-                Chart shows reference-style categories until published snapshots include <code className="rounded bg-muted px-1">who_*</code>{' '}
-                percentage fields.
-              </p>
-            ) : null}
           </motion.div>
           <motion.div
             initial="hidden"
@@ -639,12 +629,6 @@ export function ImpactPage() {
             <p className="mx-auto mt-3 max-w-xl text-white/70">
               We are committed to responsible stewardship. Every peso is accounted for.
             </p>
-            {summary != null && summary.donationsLastMonthPhp > 0 ? (
-              <p className="mx-auto mt-4 max-w-xl text-sm text-white/60">
-                Last month: approximately ₱{summary.donationsLastMonthPhp.toLocaleString(undefined, { maximumFractionDigits: 0 })}{' '}
-                in recorded monetary gifts ({SITE_DISPLAY_NAME} impact API).
-              </p>
-            ) : null}
           </motion.div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {allocationData.map((item, i) => (
@@ -700,13 +684,12 @@ export function ImpactPage() {
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
             <Heart className="mx-auto mb-6 h-10 w-10 fill-current text-accent" aria-hidden />
             <h2 className="font-heading text-3xl font-bold leading-tight text-white lg:text-5xl">
-              The data is clear.
+              You can change her story.
               <br />
-              Your gift changes lives.
+              Don’t wait to make a difference.
             </h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-white/75">
-              Behind every percentage on this page is a girl who found safety, healing, and a future. Join hundreds of
-              supporters making it possible.
+              Every gift provides safety, healing, and a future for girls who need it most.
             </p>
             <div className="mt-10 flex flex-wrap justify-center gap-4">
               <Button
