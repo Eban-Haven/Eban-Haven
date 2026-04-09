@@ -411,6 +411,7 @@ export function ReportsInsightsPage() {
         <ReportTabPanel id="overview" active={tab}>
           <OverviewReportTab
             filteredTrends={filteredTrends}
+            reports={reports}
             dashboard={dashboard}
             marketing={marketing}
             safehousesFiltered={safehousesFiltered}

@@ -12,6 +12,7 @@ function formatMonthLabel(month: string) {
 
 type Props = {
   filteredTrends: ReportsSummary['donationTrends']
+  reports: ReportsSummary
   dashboard: DashboardSummary
   marketing: MarketingAnalyticsSummary | null
   safehousesFiltered: SafehousePerformance[]
@@ -27,6 +28,7 @@ type Props = {
 
 export function OverviewReportTab({
   filteredTrends,
+  reports,
   dashboard,
   marketing,
   safehousesFiltered,
@@ -144,31 +146,19 @@ export function OverviewReportTab({
           )}
         </ChartCard>
 
-        <ChartCard
-          title="Education proxy by safehouse"
-          description="Average education progress from latest monthly metrics (top five sites)."
-          actions={
-            shBars[0] ? (
-              <button
-                type="button"
-                className="text-xs font-medium text-primary hover:underline"
-                onClick={() => onPickSafehouse(Number(shBars[0].key))}
-              >
-                Focus top site
-              </button>
-            ) : null
-          }
-        >
-          {shBars.length === 0 ? (
-            <ReportEmptyState />
-          ) : (
-            <SimpleHorizontalBarChart
-              rows={shBars}
-              formatValue={(n) => `${n.toFixed(1)}%`}
-              onBarClick={(key) => onPickSafehouse(Number(key))}
-              ariaLabel="Education progress by safehouse"
-            />
-          )}
+        <ChartCard title="Outcome snapshot" description="Current resident outcome averages across recorded progress.">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Education</p>
+              <p className="mt-2 text-2xl font-bold">{reports.outcomeMetrics.avgEducationProgressPercent.toFixed(1)}%</p>
+              <p className="text-xs text-muted-foreground">{reports.outcomeMetrics.educationRecordsCount} records</p>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Wellbeing</p>
+              <p className="mt-2 text-2xl font-bold">{reports.outcomeMetrics.avgHealthScore.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">{reports.outcomeMetrics.healthRecordsCount} records</p>
+            </div>
+          </div>
         </ChartCard>
 
         <ChartCard

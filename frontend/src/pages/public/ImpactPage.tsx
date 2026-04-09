@@ -300,12 +300,6 @@ export function ImpactPage() {
               >
                 <HandHeart className="h-5 w-5" /> Donate Today
               </Button>
-              <a
-                href="#data"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-white/30 bg-transparent px-8 text-base font-medium text-white transition-colors hover:bg-white/10"
-              >
-                Explore the Data <ArrowRight className="h-4 w-4" />
-              </a>
             </motion.div>
             {loadError ? (
               <motion.p variants={fadeUp} className="mt-4 text-sm text-destructive">
