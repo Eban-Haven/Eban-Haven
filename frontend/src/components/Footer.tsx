@@ -114,6 +114,9 @@ export function Footer() {
             </p>
             <p className="mt-1 text-sm text-muted-foreground">{PUBLIC_CONTACT.phone}</p>
             <p className="mt-1 text-sm text-muted-foreground">{PUBLIC_CONTACT.addressLine}</p>
+            <div className="mt-4">
+              <GoogleTranslate />
+            </div>
           </div>
         </div>
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
@@ -126,10 +129,6 @@ export function Footer() {
           >
             Privacy Policy
           </Link>
-        </div>
-        <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted-foreground">Language support for readers across Ghana.</p>
-          <GoogleTranslate />
         </div>
       </div>
     </footer>

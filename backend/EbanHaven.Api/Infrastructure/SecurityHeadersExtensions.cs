@@ -7,11 +7,12 @@ public static class SecurityHeadersExtensions
         "base-uri 'self'; " +
         "frame-ancestors 'none'; " +
         "object-src 'none'; " +
-        "img-src 'self' data: blob:; " +
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+        "img-src 'self' data: blob: https://translate.googleapis.com https://translate.google.com https://www.google.com; " +
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://translate.googleapis.com https://translate.google.com https://www.google.com; " +
         "font-src 'self' data: https://fonts.gstatic.com; " +
-        "script-src 'self'; " +
+        "script-src 'self' https://translate.google.com https://translate.googleapis.com https://www.google.com; " +
         "connect-src 'self' https: wss:; " +
+        "frame-src https://translate.google.com https://translate.googleapis.com https://www.google.com; " +
         "form-action 'self'";
 
     public static IApplicationBuilder UseSecurityHeaders(this IApplicationBuilder app)

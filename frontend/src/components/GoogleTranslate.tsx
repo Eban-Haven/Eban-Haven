@@ -29,7 +29,7 @@ declare global {
 
 const STORAGE_KEY = 'haven_selected_language'
 const SCRIPT_ID = 'google-translate-script'
-const ELEMENT_ID = 'google_translate_element'
+const ELEMENT_ID = 'google_translate_element_host'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
 const languageOptions = [
@@ -79,6 +79,19 @@ function getGoogleTranslateCombo() {
   return document.querySelector<HTMLSelectElement>('.goog-te-combo')
 }
 
+function ensureGoogleTranslateHost() {
+  let host = document.getElementById(ELEMENT_ID)
+  if (host) {
+    return host
+  }
+
+  host = document.createElement('div')
+  host.id = ELEMENT_ID
+  host.className = 'google-translate-host'
+  document.body.appendChild(host)
+  return host
+}
+
 function triggerGoogleTranslate(language: SupportedLanguageCode) {
   const combo = getGoogleTranslateCombo()
   if (!combo) {
@@ -95,7 +108,9 @@ async function ensureGoogleTranslateLoaded() {
     return
   }
 
-  if (window.__havenGoogleTranslateReady) {
+  ensureGoogleTranslateHost()
+
+  if (window.__havenGoogleTranslateReady && getGoogleTranslateCombo()) {
     return
   }
 
@@ -111,7 +126,7 @@ async function ensureGoogleTranslateLoaded() {
         return
       }
 
-      const host = document.getElementById(ELEMENT_ID)
+      const host = ensureGoogleTranslateHost()
       if (host && host.childElementCount === 0) {
         new window.google.translate.TranslateElement(
           {
@@ -206,7 +221,9 @@ export function GoogleTranslate({ variant = 'footer' }: GoogleTranslateProps) {
       return
     }
 
-    applySelectedLanguage(nextLanguage)
+    void ensureGoogleTranslateLoaded().then(() => {
+      applySelectedLanguage(nextLanguage)
+    })
   }
 
   const wrapperClassName =
@@ -256,7 +273,6 @@ export function GoogleTranslate({ variant = 'footer' }: GoogleTranslateProps) {
           <p className={descriptionClassName}>Translate this site</p>
         )}
       </div>
-      <div id={ELEMENT_ID} className="google-translate-host" aria-hidden />
     </div>
   )
 }
