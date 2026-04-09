@@ -78,6 +78,10 @@ function residentLabel(resident: ResidentSummary) {
   return resident.internalCode || resident.caseControlNo
 }
 
+function residentPath(residentId: number) {
+  return `/admin/residents/${residentId}`
+}
+
 function KpiCard({
   label,
   value,
@@ -287,9 +291,31 @@ export function SocialWorkerDashboardPage() {
                         <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-foreground">{resident ? residentLabel(resident) : `Resident #${item.residentId}`}</p>
+                        {resident ? (
+                          <Link to={residentPath(resident.id)} className="text-sm font-medium text-primary hover:underline">
+                            {residentLabel(resident)}
+                          </Link>
+                        ) : (
+                          <p className="text-sm font-medium text-foreground">{`Resident #${item.residentId}`}</p>
+                        )}
                         <p className="mt-1 text-xs text-muted-foreground">{formatDate(item.date)}</p>
                       </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {resident ? (
+                        <Link
+                          to={residentPath(resident.id)}
+                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                        >
+                          Open profile
+                        </Link>
+                      ) : null}
+                      <Link
+                        to={item.kind === 'Home visit' ? '/admin/home-visitations' : '/admin/case-conferences'}
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                      >
+                        {item.kind === 'Home visit' ? 'Open visits' : 'Open plans'}
+                      </Link>
                     </div>
                   </div>
                 )
@@ -300,6 +326,66 @@ export function SocialWorkerDashboardPage() {
 
         <div className="space-y-6">
           <div className={`${card} space-y-5`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <TriangleAlert className="h-4 w-4 text-primary" />
+                <h3 className="text-lg font-semibold text-foreground">High-risk residents</h3>
+              </div>
+              <Link to="/admin/residents" className="text-sm font-medium text-primary hover:underline">
+                View all
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {highRiskResidents.length === 0 ? (
+                <div className="rounded-2xl border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                  No residents are currently marked high or critical risk.
+                </div>
+              ) : (
+                highRiskResidents.slice(0, 6).map((resident) => (
+                  <div key={resident.id} className="rounded-2xl border border-border bg-muted/20 p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <Link to={residentPath(resident.id)} className="text-sm font-semibold text-primary hover:underline">
+                          {residentLabel(resident)}
+                        </Link>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {resident.safehouseName ?? 'No safehouse listed'} · {resident.caseCategory}
+                        </p>
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Assigned {resident.assignedSocialWorker ?? '—'} · Reintegration {resident.reintegrationStatus ?? '—'}
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
+                        {resident.currentRiskLevel ?? 'High risk'}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        to={residentPath(resident.id)}
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                      >
+                        Open profile
+                      </Link>
+                      <Link
+                        to="/admin/process-recordings"
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                      >
+                        Log session
+                      </Link>
+                      <Link
+                        to="/admin/home-visitations"
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                      >
+                        Plan visit
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className={`${card} space-y-5`}>
             <div className="flex items-center gap-2">
               <Waypoints className="h-4 w-4 text-primary" />
               <h3 className="text-lg font-semibold text-foreground">Reintegration watch</h3>
@@ -309,7 +395,9 @@ export function SocialWorkerDashboardPage() {
                 <div key={resident.id} className="rounded-2xl border border-border bg-muted/20 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{residentLabel(resident)}</p>
+                      <Link to={residentPath(resident.id)} className="text-sm font-semibold text-primary hover:underline">
+                        {residentLabel(resident)}
+                      </Link>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {resident.safehouseName ?? 'No safehouse listed'} · {resident.caseCategory}
                       </p>
@@ -321,6 +409,20 @@ export function SocialWorkerDashboardPage() {
                   <p className="mt-3 text-xs text-muted-foreground">
                     {resident.reintegrationType ?? 'No reintegration type recorded'} · Current risk {resident.currentRiskLevel ?? '—'}
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      to={residentPath(resident.id)}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                    >
+                      Open profile
+                    </Link>
+                    <Link
+                      to="/admin/case-conferences"
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                    >
+                      Review plan
+                    </Link>
+                  </div>
                 </div>
               ))}
               {reintegrationInProgress.length === 0 ? (
@@ -393,6 +495,22 @@ export function SocialWorkerDashboardPage() {
                         </p>
                       </div>
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {resident ? (
+                        <Link
+                          to={residentPath(resident.id)}
+                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                        >
+                          Open profile
+                        </Link>
+                      ) : null}
+                      <Link
+                        to="/admin/case-conferences"
+                        className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                      >
+                        Open plans
+                      </Link>
+                    </div>
                   </div>
                 )
               })
@@ -426,6 +544,20 @@ export function SocialWorkerDashboardPage() {
                         </div>
                         <p className="text-xs text-muted-foreground">{formatDate(recording.sessionDate)}</p>
                       </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          to={`/admin/residents/${recording.residentId}`}
+                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                        >
+                          Open profile
+                        </Link>
+                        <Link
+                          to="/admin/process-recordings"
+                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                        >
+                          View records
+                        </Link>
+                      </div>
                     </div>
                   ))
                 )}
@@ -450,6 +582,20 @@ export function SocialWorkerDashboardPage() {
                           </p>
                         </div>
                         <p className="text-xs text-muted-foreground">{formatDate(visit.visitDate)}</p>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Link
+                          to={`/admin/residents/${visit.residentId}`}
+                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                        >
+                          Open profile
+                        </Link>
+                        <Link
+                          to="/admin/home-visitations"
+                          className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                        >
+                          View visits
+                        </Link>
                       </div>
                     </div>
                   ))
