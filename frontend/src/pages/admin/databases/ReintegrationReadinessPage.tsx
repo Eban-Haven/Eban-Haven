@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowUpDown, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { getReintegrationReadinessCohort, type ResidentSummary } from '../../../api/admin'
+import { createInterventionPlan, getReintegrationReadinessCohort, type ResidentSummary } from '../../../api/admin'
 import {
   deriveReadinessPrediction,
   deriveReadinessTier,
@@ -35,9 +35,42 @@ type CohortResident = ResidentSummary & {
   readiness: ReintegrationResult
 }
 
+type SavedChecklistItem = {
+  id: string
+  text: string
+  done: boolean
+}
+
+type SavedActionPlan = {
+  owner: string
+  dueDate: string
+  nextReviewDate: string
+  lastReviewedAt: string | null
+  checklist: SavedChecklistItem[]
+}
+
+const ACTION_PLAN_STORAGE_KEY = 'reintegration-readiness-action-plans:v1'
+
 type QuickAction = {
   label: string
   to: string
+}
+
+function loadSavedActionPlans(): Record<string, SavedActionPlan> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(ACTION_PLAN_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as Record<string, SavedActionPlan>
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveActionPlans(plans: Record<string, SavedActionPlan>) {
+  if (typeof window === 'undefined') return
+  window.localStorage.setItem(ACTION_PLAN_STORAGE_KEY, JSON.stringify(plans))
 }
 
 function buildQuickActions(resident: CohortResident, area?: ReintegrationResult['top_improvements'][number]): QuickAction[] {
@@ -100,6 +133,20 @@ function checklistItems(resident: CohortResident) {
     ...actions,
     'Review reintegration status and assign the next follow-up date.',
   ].slice(0, 4)
+}
+
+function defaultSavedPlan(resident: CohortResident): SavedActionPlan {
+  return {
+    owner: resident.assignedSocialWorker ?? '',
+    dueDate: '',
+    nextReviewDate: '',
+    lastReviewedAt: null,
+    checklist: checklistItems(resident).map((text, index) => ({
+      id: `${resident.id}-${index}-${text}`,
+      text,
+      done: false,
+    })),
+  }
 }
 
 function CohortOverviewCard({
@@ -172,16 +219,55 @@ function CohortOverviewCard({
 
 function ResidentActionDrawer({
   resident,
+  savedPlan,
+  onPlanChange,
   onClose,
 }: {
   resident: CohortResident
+  savedPlan: SavedActionPlan
+  onPlanChange: (plan: SavedActionPlan) => void
   onClose: () => void
 }) {
   const score = Math.round(resident.readiness.reintegration_probability * 100)
   const tier = deriveReadinessTier(resident.readiness.reintegration_probability)
   const prediction = deriveReadinessPrediction(resident.readiness.reintegration_probability)
   const tierConfig = TIER_CONFIG[tier]
-  const checklist = checklistItems(resident)
+  const [planSaving, setPlanSaving] = useState(false)
+  const [planMessage, setPlanMessage] = useState<string | null>(null)
+
+  const completedCount = savedPlan.checklist.filter((item) => item.done).length
+
+  const updateChecklist = (id: string, done: boolean) => {
+    onPlanChange({
+      ...savedPlan,
+      checklist: savedPlan.checklist.map((item) => (item.id === id ? { ...item, done } : item)),
+    })
+  }
+
+  const createPlanFromRecommendations = async () => {
+    setPlanSaving(true)
+    setPlanMessage(null)
+    try {
+      await createInterventionPlan({
+        residentId: resident.id,
+        planCategory: 'Reintegration',
+        planDescription: savedPlan.checklist.map((item, index) => `${index + 1}. ${item.text}`).join('\n'),
+        status: 'In Progress',
+        targetDate: savedPlan.dueDate || null,
+        caseConferenceDate: savedPlan.nextReviewDate || null,
+        servicesProvided:
+          resident.readiness.top_improvements
+            .slice(0, 3)
+            .map((area) => area.label)
+            .join(', ') || 'Reintegration follow-up',
+      })
+      setPlanMessage('Intervention plan created from these recommendations.')
+    } catch (error) {
+      setPlanMessage(error instanceof Error ? error.message : 'Unable to create intervention plan.')
+    } finally {
+      setPlanSaving(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35">
@@ -219,6 +305,9 @@ function ResidentActionDrawer({
             <Link to={`/admin/residents/${resident.id}`} className={btnPrimary}>
               Open full case
             </Link>
+            <button type="button" className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted" onClick={() => void createPlanFromRecommendations()} disabled={planSaving}>
+              {planSaving ? 'Creating plan…' : 'Create reintegration plan'}
+            </button>
             <Link to="/admin/resident-pipeline" className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
               Resident pipeline
             </Link>
@@ -272,17 +361,73 @@ function ResidentActionDrawer({
 
           <section className={`${card} space-y-3`}>
             <div>
-              <h4 className="text-sm font-semibold text-foreground">Recommended next steps</h4>
-              <p className="mt-1 text-sm text-muted-foreground">A simple checklist for the next review cycle.</p>
+              <h4 className="text-sm font-semibold text-foreground">Reintegration work plan</h4>
+              <p className="mt-1 text-sm text-muted-foreground">Track ownership, due dates, and what has already been completed.</p>
             </div>
-            <ul className="space-y-2 text-sm">
-              {checklist.map((item) => (
-                <li key={item} className="flex gap-3 rounded-lg border border-border bg-background px-3 py-3">
-                  <span className="mt-0.5 h-4 w-4 rounded-full border border-border bg-muted" />
-                  <span className="text-foreground">{item}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm text-foreground">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</span>
+                <input
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  value={savedPlan.owner}
+                  onChange={(event) => onPlanChange({ ...savedPlan, owner: event.target.value })}
+                  placeholder="Assigned worker"
+                />
+              </label>
+              <label className="text-sm text-foreground">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Due date</span>
+                <input
+                  type="date"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  value={savedPlan.dueDate}
+                  onChange={(event) => onPlanChange({ ...savedPlan, dueDate: event.target.value })}
+                />
+              </label>
+              <label className="text-sm text-foreground">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground">Next review</span>
+                <input
+                  type="date"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                  value={savedPlan.nextReviewDate}
+                  onChange={(event) => onPlanChange({ ...savedPlan, nextReviewDate: event.target.value })}
+                />
+              </label>
+              <div className="rounded-lg border border-border bg-background px-3 py-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Review status</p>
+                <p className="mt-2 text-sm font-medium text-foreground">
+                  {savedPlan.lastReviewedAt ? `Reviewed ${new Date(savedPlan.lastReviewedAt).toLocaleString()}` : 'Not reviewed yet'}
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted"
+                  onClick={() => onPlanChange({ ...savedPlan, lastReviewedAt: new Date().toISOString() })}
+                >
+                  Mark reviewed today
+                </button>
+              </div>
+            </div>
+            <div className="rounded-lg border border-border bg-background px-3 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Checklist progress</p>
+                <p className="text-sm font-medium text-foreground">
+                  {completedCount}/{savedPlan.checklist.length} complete
+                </p>
+              </div>
+              <ul className="mt-3 space-y-2 text-sm">
+                {savedPlan.checklist.map((item) => (
+                  <li key={item.id} className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={(event) => updateChecklist(item.id, event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-border"
+                    />
+                    <span className={item.done ? 'text-muted-foreground line-through' : 'text-foreground'}>{item.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {planMessage ? <p className="text-sm text-muted-foreground">{planMessage}</p> : null}
           </section>
 
           <section className={`${card} space-y-3`}>
@@ -315,6 +460,14 @@ function ResidentActionDrawer({
               <Link to={`/admin/residents/${resident.id}`} className={btnPrimary}>
                 Open full case
               </Link>
+              <button
+                type="button"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                onClick={() => void createPlanFromRecommendations()}
+                disabled={planSaving}
+              >
+                {planSaving ? 'Creating…' : 'Create plan'}
+              </button>
               <Link to="/admin/home-visitations" className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
                 Log visit
               </Link>
@@ -406,7 +559,20 @@ export function ReintegrationReadinessPage() {
   const [partialError, setPartialError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [selectedResident, setSelectedResident] = useState<CohortResident | null>(null)
+  const [savedPlans, setSavedPlans] = useState<Record<string, SavedActionPlan>>({})
   const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    setSavedPlans(loadSavedActionPlans())
+  }, [])
+
+  const updateSavedPlan = useCallback((residentId: number, plan: SavedActionPlan) => {
+    setSavedPlans((current) => {
+      const next = { ...current, [String(residentId)]: plan }
+      saveActionPlans(next)
+      return next
+    })
+  }, [])
 
   const load = useCallback(async () => {
     abortRef.current?.abort()
@@ -721,7 +887,14 @@ export function ReintegrationReadinessPage() {
         </>
       )}
 
-      {selectedResident ? <ResidentActionDrawer resident={selectedResident} onClose={() => setSelectedResident(null)} /> : null}
+      {selectedResident ? (
+        <ResidentActionDrawer
+          resident={selectedResident}
+          savedPlan={savedPlans[String(selectedResident.id)] ?? defaultSavedPlan(selectedResident)}
+          onPlanChange={(plan) => updateSavedPlan(selectedResident.id, plan)}
+          onClose={() => setSelectedResident(null)}
+        />
+      ) : null}
     </div>
   )
 }
