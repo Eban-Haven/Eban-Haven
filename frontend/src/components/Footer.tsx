@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { PUBLIC_CONTACT, SITE_DISPLAY_NAME, SOCIAL_LINKS } from '../site'
 import { SiteLogoMark } from './SiteLogoMark'
-import { GoogleTranslate } from './GoogleTranslate'
+import { PublicTranslate } from './PublicTranslate'
 
 function IconFacebook({ className }: { className?: string }) {
   return (
@@ -115,7 +115,7 @@ export function Footer() {
             <p className="mt-1 text-sm text-muted-foreground">{PUBLIC_CONTACT.phone}</p>
             <p className="mt-1 text-sm text-muted-foreground">{PUBLIC_CONTACT.addressLine}</p>
             <div className="mt-4">
-              <GoogleTranslate />
+              <PublicTranslate />
             </div>
           </div>
         </div>

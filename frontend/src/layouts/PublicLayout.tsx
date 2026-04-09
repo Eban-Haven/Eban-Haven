@@ -4,11 +4,13 @@ import { DocumentTitle } from '../components/DocumentTitle'
 import { Navigation } from '../components/Navigation'
 import { Footer } from '../components/Footer'
 import { CookieConsent } from '../components/CookieConsent'
+import { PublicTranslationSync } from '../components/PublicTranslate'
 
 export function PublicLayout() {
   return (
     <SiteProvider>
       <DocumentTitle />
+      <PublicTranslationSync />
       <div className="min-h-screen bg-background">
         <Navigation />
         <main className="pt-16 lg:pt-20">

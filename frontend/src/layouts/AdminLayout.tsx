@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import { logoutAndReload } from '../api/auth'
 import type { LucideIcon } from 'lucide-react'
-import { GoogleTranslate } from '../components/GoogleTranslate'
 import { SiteLogoMark } from '../components/SiteLogoMark'
 import { SITE_DISPLAY_NAME } from '../site'
 
@@ -200,7 +199,6 @@ export function AdminLayout() {
         </nav>
 
         <div className="shrink-0 space-y-3 border-t border-sidebar-border bg-sidebar p-3">
-          {!sidebarCollapsed && <GoogleTranslate variant="admin" />}
           <button
             type="button"
             onClick={() => void signOut()}
