@@ -6,6 +6,7 @@ export type DonorDashboardData = {
   supporter: Supporter | null
   donations: Donation[]
   allocations: DonationAllocation[]
+  designationOptions: string[]
 }
 
 export async function getDonorDashboard(): Promise<DonorDashboardData> {

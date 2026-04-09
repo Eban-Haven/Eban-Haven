@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GraduationCap, Heart, Home, UserCheck, Users } from 'lucide-react'
-import { getImpactSummary, type PublicImpactSummary } from '../../api/impact'
+import { getImpactSnapshots, getImpactSummary, type PublicImpactSnapshot, type PublicImpactSummary } from '../../api/impact'
 import { SITE_DISPLAY_NAME } from '../../site'
 
 const fade = {
@@ -40,43 +40,118 @@ const btnPrimary =
 const btnOutline =
   'inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-primary bg-transparent px-8 text-sm font-medium text-primary transition-colors hover:bg-primary/10'
 
+type GrowthPoint = {
+  month: string
+  label: string
+  value: number
+}
+
+function metricNumber(value: string) {
+  return value === '—' ? value : value
+}
+
 function buildStats(summary: PublicImpactSummary | null) {
   const base = [
-    { icon: Home, color: 'text-accent' as const },
-    { icon: GraduationCap, color: 'text-primary' as const },
-    { icon: Heart, color: 'text-accent' as const },
-    { icon: UserCheck, color: 'text-primary' as const },
-    { icon: Users, color: 'text-accent' as const },
+    { icon: Home, color: 'text-accent' as const, tone: 'bg-accent/10' },
+    { icon: GraduationCap, color: 'text-primary' as const, tone: 'bg-primary/10' },
+    { icon: Heart, color: 'text-accent' as const, tone: 'bg-accent/10' },
+    { icon: UserCheck, color: 'text-primary' as const, tone: 'bg-primary/10' },
+    { icon: Users, color: 'text-accent' as const, tone: 'bg-accent/10' },
   ]
   const labels = [
     'Active safehouses',
-    'School enrollment / progress (avg. %)',
-    'Health improvement (avg. score)',
-    'Successful family reintegration (rate)',
+    'School progress average',
+    'Health score average',
+    'Family reintegration rate',
     'Community partners',
   ]
+  const descriptions = [
+    'Safe spaces currently operating for girls in recovery.',
+    'Average educational progress across active care plans.',
+    'Wellbeing trend across active support records.',
+    'Girls successfully transitioned into supported family settings.',
+    'Supporters, advocates, and organizational partners in the network.',
+  ]
   if (!summary) {
-    return base.map((b, i) => ({ ...b, value: '—', label: labels[i] ?? '' }))
+    return base.map((b, i) => ({ ...b, value: '—', label: labels[i] ?? '', description: descriptions[i] ?? '' }))
   }
   return [
-    { ...base[0], value: String(summary.safehouseCount), label: labels[0] },
-    { ...base[1], value: `${summary.avgEducationProgressPercent.toFixed(0)}%`, label: labels[1] },
-    { ...base[2], value: summary.avgHealthScore.toFixed(2), label: labels[2] },
-    { ...base[3], value: `${summary.reintegrationSuccessRatePercent.toFixed(0)}%`, label: labels[3] },
-    { ...base[4], value: String(summary.supporterCount), label: labels[4] },
+    { ...base[0], value: String(summary.safehouseCount), label: labels[0], description: descriptions[0] },
+    {
+      ...base[1],
+      value: `${summary.avgEducationProgressPercent.toFixed(0)}%`,
+      label: labels[1],
+      description: descriptions[1],
+    },
+    { ...base[2], value: summary.avgHealthScore.toFixed(2), label: labels[2], description: descriptions[2] },
+    {
+      ...base[3],
+      value: `${summary.reintegrationSuccessRatePercent.toFixed(0)}%`,
+      label: labels[3],
+      description: descriptions[3],
+    },
+    { ...base[4], value: String(summary.supporterCount), label: labels[4], description: descriptions[4] },
   ]
+}
+
+function parseGrowthPoints(snapshots: PublicImpactSnapshot[]) {
+  return snapshots
+    .map((snapshot) => {
+      const month = snapshot.metrics.month ?? snapshot.snapshotDate
+      const raw = snapshot.metrics.total_residents
+      const value = raw ? Number(raw) : Number.NaN
+      if (!Number.isFinite(value)) return null
+      const date = new Date(`${month}-01`)
+      const label = date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+      return { month, label, value }
+    })
+    .filter((point): point is GrowthPoint => point != null)
+    .sort((a, b) => a.month.localeCompare(b.month))
+}
+
+function buildChart(points: GrowthPoint[]) {
+  const width = 640
+  const height = 220
+  const paddingX = 28
+  const paddingTop = 16
+  const paddingBottom = 36
+
+  if (points.length === 0) {
+    return { path: '', areaPath: '', points: [], gridLines: [], min: 0, max: 0, width, height, paddingBottom }
+  }
+
+  const values = points.map((point) => point.value)
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = Math.max(max - min, 1)
+  const chartHeight = height - paddingTop - paddingBottom
+  const chartWidth = width - paddingX * 2
+
+  const plotted = points.map((point, index) => {
+    const x = paddingX + (points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth)
+    const y = paddingTop + (1 - (point.value - min) / range) * chartHeight
+    return { ...point, x, y }
+  })
+
+  const path = plotted.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
+  const areaPath = `${path} L ${plotted[plotted.length - 1]?.x ?? paddingX} ${height - paddingBottom} L ${plotted[0]?.x ?? paddingX} ${height - paddingBottom} Z`
+  const gridLines = [0, 0.5, 1].map((ratio) => paddingTop + ratio * chartHeight)
+
+  return { path, areaPath, points: plotted, gridLines, min, max, width, height, paddingBottom }
 }
 
 export function ImpactPage() {
   const [summary, setSummary] = useState<PublicImpactSummary | null>(null)
+  const [snapshots, setSnapshots] = useState<PublicImpactSnapshot[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    void getImpactSummary()
-      .then((s) => {
+    void Promise.all([getImpactSummary(), getImpactSnapshots()])
+      .then(([summaryResponse, snapshotResponse]) => {
         if (!cancelled) {
-          setSummary(s)
+          setSummary(summaryResponse)
+          setSnapshots(snapshotResponse)
           setLoadError(null)
         }
       })
@@ -89,6 +164,10 @@ export function ImpactPage() {
   }, [])
 
   const stats = buildStats(summary)
+  const growthPoints = useMemo(() => parseGrowthPoints(snapshots).slice(-8), [snapshots])
+  const chart = useMemo(() => buildChart(growthPoints), [growthPoints])
+  const growthDelta =
+    growthPoints.length > 1 ? growthPoints[growthPoints.length - 1].value - growthPoints[0].value : null
 
   return (
     <div>
@@ -161,53 +240,125 @@ export function ImpactPage() {
       </section>
 
       <section className="py-20 lg:py-28">
-        <div className="mx-auto max-w-3xl px-6 text-center lg:px-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-accent">Our growth</p>
-          <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
-            Girls helped over the years
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            From a small first cohort to growing safehouse capacity today — every year, more lives change because of
-            donors and partners who show up. Live figures below reflect our current operational dataset.
-          </p>
-        </div>
-
-        {summary != null && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mx-auto mt-12 max-w-lg rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm"
-          >
-            <p className="text-xs font-semibold uppercase tracking-widest text-accent">Total girls helped</p>
-            <p className="mt-3 font-heading text-5xl font-bold text-primary lg:text-6xl">{summary.activeResidents}</p>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Girls reached through safe care, education, and reintegration support in our programs.
+        <div className="mx-auto max-w-6xl px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-accent">Our growth</p>
+            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
+              Growth you can actually follow
+            </h2>
+            <p className="mt-4 text-muted-foreground">
+              The headline number stays visible here, but it now sits beside the trend line and current operating
+              metrics so the section reads like one story instead of separate boxes.
             </p>
-          </motion.div>
-        )}
+          </div>
 
-        <div className="mx-auto mt-14 max-w-6xl px-6 lg:px-8">
-          <p className="mb-6 text-center text-xs font-semibold uppercase tracking-widest text-accent">
-            By the numbers
-          </p>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 lg:gap-6">
-            {stats.map((s, t) => (
-              <motion.div
-                key={s.label}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: t * 0.06 }}
-                className="rounded-2xl border border-border bg-card p-6 text-center lg:p-8"
-              >
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <s.icon className={`h-6 w-6 ${s.color}`} />
+          <div className="mt-12 grid gap-6 xl:grid-cols-[0.95fr_1.45fr]">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="rounded-[1.75rem] border border-border bg-card p-8 shadow-sm"
+            >
+              <p className="text-xs font-semibold uppercase tracking-[0.26em] text-accent">Girls helped today</p>
+              <p className="mt-4 font-heading text-5xl font-bold text-primary lg:text-6xl">
+                {summary ? summary.activeResidents : '—'}
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Girls currently reached through safe care, education, and reintegration support across our program
+                network.
+              </p>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="rounded-2xl bg-primary/6 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Current network</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {summary ? `${summary.safehouseCount} safehouses and ${summary.supporterCount} active supporters.` : 'Loading live network data.'}
+                  </p>
                 </div>
-                <p className="font-heading text-3xl font-bold text-foreground lg:text-4xl">{s.value}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{s.label}</p>
-              </motion.div>
-            ))}
+                <div className="rounded-2xl bg-accent/8 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-accent">Trend view</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {growthDelta != null
+                      ? `${growthDelta >= 0 ? '+' : ''}${growthDelta} girls across the latest ${growthPoints.length} published monthly snapshots.`
+                      : 'Published snapshots will populate the chart as they become available.'}
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="rounded-[1.75rem] border border-border bg-card p-6 shadow-sm lg:p-8"
+            >
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.26em] text-accent">Girls helped over time</p>
+                  <h3 className="mt-2 font-heading text-2xl font-semibold text-foreground">Published monthly trend</h3>
+                </div>
+                {growthPoints.length > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {growthPoints[0].label} to {growthPoints[growthPoints.length - 1].label}
+                  </p>
+                )}
+              </div>
+
+              {growthPoints.length > 0 ? (
+                <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-[linear-gradient(180deg,hsl(174_55%_28%/_0.08),transparent_55%),linear-gradient(180deg,hsl(0_0%_100%),hsl(40_20%_96%))] px-3 py-4 sm:px-5">
+                  <svg viewBox={`0 0 ${chart.width} ${chart.height}`} className="h-64 w-full" aria-label="Girls helped line chart">
+                    {chart.gridLines.map((line) => (
+                      <line key={line} x1="28" x2={chart.width - 28} y1={line} y2={line} stroke="currentColor" className="text-border" strokeDasharray="4 6" />
+                    ))}
+                    <path d={chart.areaPath} fill="hsl(174 55% 28% / 0.14)" />
+                    <path d={chart.path} fill="none" stroke="hsl(174 55% 28%)" strokeWidth="4" strokeLinecap="round" />
+                    {chart.points.map((point) => (
+                      <g key={point.month}>
+                        <circle cx={point.x} cy={point.y} r="5" fill="hsl(32 80% 55%)" />
+                        <text x={point.x} y={chart.height - 12} textAnchor="middle" className="fill-current text-[12px] text-muted-foreground">
+                          {point.label}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center text-sm text-muted-foreground">
+                  Growth snapshots will appear here once published data is available.
+                </div>
+              )}
+            </motion.div>
+          </div>
+
+          <div className="mt-14">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">By the numbers</p>
+                <h3 className="mt-2 font-heading text-2xl font-semibold text-foreground">A cleaner operational snapshot</h3>
+              </div>
+              <p className="max-w-xl text-right text-sm text-muted-foreground">
+                These indicators now use a more editorial card layout so the values are easier to scan and compare.
+              </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              {stats.map((s, t) => (
+                <motion.div
+                  key={s.label}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: t * 0.06 }}
+                  className="rounded-[1.5rem] border border-border bg-card p-6 text-left"
+                >
+                  <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-2xl ${s.tone}`}>
+                    <s.icon className={`h-6 w-6 ${s.color}`} />
+                  </div>
+                  <p className="font-heading text-3xl font-bold text-foreground">{metricNumber(String(s.value))}</p>
+                  <p className="mt-2 text-base font-medium text-foreground">{s.label}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{s.description}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -255,27 +406,6 @@ export function ImpactPage() {
                 <p className="mt-2 text-sm text-muted-foreground">{a.desc}</p>
               </motion.div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-primary py-20 lg:py-28">
-        <div className="mx-auto max-w-3xl px-6 text-center text-primary-foreground lg:px-8">
-          <h2 className="font-heading text-3xl font-bold lg:text-4xl">A girl is waiting. Will you answer?</h2>
-          <p className="mx-auto mt-4 max-w-xl text-primary-foreground/85">
-            Your gift — no matter the size — provides safety, healing, and a future for a girl who has nowhere else to
-            turn.
-          </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link to="/login" className={btnPrimary}>
-              Donate now
-            </Link>
-            <Link
-              to="/login"
-              className="inline-flex h-11 items-center justify-center rounded-lg border border-primary-foreground/40 bg-transparent px-8 text-sm font-medium text-primary-foreground hover:bg-primary-foreground/10"
-            >
-              Become a monthly supporter
-            </Link>
           </div>
         </div>
       </section>

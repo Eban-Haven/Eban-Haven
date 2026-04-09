@@ -12,6 +12,7 @@ export function DonorDashboardPage() {
   const [supporter, setSupporter] = useState<Supporter | null>(null)
   const [donations, setDonations] = useState<Donation[]>([])
   const [allocations, setAllocations] = useState<DonationAllocation[]>([])
+  const [designationOptions, setDesignationOptions] = useState<string[]>(['General Fund'])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedAmt, setSelectedAmt] = useState<number | null>(500)
@@ -31,6 +32,8 @@ export function DonorDashboardPage() {
       setSupporter(data.supporter)
       setDonations(data.donations)
       setAllocations(data.allocations)
+      setDesignationOptions(data.designationOptions)
+      setDesignate((current) => (data.designationOptions.includes(current) ? current : data.designationOptions[0] ?? 'General Fund'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -211,11 +214,17 @@ export function DonorDashboardPage() {
                 </label>
                 <label className="block text-sm">
                   <span className="text-muted-foreground">Designate to</span>
-                  <input
-                    className="mt-1 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+                  <select
+                    className="mt-1 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     value={designate}
                     onChange={(e) => setDesignate(e.target.value)}
-                  />
+                  >
+                    {designationOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block text-sm">
                   <span className="text-muted-foreground">Message (optional)</span>
