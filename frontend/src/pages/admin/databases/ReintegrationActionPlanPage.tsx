@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   createEducationRecord,
@@ -254,27 +254,23 @@ function actionConfig(area: ImprovementArea): SectionAction[] {
   }
 }
 
-function SectionCard({
-  id,
+function SectionPanel({
   title,
   description,
-  sectionRefs,
   children,
 }: {
-  id: SectionId
   title: string
   description: string
-  sectionRefs: Record<SectionId, RefObject<HTMLDivElement | null>>
   children: ReactNode
 }) {
   return (
-    <section id={id} ref={sectionRefs[id]} className={`${card} scroll-mt-28 space-y-4`}>
+    <div className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
       <div>
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
       {children}
-    </section>
+    </div>
   )
 }
 
@@ -293,6 +289,8 @@ export function ReintegrationActionPlanPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [expandedSection, setExpandedSection] = useState<SectionId>('plan-overview')
+  const [expandedBlocker, setExpandedBlocker] = useState<string>('plan-overview')
 
   const [plannerPreset, setPlannerPreset] = useState<PlannerPreset>({
     category: 'Reintegration',
@@ -327,24 +325,6 @@ export function ReintegrationActionPlanPage() {
     caseConferenceDate: '',
     servicesProvided: '',
   })
-
-  const sectionRefs: Record<SectionId, RefObject<HTMLDivElement | null>> = {
-    'plan-overview': useRef<HTMLDivElement>(null),
-    'health-history': useRef<HTMLDivElement>(null),
-    'health-form': useRef<HTMLDivElement>(null),
-    'education-history': useRef<HTMLDivElement>(null),
-    'education-form': useRef<HTMLDivElement>(null),
-    'session-history': useRef<HTMLDivElement>(null),
-    'session-form': useRef<HTMLDivElement>(null),
-    'incident-history': useRef<HTMLDivElement>(null),
-    'visit-history': useRef<HTMLDivElement>(null),
-    'visit-form': useRef<HTMLDivElement>(null),
-    'plan-builder': useRef<HTMLDivElement>(null),
-  }
-
-  const scrollToSection = useCallback((section: SectionId) => {
-    sectionRefs[section].current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [sectionRefs])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -426,7 +406,7 @@ export function ReintegrationActionPlanPage() {
 
   const handlePriorityAction = (action: SectionAction) => {
     if (action.preset) setPlannerPreset((current) => ({ ...current, ...action.preset }))
-    scrollToSection(action.section)
+    setExpandedSection(action.section)
   }
 
   const handleCreateHealthRecord = async () => {
@@ -558,6 +538,275 @@ export function ReintegrationActionPlanPage() {
   const sortedVisits = [...homeVisits].sort((a, b) => b.visitDate.localeCompare(a.visitDate))
   const sortedPlans = [...plans].sort((a, b) => (b.targetDate ?? '').localeCompare(a.targetDate ?? ''))
 
+  function renderExpandedSection(section: SectionId) {
+    switch (section) {
+      case 'health-history':
+        return (
+          <SectionPanel title="Health history" description="Review prior health scores and recent assessment notes.">
+            {sortedHealth.length === 0 ? <p className="text-sm text-muted-foreground">No health records yet.</p> : (
+              <ul className="space-y-2">
+                {sortedHealth.slice(0, 8).map((record) => (
+                  <li key={record.id} className="rounded-lg border border-border bg-background px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">{record.recordDate.slice(0, 10)} · Score {record.healthScore?.toFixed(2) ?? '—'}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{record.extendedJson ?? 'No additional notes recorded.'}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionPanel>
+        )
+      case 'health-form':
+        return (
+          <SectionPanel title="Create health assessment" description="Add a new health score update without leaving this page.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={label}>
+                Assessment date
+                <input type="date" className={input} value={healthForm.recordDate} onChange={(e) => setHealthForm((c) => ({ ...c, recordDate: e.target.value }))} />
+              </label>
+              <label className={label}>
+                Health score
+                <input className={input} value={healthForm.healthScore} onChange={(e) => setHealthForm((c) => ({ ...c, healthScore: e.target.value }))} placeholder="1.0 - 10.0" />
+              </label>
+            </div>
+            <label className={label}>
+              Notes
+              <textarea className={input} rows={4} value={healthForm.notes} onChange={(e) => setHealthForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Assessment findings, follow-up needs, medications, referrals…" />
+            </label>
+            <button type="button" className={btnPrimary} onClick={() => void handleCreateHealthRecord()}>
+              Save health assessment
+            </button>
+          </SectionPanel>
+        )
+      case 'education-history':
+        return (
+          <SectionPanel title="Education history" description="Review progress records and attendance-related updates.">
+            {sortedEducation.length === 0 ? <p className="text-sm text-muted-foreground">No education records yet.</p> : (
+              <ul className="space-y-2">
+                {sortedEducation.slice(0, 8).map((record) => (
+                  <li key={record.id} className="rounded-lg border border-border bg-background px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">{record.recordDate.slice(0, 10)} · Progress {record.progressPercent?.toFixed(1) ?? '—'}%</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{record.extendedJson ?? 'No additional notes recorded.'}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionPanel>
+        )
+      case 'education-form':
+        return (
+          <SectionPanel title="Log education update" description="Add a progress update or school support note from this page.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={label}>
+                Record date
+                <input type="date" className={input} value={educationForm.recordDate} onChange={(e) => setEducationForm((c) => ({ ...c, recordDate: e.target.value }))} />
+              </label>
+              <label className={label}>
+                Progress percent
+                <input className={input} value={educationForm.progressPercent} onChange={(e) => setEducationForm((c) => ({ ...c, progressPercent: e.target.value }))} placeholder="0 - 100" />
+              </label>
+            </div>
+            <label className={label}>
+              Notes
+              <textarea className={input} rows={4} value={educationForm.notes} onChange={(e) => setEducationForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Attendance concerns, tutoring steps, school updates…" />
+            </label>
+            <button type="button" className={btnPrimary} onClick={() => void handleCreateEducationRecord()}>
+              Save education update
+            </button>
+          </SectionPanel>
+        )
+      case 'session-history':
+        return (
+          <SectionPanel title="Session history" description="Recent counselling and process-recording notes related to readiness.">
+            {sortedSessions.length === 0 ? <p className="text-sm text-muted-foreground">No process recordings yet.</p> : (
+              <ul className="space-y-2">
+                {sortedSessions.slice(0, 8).map((record) => (
+                  <li key={record.id} className="rounded-lg border border-border bg-background px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">{record.sessionDate.slice(0, 10)} · {record.sessionType}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{record.socialWorker} · Progress {record.progressNoted ? 'noted' : 'not noted'} · Concerns {record.concernsFlagged ? 'flagged' : 'not flagged'}</p>
+                    <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{record.sessionNarrative}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionPanel>
+        )
+      case 'session-form':
+        return (
+          <SectionPanel title="Add process note" description="Capture a readiness-related session note here.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={label}>
+                Session date
+                <input type="date" className={input} value={sessionForm.sessionDate} onChange={(e) => setSessionForm((c) => ({ ...c, sessionDate: e.target.value }))} />
+              </label>
+              <label className={label}>
+                Social worker
+                <input className={input} value={sessionForm.socialWorker} onChange={(e) => setSessionForm((c) => ({ ...c, socialWorker: e.target.value }))} />
+              </label>
+            </div>
+            <label className={label}>
+              Session type
+              <input className={input} value={sessionForm.sessionType} onChange={(e) => setSessionForm((c) => ({ ...c, sessionType: e.target.value }))} />
+            </label>
+            <label className={label}>
+              Session narrative
+              <textarea className={input} rows={4} value={sessionForm.narrative} onChange={(e) => setSessionForm((c) => ({ ...c, narrative: e.target.value }))} />
+            </label>
+            <div className="flex flex-wrap gap-4 text-sm text-foreground">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={sessionForm.progressNoted} onChange={(e) => setSessionForm((c) => ({ ...c, progressNoted: e.target.checked }))} />
+                Progress noted
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={sessionForm.concernsFlagged} onChange={(e) => setSessionForm((c) => ({ ...c, concernsFlagged: e.target.checked }))} />
+                Concerns flagged
+              </label>
+            </div>
+            <button type="button" className={btnPrimary} onClick={() => void handleCreateProcessRecording()}>
+              Save process note
+            </button>
+          </SectionPanel>
+        )
+      case 'incident-history':
+        return (
+          <SectionPanel title="Incident history" description="Review recent incidents and their resolution status.">
+            {sortedIncidents.length === 0 ? <p className="text-sm text-muted-foreground">No incident reports yet.</p> : (
+              <ul className="space-y-2">
+                {sortedIncidents.slice(0, 8).map((incident) => (
+                  <li key={incident.id} className="rounded-lg border border-border bg-background px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">{incident.incidentDate.slice(0, 10)} · {incident.incidentType} · {incident.severity}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{incident.resolved ? 'Resolved' : 'Open'} · Follow-up {incident.followUpRequired ? 'required' : 'not required'}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{incident.description ?? 'No description recorded.'}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionPanel>
+        )
+      case 'visit-history':
+        return (
+          <SectionPanel title="Visit history" description="Home and reintegration visits that support family readiness work.">
+            {sortedVisits.length === 0 ? <p className="text-sm text-muted-foreground">No home visits yet.</p> : (
+              <ul className="space-y-2">
+                {sortedVisits.slice(0, 8).map((visit) => (
+                  <li key={visit.id} className="rounded-lg border border-border bg-background px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">{visit.visitDate.slice(0, 10)} · {visit.visitType}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{visit.socialWorker} · Follow-up {visit.followUpNeeded ? 'needed' : 'not needed'}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{visit.observations ?? visit.purpose ?? 'No observations recorded.'}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionPanel>
+        )
+      case 'visit-form':
+        return (
+          <SectionPanel title="Schedule home visit" description="Add a reintegration-focused visit without leaving this page.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={label}>
+                Visit date
+                <input type="date" className={input} value={visitForm.visitDate} onChange={(e) => setVisitForm((c) => ({ ...c, visitDate: e.target.value }))} />
+              </label>
+              <label className={label}>
+                Social worker
+                <input className={input} value={visitForm.socialWorker} onChange={(e) => setVisitForm((c) => ({ ...c, socialWorker: e.target.value }))} />
+              </label>
+            </div>
+            <label className={label}>
+              Visit type
+              <input className={input} value={visitForm.visitType} onChange={(e) => setVisitForm((c) => ({ ...c, visitType: e.target.value }))} />
+            </label>
+            <label className={label}>
+              Purpose
+              <textarea className={input} rows={3} value={visitForm.purpose} onChange={(e) => setVisitForm((c) => ({ ...c, purpose: e.target.value }))} />
+            </label>
+            <label className={label}>
+              Observations
+              <textarea className={input} rows={3} value={visitForm.observations} onChange={(e) => setVisitForm((c) => ({ ...c, observations: e.target.value }))} />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input type="checkbox" checked={visitForm.followUpNeeded} onChange={(e) => setVisitForm((c) => ({ ...c, followUpNeeded: e.target.checked }))} />
+              Follow-up needed
+            </label>
+            <button type="button" className={btnPrimary} onClick={() => void handleCreateVisit()}>
+              Save home visit
+            </button>
+          </SectionPanel>
+        )
+      case 'plan-builder':
+      case 'plan-overview':
+      default:
+        return (
+          <SectionPanel title="Plan builder" description="Create a focused intervention, support plan, or case conference directly from this blocker.">
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={label}>
+                Plan category
+                <input className={input} value={plannerForm.category} onChange={(e) => setPlannerForm((c) => ({ ...c, category: e.target.value }))} />
+              </label>
+              <label className={label}>
+                Target date
+                <input type="date" className={input} value={plannerForm.targetDate} onChange={(e) => setPlannerForm((c) => ({ ...c, targetDate: e.target.value }))} />
+              </label>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className={label}>
+                Case conference date
+                <input type="date" className={input} value={plannerForm.caseConferenceDate} onChange={(e) => setPlannerForm((c) => ({ ...c, caseConferenceDate: e.target.value }))} />
+              </label>
+              <label className={label}>
+                Services provided
+                <input className={input} value={plannerForm.servicesProvided} onChange={(e) => setPlannerForm((c) => ({ ...c, servicesProvided: e.target.value }))} />
+              </label>
+            </div>
+            <label className={label}>
+              Plan description
+              <textarea className={input} rows={4} value={plannerForm.description} onChange={(e) => setPlannerForm((c) => ({ ...c, description: e.target.value }))} />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={btnPrimary} onClick={() => void handleCreatePlan()}>
+                Create intervention plan
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                onClick={() => {
+                  setPlannerForm({
+                    category: 'Reintegration',
+                    description: '',
+                    targetDate: '',
+                    caseConferenceDate: '',
+                    servicesProvided: '',
+                  })
+                  setPlannerPreset({
+                    category: 'Reintegration',
+                    description: '',
+                    targetDate: '',
+                    caseConferenceDate: '',
+                    servicesProvided: '',
+                  })
+                }}
+              >
+                Clear template
+              </button>
+            </div>
+            <div className="rounded-xl border border-border bg-background px-4 py-4">
+              <h3 className="text-sm font-semibold text-foreground">Existing plans</h3>
+              {sortedPlans.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No intervention plans yet.</p> : (
+                <ul className="mt-3 space-y-2">
+                  {sortedPlans.slice(0, 8).map((plan) => (
+                    <li key={plan.id} className="rounded-lg border border-border bg-muted/20 px-3 py-3">
+                      <p className="text-sm font-medium text-foreground">{plan.planCategory} · {plan.status}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{plan.planDescription}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Target {plan.targetDate ? plan.targetDate.slice(0, 10) : '—'} · Conference {plan.caseConferenceDate ? plan.caseConferenceDate.slice(0, 10) : '—'}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </SectionPanel>
+        )
+    }
+  }
+
   if (loading) {
     return <div className="space-y-4"><div className={`${card} animate-pulse h-28`} /><div className={`${card} animate-pulse h-96`} /></div>
   }
@@ -593,31 +842,117 @@ export function ReintegrationActionPlanPage() {
 
       {notice ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{notice}</div> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
-        <SectionCard id="plan-overview" title="Plan overview" description="Readiness summary, ownership, and next review details." sectionRefs={sectionRefs}>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-border bg-background px-4 py-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Readiness score</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">{Math.round(resident.readiness.reintegration_probability * 100)}%</p>
-              <span className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${tierConfig.badge}`}>{prediction}</span>
+      <section className={`${card} space-y-5`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${tierConfig.badge}`}>{prediction}</span>
+              <span className="rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">{tier}</span>
             </div>
-            <div className="rounded-xl border border-border bg-background px-4 py-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resident context</p>
-              <p className="mt-2 text-sm font-medium text-foreground">{resident.safehouseName ?? 'No safehouse'}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{resident.reintegrationStatus ?? 'Not started'} · {resident.currentRiskLevel ?? 'No current risk label'}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-background px-4 py-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Checklist progress</p>
-              <p className="mt-2 text-3xl font-bold text-foreground">{completedChecklist}/{actionPlan.checklist.length}</p>
-              <p className="mt-1 text-sm text-muted-foreground">Actions completed in this working plan</p>
+            <div>
+              <h2 className="text-xl font-semibold text-foreground">{resident.internalCode}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {resident.safehouseName ?? 'No safehouse'} · {resident.assignedSocialWorker ?? 'No assigned worker'}
+              </p>
             </div>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Link to={`/admin/residents/${resident.id}`} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
+              Open full resident page
+            </Link>
+            <Link to="/admin/reintigration-readiness" className={btnPrimary}>
+              Back to readiness list
+            </Link>
+          </div>
+        </div>
 
-          <p className="rounded-xl border border-border bg-muted/20 px-4 py-4 text-sm leading-relaxed text-muted-foreground">
-            {readinessNarrative(resident)}
-          </p>
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Readiness score</p>
+            <p className="mt-2 text-3xl font-bold text-foreground">{Math.round(resident.readiness.reintegration_probability * 100)}%</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reintegration status</p>
+            <p className="mt-2 text-sm font-medium text-foreground">{resident.reintegrationStatus ?? 'Not started'}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current risk</p>
+            <p className="mt-2 text-sm font-medium text-foreground">{resident.currentRiskLevel ?? 'No current risk label'}</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Reintegration type</p>
+            <p className="mt-2 text-sm font-medium text-foreground">{resident.reintegrationType ?? 'Not recorded'}</p>
+          </div>
+        </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+        <p className="rounded-xl border border-border bg-muted/20 px-4 py-4 text-sm leading-relaxed text-muted-foreground">
+          {readinessNarrative(resident)}
+        </p>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_22rem]">
+        <div className="space-y-4">
+          <div className={`${card} space-y-4`}>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Priority blockers</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Open the specific history or form you need directly inside each blocker card.</p>
+            </div>
+            {resident.readiness.top_improvements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No major blockers surfaced in the latest model run.</p>
+            ) : (
+              resident.readiness.top_improvements.map((area, index) => (
+                <div key={area.feature} className="rounded-xl border border-border bg-background px-4 py-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority {index + 1}</p>
+                      <h3 className="mt-1 text-base font-semibold text-foreground">{area.label}</h3>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      <div>{formatFeatureValue(area.feature, area.resident_value)} current</div>
+                      <div>{formatFeatureValue(area.feature, area.benchmark_value)} target</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-foreground">{area.suggestion}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {actionConfig(area).map((action) => {
+                      const isActive = expandedSection === action.section && expandedBlocker === area.feature
+                      return (
+                        <button
+                          key={`${area.feature}-${action.label}`}
+                          type="button"
+                          className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                            isActive
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-foreground hover:bg-muted'
+                          }`}
+                          onClick={() => {
+                            handlePriorityAction(action)
+                            setExpandedBlocker(area.feature)
+                          }}
+                        >
+                          {action.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {expandedBlocker === area.feature ? renderExpandedSection(expandedSection) : null}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className={`${card} sticky top-24 h-fit space-y-4`}>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Action checklist</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Keep the working plan visible while you review blocker details.</p>
+          </div>
+          <div className="rounded-xl border border-border bg-background px-4 py-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Checklist progress</p>
+            <p className="mt-2 text-3xl font-bold text-foreground">{completedChecklist}/{actionPlan.checklist.length}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Actions completed</p>
+          </div>
+          <div className="grid gap-3">
             <label className={label}>
               Owner
               <input className={input} value={actionPlan.owner} onChange={(e) => updateActionPlan({ ...actionPlan, owner: e.target.value })} />
@@ -631,11 +966,11 @@ export function ReintegrationActionPlanPage() {
               <input type="date" className={input} value={actionPlan.nextReviewDate} onChange={(e) => updateActionPlan({ ...actionPlan, nextReviewDate: e.target.value })} />
             </label>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-background px-4 py-3">
+          <div className="rounded-xl border border-border bg-background px-4 py-3">
             <p className="text-sm text-muted-foreground">
-              {actionPlan.lastReviewedAt ? `Last reviewed ${new Date(actionPlan.lastReviewedAt).toLocaleString()}` : 'No review has been logged for this action plan yet.'}
+              {actionPlan.lastReviewedAt ? `Last reviewed ${new Date(actionPlan.lastReviewedAt).toLocaleString()}` : 'No review has been logged yet.'}
             </p>
-            <button type="button" className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted" onClick={() => updateActionPlan({ ...actionPlan, lastReviewedAt: new Date().toISOString() })}>
+            <button type="button" className="mt-3 rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted" onClick={() => updateActionPlan({ ...actionPlan, lastReviewedAt: new Date().toISOString() })}>
               Mark reviewed today
             </button>
           </div>
@@ -657,285 +992,8 @@ export function ReintegrationActionPlanPage() {
               </li>
             ))}
           </ul>
-        </SectionCard>
-
-        <div className={`${card} sticky top-24 h-fit space-y-4`}>
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Priority blockers</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Each blocker has buttons that jump to the matching history or in-page form.</p>
-          </div>
-          {resident.readiness.top_improvements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No major blockers surfaced in the latest model run.</p>
-          ) : (
-            resident.readiness.top_improvements.map((area, index) => (
-              <div key={area.feature} className="rounded-xl border border-border bg-background px-4 py-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority {index + 1}</p>
-                <h3 className="mt-1 text-base font-semibold text-foreground">{area.label}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {formatFeatureValue(area.feature, area.resident_value)} current vs {formatFeatureValue(area.feature, area.benchmark_value)} target
-                </p>
-                <p className="mt-3 text-sm leading-relaxed text-foreground">{area.suggestion}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {actionConfig(area).map((action) => (
-                    <button
-                      key={`${area.feature}-${action.label}`}
-                      type="button"
-                      className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-muted"
-                      onClick={() => handlePriorityAction(action)}
-                    >
-                      {action.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
         </div>
       </div>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <SectionCard id="health-history" title="Health history" description="Review prior health scores and recent assessment notes." sectionRefs={sectionRefs}>
-          {sortedHealth.length === 0 ? <p className="text-sm text-muted-foreground">No health records yet.</p> : (
-            <ul className="space-y-2">
-              {sortedHealth.slice(0, 8).map((record) => (
-                <li key={record.id} className="rounded-lg border border-border bg-background px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{record.recordDate.slice(0, 10)} · Score {record.healthScore?.toFixed(2) ?? '—'}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{record.extendedJson ?? 'No additional notes recorded.'}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard id="health-form" title="Create health assessment" description="Add a new health score update without leaving this page." sectionRefs={sectionRefs}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className={label}>
-              Assessment date
-              <input type="date" className={input} value={healthForm.recordDate} onChange={(e) => setHealthForm((c) => ({ ...c, recordDate: e.target.value }))} />
-            </label>
-            <label className={label}>
-              Health score
-              <input className={input} value={healthForm.healthScore} onChange={(e) => setHealthForm((c) => ({ ...c, healthScore: e.target.value }))} placeholder="1.0 - 10.0" />
-            </label>
-          </div>
-          <label className={label}>
-            Notes
-            <textarea className={input} rows={4} value={healthForm.notes} onChange={(e) => setHealthForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Assessment findings, follow-up needs, medications, referrals…" />
-          </label>
-          <button type="button" className={btnPrimary} onClick={() => void handleCreateHealthRecord()}>
-            Save health assessment
-          </button>
-        </SectionCard>
-
-        <SectionCard id="education-history" title="Education history" description="Review progress records and attendance-related updates." sectionRefs={sectionRefs}>
-          {sortedEducation.length === 0 ? <p className="text-sm text-muted-foreground">No education records yet.</p> : (
-            <ul className="space-y-2">
-              {sortedEducation.slice(0, 8).map((record) => (
-                <li key={record.id} className="rounded-lg border border-border bg-background px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{record.recordDate.slice(0, 10)} · Progress {record.progressPercent?.toFixed(1) ?? '—'}%</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{record.extendedJson ?? 'No additional notes recorded.'}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard id="education-form" title="Log education update" description="Add a progress update or school support note from this page." sectionRefs={sectionRefs}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className={label}>
-              Record date
-              <input type="date" className={input} value={educationForm.recordDate} onChange={(e) => setEducationForm((c) => ({ ...c, recordDate: e.target.value }))} />
-            </label>
-            <label className={label}>
-              Progress percent
-              <input className={input} value={educationForm.progressPercent} onChange={(e) => setEducationForm((c) => ({ ...c, progressPercent: e.target.value }))} placeholder="0 - 100" />
-            </label>
-          </div>
-          <label className={label}>
-            Notes
-            <textarea className={input} rows={4} value={educationForm.notes} onChange={(e) => setEducationForm((c) => ({ ...c, notes: e.target.value }))} placeholder="Attendance concerns, tutoring steps, school updates…" />
-          </label>
-          <button type="button" className={btnPrimary} onClick={() => void handleCreateEducationRecord()}>
-            Save education update
-          </button>
-        </SectionCard>
-
-        <SectionCard id="session-history" title="Session history" description="Recent counselling and process-recording notes related to readiness." sectionRefs={sectionRefs}>
-          {sortedSessions.length === 0 ? <p className="text-sm text-muted-foreground">No process recordings yet.</p> : (
-            <ul className="space-y-2">
-              {sortedSessions.slice(0, 8).map((record) => (
-                <li key={record.id} className="rounded-lg border border-border bg-background px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{record.sessionDate.slice(0, 10)} · {record.sessionType}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{record.socialWorker} · Progress {record.progressNoted ? 'noted' : 'not noted'} · Concerns {record.concernsFlagged ? 'flagged' : 'not flagged'}</p>
-                  <p className="mt-2 text-sm text-muted-foreground line-clamp-3">{record.sessionNarrative}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard id="session-form" title="Add process note" description="Capture a readiness-related session note here." sectionRefs={sectionRefs}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className={label}>
-              Session date
-              <input type="date" className={input} value={sessionForm.sessionDate} onChange={(e) => setSessionForm((c) => ({ ...c, sessionDate: e.target.value }))} />
-            </label>
-            <label className={label}>
-              Social worker
-              <input className={input} value={sessionForm.socialWorker} onChange={(e) => setSessionForm((c) => ({ ...c, socialWorker: e.target.value }))} />
-            </label>
-          </div>
-          <label className={label}>
-            Session type
-            <input className={input} value={sessionForm.sessionType} onChange={(e) => setSessionForm((c) => ({ ...c, sessionType: e.target.value }))} />
-          </label>
-          <label className={label}>
-            Session narrative
-            <textarea className={input} rows={4} value={sessionForm.narrative} onChange={(e) => setSessionForm((c) => ({ ...c, narrative: e.target.value }))} />
-          </label>
-          <div className="flex flex-wrap gap-4 text-sm text-foreground">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={sessionForm.progressNoted} onChange={(e) => setSessionForm((c) => ({ ...c, progressNoted: e.target.checked }))} />
-              Progress noted
-            </label>
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={sessionForm.concernsFlagged} onChange={(e) => setSessionForm((c) => ({ ...c, concernsFlagged: e.target.checked }))} />
-              Concerns flagged
-            </label>
-          </div>
-          <button type="button" className={btnPrimary} onClick={() => void handleCreateProcessRecording()}>
-            Save process note
-          </button>
-        </SectionCard>
-
-        <SectionCard id="incident-history" title="Incident history" description="Review recent incidents and their resolution status." sectionRefs={sectionRefs}>
-          {sortedIncidents.length === 0 ? <p className="text-sm text-muted-foreground">No incident reports yet.</p> : (
-            <ul className="space-y-2">
-              {sortedIncidents.slice(0, 8).map((incident) => (
-                <li key={incident.id} className="rounded-lg border border-border bg-background px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{incident.incidentDate.slice(0, 10)} · {incident.incidentType} · {incident.severity}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{incident.resolved ? 'Resolved' : 'Open'} · Follow-up {incident.followUpRequired ? 'required' : 'not required'}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{incident.description ?? 'No description recorded.'}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard id="visit-history" title="Visit history" description="Home and reintegration visits that support family readiness work." sectionRefs={sectionRefs}>
-          {sortedVisits.length === 0 ? <p className="text-sm text-muted-foreground">No home visits yet.</p> : (
-            <ul className="space-y-2">
-              {sortedVisits.slice(0, 8).map((visit) => (
-                <li key={visit.id} className="rounded-lg border border-border bg-background px-4 py-3">
-                  <p className="text-sm font-medium text-foreground">{visit.visitDate.slice(0, 10)} · {visit.visitType}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{visit.socialWorker} · Follow-up {visit.followUpNeeded ? 'needed' : 'not needed'}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{visit.observations ?? visit.purpose ?? 'No observations recorded.'}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </SectionCard>
-
-        <SectionCard id="visit-form" title="Schedule home visit" description="Add a reintegration-focused visit without leaving this page." sectionRefs={sectionRefs}>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className={label}>
-              Visit date
-              <input type="date" className={input} value={visitForm.visitDate} onChange={(e) => setVisitForm((c) => ({ ...c, visitDate: e.target.value }))} />
-            </label>
-            <label className={label}>
-              Social worker
-              <input className={input} value={visitForm.socialWorker} onChange={(e) => setVisitForm((c) => ({ ...c, socialWorker: e.target.value }))} />
-            </label>
-          </div>
-          <label className={label}>
-            Visit type
-            <input className={input} value={visitForm.visitType} onChange={(e) => setVisitForm((c) => ({ ...c, visitType: e.target.value }))} />
-          </label>
-          <label className={label}>
-            Purpose
-            <textarea className={input} rows={3} value={visitForm.purpose} onChange={(e) => setVisitForm((c) => ({ ...c, purpose: e.target.value }))} />
-          </label>
-          <label className={label}>
-            Observations
-            <textarea className={input} rows={3} value={visitForm.observations} onChange={(e) => setVisitForm((c) => ({ ...c, observations: e.target.value }))} />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-foreground">
-            <input type="checkbox" checked={visitForm.followUpNeeded} onChange={(e) => setVisitForm((c) => ({ ...c, followUpNeeded: e.target.checked }))} />
-            Follow-up needed
-          </label>
-          <button type="button" className={btnPrimary} onClick={() => void handleCreateVisit()}>
-            Save home visit
-          </button>
-        </SectionCard>
-      </div>
-
-      <SectionCard id="plan-builder" title="Plan builder" description="Create a focused intervention, support plan, or case conference directly from the action plan page." sectionRefs={sectionRefs}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className={label}>
-            Plan category
-            <input className={input} value={plannerForm.category} onChange={(e) => setPlannerForm((c) => ({ ...c, category: e.target.value }))} />
-          </label>
-          <label className={label}>
-            Target date
-            <input type="date" className={input} value={plannerForm.targetDate} onChange={(e) => setPlannerForm((c) => ({ ...c, targetDate: e.target.value }))} />
-          </label>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2">
-          <label className={label}>
-            Case conference date
-            <input type="date" className={input} value={plannerForm.caseConferenceDate} onChange={(e) => setPlannerForm((c) => ({ ...c, caseConferenceDate: e.target.value }))} />
-          </label>
-          <label className={label}>
-            Services provided
-            <input className={input} value={plannerForm.servicesProvided} onChange={(e) => setPlannerForm((c) => ({ ...c, servicesProvided: e.target.value }))} />
-          </label>
-        </div>
-        <label className={label}>
-          Plan description
-          <textarea className={input} rows={4} value={plannerForm.description} onChange={(e) => setPlannerForm((c) => ({ ...c, description: e.target.value }))} />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={btnPrimary} onClick={() => void handleCreatePlan()}>
-            Create intervention plan
-          </button>
-          <button
-            type="button"
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-            onClick={() => {
-              setPlannerForm({
-                category: 'Reintegration',
-                description: '',
-                targetDate: '',
-                caseConferenceDate: '',
-                servicesProvided: '',
-              })
-              setPlannerPreset({
-                category: 'Reintegration',
-                description: '',
-                targetDate: '',
-                caseConferenceDate: '',
-                servicesProvided: '',
-              })
-            }}
-          >
-            Clear template
-          </button>
-        </div>
-        <div className="rounded-xl border border-border bg-background px-4 py-4">
-          <h3 className="text-sm font-semibold text-foreground">Existing plans</h3>
-          {sortedPlans.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">No intervention plans yet.</p> : (
-            <ul className="mt-3 space-y-2">
-              {sortedPlans.slice(0, 8).map((plan) => (
-                <li key={plan.id} className="rounded-lg border border-border bg-muted/20 px-3 py-3">
-                  <p className="text-sm font-medium text-foreground">{plan.planCategory} · {plan.status}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{plan.planDescription}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Target {plan.targetDate ? plan.targetDate.slice(0, 10) : '—'} · Conference {plan.caseConferenceDate ? plan.caseConferenceDate.slice(0, 10) : '—'}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </SectionCard>
     </div>
   )
 }
