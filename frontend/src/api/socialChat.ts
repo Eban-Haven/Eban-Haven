@@ -68,11 +68,12 @@ export type SocialChatResponse = {
   generatedAtUtc: string
 }
 
-export async function sendSocialChat(messages: SocialChatMessage[]): Promise<SocialChatResponse> {
+export async function sendSocialChat(messages: SocialChatMessage[], signal?: AbortSignal): Promise<SocialChatResponse> {
   return parseJson<SocialChatResponse>(
     await apiFetch('/api/social-chat', {
       method: 'POST',
       body: JSON.stringify({ messages }),
+      signal,
     }),
   )
 }

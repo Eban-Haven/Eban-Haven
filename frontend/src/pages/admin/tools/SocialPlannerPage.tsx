@@ -5,19 +5,29 @@ import {
   CheckCheck,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
+  Image,
   LoaderCircle,
+  MessageSquare,
+  Pencil,
   Plus,
   RotateCcw,
   Save,
   SendHorizonal,
   Sparkles,
+  Square,
+  Trash2,
+  X,
+  Zap,
 } from 'lucide-react'
 import {
   createPlannedSocialPosts,
+  deletePlannedSocialPost,
   getPlannedSocialPosts,
   patchPlannedSocialPostStatus,
   requestSchedulePlannedSocialPost,
   schedulePlannedSocialPostToFacebook,
+  updatePlannedSocialPost,
   type PlannedSocialPost,
 } from '../../../api/admin'
 import { type SocialChatMessage, type SocialChatResponse, sendSocialChat } from '../../../api/socialChat'
@@ -33,7 +43,29 @@ type ChatBubble = {
   response?: SocialChatResponse
 }
 
+type StartMode = 'pick' | 'quick' | 'brief' | 'chat'
+
+type UnsplashPhoto = {
+  id: string
+  urls: { small: string; regular: string; full: string }
+  alt_description: string | null
+  user: { name: string }
+  links: { html: string }
+}
+
+type EditDraft = {
+  title: string
+  caption: string
+  hashtags: string
+  notes: string
+  imageIdea: string
+  cta: string
+  suggestedTime: string
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────────
+
+const UNSPLASH_KEY = (import.meta.env.VITE_UNSPLASH_ACCESS_KEY as string | undefined) ?? ''
 
 const starterPrompts = [
   {
@@ -94,6 +126,16 @@ function normalizeHashtag(tag: string) {
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`
 }
 
+async function fetchUnsplashImages(query: string): Promise<UnsplashPhoto[]> {
+  const res = await fetch(
+    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=9&orientation=landscape`,
+    { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } },
+  )
+  if (!res.ok) throw new Error('Unsplash search failed')
+  const data = (await res.json()) as { results: UnsplashPhoto[] }
+  return data.results
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StepBadge({ n, label, active }: { n: number; label: string; active?: boolean }) {
@@ -103,6 +145,206 @@ function StepBadge({ n, label, active }: { n: number; label: string; active?: bo
         {n}
       </span>
       {label}
+    </div>
+  )
+}
+
+// ── Image search panel ────────────────────────────────────────────────────────
+
+function ImageSearchPanel({ query, onClose }: { query: string; onClose: () => void }) {
+  const [photos, setPhotos] = useState<UnsplashPhoto[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState(query)
+
+  const search = useCallback(async (q: string) => {
+    if (!q.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      setPhotos(await fetchUnsplashImages(q))
+    } catch {
+      setError('Image search failed. Check your Unsplash key or try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void search(query) }, [query, search])
+
+  function copyUrl(url: string, id: string) {
+    void navigator.clipboard.writeText(url)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-border bg-muted/30 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-foreground">Image suggestions</p>
+        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="mt-2 flex gap-2">
+        <input
+          className={`${input} flex-1 text-xs`}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void search(searchInput) } }}
+          placeholder="Search term…"
+        />
+        <button
+          type="button"
+          className={`${btnPrimary} px-3 py-1.5 text-xs`}
+          onClick={() => void search(searchInput)}
+          disabled={loading}
+        >
+          {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : 'Search'}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      {photos.length > 0 && (
+        <>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {photos.map((p) => (
+              <div key={p.id} className="group relative overflow-hidden rounded-lg">
+                <img
+                  src={p.urls.small}
+                  alt={p.alt_description ?? 'Unsplash photo'}
+                  className="h-20 w-full object-cover"
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    type="button"
+                    onClick={() => copyUrl(p.urls.regular, p.id)}
+                    className="rounded-md bg-white/90 px-2 py-1 text-[10px] font-semibold text-black"
+                  >
+                    {copied === p.id ? '✓ Copied!' : 'Copy URL'}
+                  </button>
+                  <a
+                    href={p.links.html}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-md bg-white/70 px-2 py-1 text-[10px] font-semibold text-black"
+                  >
+                    View
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground/60">
+            Photos from{' '}
+            <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="underline">
+              Unsplash
+            </a>
+            . Click to copy image URL.
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+function EditPostModal({
+  post,
+  onSave,
+  onClose,
+  saving,
+}: {
+  post: PlannedSocialPost
+  onSave: (draft: EditDraft) => void
+  onClose: () => void
+  saving: boolean
+}) {
+  const [draft, setDraft] = useState<EditDraft>({
+    title: post.title,
+    caption: post.caption ?? '',
+    hashtags: post.hashtags.join(' '),
+    notes: post.notes ?? '',
+    imageIdea: post.imageIdea ?? '',
+    cta: post.cta ?? '',
+    suggestedTime: post.suggestedTime ?? '',
+  })
+
+  function field(key: keyof EditDraft) {
+    return {
+      value: draft[key],
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+        setDraft((c) => ({ ...c, [key]: e.target.value })),
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className={`${card} w-full max-w-lg max-h-[90vh] overflow-y-auto space-y-4`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Edit post</h3>
+          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label className="block text-xs font-medium text-muted-foreground">
+          Title *
+          <input className={`${input} mt-1`} {...field('title')} placeholder="Post title" />
+        </label>
+
+        <label className="block text-xs font-medium text-muted-foreground">
+          Caption
+          <textarea className={`${input} mt-1 min-h-24 resize-y`} {...field('caption')} placeholder="Post caption…" />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-muted-foreground">
+            Hashtags
+            <input className={`${input} mt-1`} {...field('hashtags')} placeholder="#nonprofit #shelter" />
+          </label>
+          <label className="block text-xs font-medium text-muted-foreground">
+            CTA
+            <input className={`${input} mt-1`} {...field('cta')} placeholder="Donate now" />
+          </label>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-xs font-medium text-muted-foreground">
+            Image idea
+            <input className={`${input} mt-1`} {...field('imageIdea')} placeholder="Describe the image…" />
+          </label>
+          <label className="block text-xs font-medium text-muted-foreground">
+            Suggested time
+            <input className={`${input} mt-1`} {...field('suggestedTime')} placeholder="e.g. Tuesday 10am" />
+          </label>
+        </div>
+
+        <label className="block text-xs font-medium text-muted-foreground">
+          Notes
+          <textarea className={`${input} mt-1 min-h-16 resize-y`} {...field('notes')} placeholder="Internal notes…" />
+        </label>
+
+        <div className="flex justify-end gap-2 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={`${btnPrimary} inline-flex items-center gap-2 px-4 py-2 text-xs disabled:opacity-50`}
+            onClick={() => onSave(draft)}
+            disabled={saving || !draft.title.trim()}
+          >
+            {saving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            Save changes
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -121,6 +363,10 @@ export function SocialPlannerPage() {
   const [error, setError] = useState<string | null>(null)
   const [briefOpen, setBriefOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('All')
+  const [startMode, setStartMode] = useState<StartMode>('pick')
+  const [editingPost, setEditingPost] = useState<PlannedSocialPost | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [imageSearchKey, setImageSearchKey] = useState<string | null>(null)
   const [brief, setBrief] = useState({
     goal: '',
     platforms: ['Facebook'] as string[],
@@ -130,10 +376,13 @@ export function SocialPlannerPage() {
     audience: '',
     notes: '',
   })
+
+  const abortCtrlRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
-  const hasStarted = messages.length > 1
+  // Chat is "active" if a message has been sent, or mode is chat (to show input bar before first send)
+  const showChatView = messages.length > 1 || startMode === 'chat'
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -163,6 +412,9 @@ export function SocialPlannerPage() {
     const content = (rawPrompt ?? draft).trim()
     if (!content || loading) return
 
+    const ctrl = new AbortController()
+    abortCtrlRef.current = ctrl
+
     const userMessage: ChatBubble = { id: crypto.randomUUID(), role: 'user', content }
     const nextConversation = [...conversation, { role: 'user' as const, content }]
 
@@ -173,7 +425,7 @@ export function SocialPlannerPage() {
     setLoading(true)
 
     try {
-      const response = await sendSocialChat(nextConversation)
+      const response = await sendSocialChat(nextConversation, ctrl.signal)
       setMessages((c) => [
         ...c,
         {
@@ -184,11 +436,19 @@ export function SocialPlannerPage() {
         },
       ])
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return // user stopped — no error
       setError(err instanceof Error ? err.message : 'Failed to generate social plan.')
     } finally {
+      abortCtrlRef.current = null
       setLoading(false)
       setTimeout(() => inputRef.current?.focus(), 100)
     }
+  }
+
+  function stopGeneration() {
+    abortCtrlRef.current?.abort()
+    abortCtrlRef.current = null
+    setLoading(false)
   }
 
   async function saveIdeasFromResponse(response: SocialChatResponse) {
@@ -263,6 +523,45 @@ export function SocialPlannerPage() {
     }
   }
 
+  async function deletePost(id: number) {
+    const key = `delete-${id}`
+    setSavingIds((c) => new Set(c).add(key))
+    setError(null)
+    try {
+      await deletePlannedSocialPost(id)
+      setPlannedPosts((c) => c.filter((p) => p.id !== id))
+      setDeletingId(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete post.')
+    } finally {
+      setSavingIds((c) => { const n = new Set(c); n.delete(key); return n })
+    }
+  }
+
+  async function saveEditedPost(draft: EditDraft) {
+    if (!editingPost) return
+    const key = `edit-${editingPost.id}`
+    setSavingIds((c) => new Set(c).add(key))
+    setError(null)
+    try {
+      const updated = await updatePlannedSocialPost(editingPost.id, {
+        title: draft.title,
+        caption: draft.caption,
+        hashtags: draft.hashtags,
+        notes: draft.notes,
+        imageIdea: draft.imageIdea,
+        cta: draft.cta,
+        suggestedTime: draft.suggestedTime,
+      })
+      setPlannedPosts((c) => c.map((p) => (p.id === updated.id ? updated : p)))
+      setEditingPost(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes.')
+    } finally {
+      setSavingIds((c) => { const n = new Set(c); n.delete(key); return n })
+    }
+  }
+
   function toggleBriefArray(field: 'platforms' | 'contentTypes', value: string) {
     setBrief((c) => {
       const exists = c[field].includes(value)
@@ -276,6 +575,8 @@ export function SocialPlannerPage() {
     setDraft('')
     setError(null)
     setBriefOpen(false)
+    setStartMode('pick')
+    setImageSearchKey(null)
   }
 
   const statusOptions = ['All', ...Array.from(new Set(plannedPosts.map((p) => p.status)))]
@@ -287,17 +588,25 @@ export function SocialPlannerPage() {
 
   return (
     <div className="space-y-6">
+      {/* Edit modal */}
+      {editingPost && (
+        <EditPostModal
+          post={editingPost}
+          saving={savingIds.has(`edit-${editingPost.id}`)}
+          onSave={(d) => void saveEditedPost(d)}
+          onClose={() => setEditingPost(null)}
+        />
+      )}
+
       {/* Header */}
       <div>
         <h2 className={pageTitle}>Marketing Support</h2>
-        <p className={pageDesc}>
-          Use the AI copilot to plan social media content, then save and schedule posts.
-        </p>
+        <p className={pageDesc}>Use the AI copilot to plan social media content, then save and schedule posts.</p>
         {/* Step strip */}
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-muted/30 px-4 py-3">
-          <StepBadge n={1} label="Describe your goal" active={!hasStarted} />
+          <StepBadge n={1} label="Describe your goal" active={!showChatView} />
           <span className="text-muted-foreground/40">→</span>
-          <StepBadge n={2} label="Review AI-generated posts" active={hasStarted && loading === false} />
+          <StepBadge n={2} label="Review AI-generated posts" active={showChatView && !loading} />
           <span className="text-muted-foreground/40">→</span>
           <StepBadge n={3} label="Save & schedule" active={plannedPosts.length > 0} />
         </div>
@@ -320,160 +629,263 @@ export function SocialPlannerPage() {
                   <p className="text-xs text-muted-foreground">Describe your goal and get a ready-to-post content plan.</p>
                 </div>
               </div>
-              {hasStarted && (
-                <button
-                  type="button"
-                  onClick={resetConversation}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  New session
-                </button>
-              )}
-            </div>
-
-            {/* Chat / starter area */}
-            {!hasStarted ? (
-              /* ── First visit: starter prompts + brief form ── */
-              <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Start with a quick prompt
-                  </p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                    {starterPrompts.map((p) => (
-                      <button
-                        key={p.title}
-                        type="button"
-                        disabled={loading}
-                        onClick={() => void submitPrompt(p.description)}
-                        className="flex flex-col gap-2 rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
-                      >
-                        <span className="text-xl">{p.icon}</span>
-                        <span className="text-sm font-semibold text-foreground">{p.title}</span>
-                        <span className="text-xs leading-relaxed text-muted-foreground">{p.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs text-muted-foreground">or describe your own goal</span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-
-                {/* Quick brief (collapsible) */}
-                <div className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-2">
+                {loading && (
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground"
-                    onClick={() => setBriefOpen((o) => !o)}
+                    onClick={stopGeneration}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20"
                   >
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      Fill a brief for a more targeted plan
-                    </span>
-                    {briefOpen
-                      ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                      : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    <Square className="h-3 w-3 fill-current" />
+                    Stop
                   </button>
+                )}
+                {showChatView && (
+                  <button
+                    type="button"
+                    onClick={resetConversation}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    New session
+                  </button>
+                )}
+              </div>
+            </div>
 
-                  {briefOpen && (
-                    <div className="space-y-4 border-t border-border px-4 pb-4 pt-4">
-                      <label className="block text-xs font-medium text-muted-foreground">
-                        Goal *
-                        <textarea
-                          className={`${input} mt-1 min-h-20 resize-y`}
-                          placeholder="e.g. raise awareness about our safe shelter programme and invite supporters to donate."
-                          value={brief.goal}
-                          onChange={(e) => setBrief((c) => ({ ...c, goal: e.target.value }))}
-                        />
-                      </label>
+            {/* ── Landing: pick a mode ── */}
+            {!showChatView && (
+              <div className="flex-1 space-y-6 overflow-y-auto px-5 py-6">
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Platforms</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {platformOptions.map((pl) => (
-                              <button
-                                key={pl}
-                                type="button"
-                                onClick={() => toggleBriefArray('platforms', pl)}
-                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                                  brief.platforms.includes(pl)
-                                    ? 'border-primary/40 bg-primary/10 text-primary'
-                                    : 'border-border bg-card text-foreground hover:bg-muted/50'
-                                }`}
-                              >
-                                {pl}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Content types</p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {contentTypeOptions.map((ct) => (
-                              <button
-                                key={ct}
-                                type="button"
-                                onClick={() => toggleBriefArray('contentTypes', ct)}
-                                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                                  brief.contentTypes.includes(ct)
-                                    ? 'border-primary/40 bg-primary/10 text-primary'
-                                    : 'border-border bg-card text-foreground hover:bg-muted/50'
-                                }`}
-                              >
-                                {ct}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-3">
-                        <label className="block text-xs font-medium text-muted-foreground">
-                          # of posts
-                          <input className={`${input} mt-1`} value={brief.postCount} placeholder="3"
-                            onChange={(e) => setBrief((c) => ({ ...c, postCount: e.target.value }))} />
-                        </label>
-                        <label className="block text-xs font-medium text-muted-foreground">
-                          Timeframe
-                          <input className={`${input} mt-1`} value={brief.timeframe} placeholder="This week"
-                            onChange={(e) => setBrief((c) => ({ ...c, timeframe: e.target.value }))} />
-                        </label>
-                        <label className="block text-xs font-medium text-muted-foreground">
-                          Audience
-                          <input className={`${input} mt-1`} value={brief.audience} placeholder="Donors, volunteers"
-                            onChange={(e) => setBrief((c) => ({ ...c, audience: e.target.value }))} />
-                        </label>
-                      </div>
-
-                      <label className="block text-xs font-medium text-muted-foreground">
-                        Extra context
-                        <textarea className={`${input} mt-1 min-h-16 resize-y`} value={brief.notes}
-                          placeholder="Photos available, themes to avoid, key message…"
-                          onChange={(e) => setBrief((c) => ({ ...c, notes: e.target.value }))} />
-                      </label>
-
+                {/* Mode selector cards */}
+                {startMode === 'pick' && (
+                  <div className="space-y-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      How would you like to start?
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {/* Quick prompt */}
                       <button
                         type="button"
-                        className={`${btnPrimary} inline-flex w-full items-center justify-center gap-2`}
-                        disabled={loading || !brief.goal.trim()}
-                        onClick={() => void submitPrompt(composePromptFromBrief(brief))}
+                        onClick={() => setStartMode('quick')}
+                        className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
                       >
-                        {loading
-                          ? <LoaderCircle className="h-4 w-4 animate-spin" />
-                          : <Sparkles className="h-4 w-4" />}
-                        Generate content plan
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                          <Zap className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Quick Prompt</p>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Pick a starter template and get a content plan in seconds.
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Targeted brief */}
+                      <button
+                        type="button"
+                        onClick={() => { setStartMode('brief'); setBriefOpen(true) }}
+                        className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Targeted Plan</p>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Fill a short brief — platforms, goals, audience — for more focused results.
+                          </p>
+                        </div>
+                      </button>
+
+                      {/* Just chatbot */}
+                      <button
+                        type="button"
+                        onClick={() => setStartMode('chat')}
+                        className="flex flex-col gap-3 rounded-xl border border-border bg-background p-5 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+                          <MessageSquare className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Just Chat</p>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            Open-ended conversation — describe anything and the AI will guide you.
+                          </p>
+                        </div>
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* Quick prompts mode */}
+                {startMode === 'quick' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStartMode('pick')}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        ← Back
+                      </button>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Choose a starter
+                      </p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {starterPrompts.map((p) => (
+                        <button
+                          key={p.title}
+                          type="button"
+                          disabled={loading}
+                          onClick={() => void submitPrompt(p.description)}
+                          className="flex flex-col gap-2 rounded-xl border border-border bg-background p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+                        >
+                          <span className="text-xl">{p.icon}</span>
+                          <span className="text-sm font-semibold text-foreground">{p.title}</span>
+                          <span className="text-xs leading-relaxed text-muted-foreground">{p.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="text-xs text-muted-foreground">or type your own below</span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Brief form mode */}
+                {startMode === 'brief' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setStartMode('pick')}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        ← Back
+                      </button>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Targeted brief
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-background">
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground"
+                        onClick={() => setBriefOpen((o) => !o)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          Fill brief for a more targeted plan
+                        </span>
+                        {briefOpen
+                          ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                      </button>
+
+                      {briefOpen && (
+                        <div className="space-y-4 border-t border-border px-4 pb-4 pt-4">
+                          <label className="block text-xs font-medium text-muted-foreground">
+                            Goal *
+                            <textarea
+                              className={`${input} mt-1 min-h-20 resize-y`}
+                              placeholder="e.g. raise awareness about our safe shelter programme and invite supporters to donate."
+                              value={brief.goal}
+                              onChange={(e) => setBrief((c) => ({ ...c, goal: e.target.value }))}
+                            />
+                          </label>
+
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground">Platforms</p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {platformOptions.map((pl) => (
+                                  <button
+                                    key={pl}
+                                    type="button"
+                                    onClick={() => toggleBriefArray('platforms', pl)}
+                                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                      brief.platforms.includes(pl)
+                                        ? 'border-primary/40 bg-primary/10 text-primary'
+                                        : 'border-border bg-card text-foreground hover:bg-muted/50'
+                                    }`}
+                                  >
+                                    {pl}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground">Content types</p>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {contentTypeOptions.map((ct) => (
+                                  <button
+                                    key={ct}
+                                    type="button"
+                                    onClick={() => toggleBriefArray('contentTypes', ct)}
+                                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                      brief.contentTypes.includes(ct)
+                                        ? 'border-primary/40 bg-primary/10 text-primary'
+                                        : 'border-border bg-card text-foreground hover:bg-muted/50'
+                                    }`}
+                                  >
+                                    {ct}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-4 sm:grid-cols-3">
+                            <label className="block text-xs font-medium text-muted-foreground">
+                              # of posts
+                              <input className={`${input} mt-1`} value={brief.postCount} placeholder="3"
+                                onChange={(e) => setBrief((c) => ({ ...c, postCount: e.target.value }))} />
+                            </label>
+                            <label className="block text-xs font-medium text-muted-foreground">
+                              Timeframe
+                              <input className={`${input} mt-1`} value={brief.timeframe} placeholder="This week"
+                                onChange={(e) => setBrief((c) => ({ ...c, timeframe: e.target.value }))} />
+                            </label>
+                            <label className="block text-xs font-medium text-muted-foreground">
+                              Audience
+                              <input className={`${input} mt-1`} value={brief.audience} placeholder="Donors, volunteers"
+                                onChange={(e) => setBrief((c) => ({ ...c, audience: e.target.value }))} />
+                            </label>
+                          </div>
+
+                          <label className="block text-xs font-medium text-muted-foreground">
+                            Extra context
+                            <textarea className={`${input} mt-1 min-h-16 resize-y`} value={brief.notes}
+                              placeholder="Photos available, themes to avoid, key message…"
+                              onChange={(e) => setBrief((c) => ({ ...c, notes: e.target.value }))} />
+                          </label>
+
+                          <button
+                            type="button"
+                            className={`${btnPrimary} inline-flex w-full items-center justify-center gap-2`}
+                            disabled={loading || !brief.goal.trim()}
+                            onClick={() => void submitPrompt(composePromptFromBrief(brief))}
+                          >
+                            {loading
+                              ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                              : <Sparkles className="h-4 w-4" />}
+                            Generate content plan
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            ) : (
-              /* ── Active conversation ── */
+            )}
+
+            {/* ── Active conversation (or "just chat" mode) ── */}
+            {showChatView && (
               <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
                 {messages.map((msg) => (
                   <div
@@ -528,47 +940,78 @@ export function SocialPlannerPage() {
                               </button>
                             </div>
                             <div className="mt-3 space-y-3">
-                              {msg.response.structured.postIdeas.map((idea) => (
-                                <article
-                                  key={`${idea.title}-${idea.platform}-${idea.contentType}`}
-                                  className="rounded-xl border border-border/70 bg-background p-4"
-                                >
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-semibold text-foreground">{idea.title}</p>
-                                    <CategoryBadge>{idea.platform}</CategoryBadge>
-                                    <Badge variant="info">{idea.contentType}</Badge>
-                                    {idea.format && <Badge variant="category">{idea.format}</Badge>}
-                                  </div>
-                                  {idea.imageIdea && (
-                                    <p className="mt-2 text-xs text-muted-foreground">📷 {idea.imageIdea}</p>
-                                  )}
-                                  <div className="mt-3 grid gap-3 text-xs md:grid-cols-2">
-                                    <div>
-                                      <p className="font-semibold uppercase tracking-wide text-foreground">Caption</p>
-                                      <p className="mt-1 whitespace-pre-wrap leading-relaxed text-muted-foreground">{idea.caption}</p>
+                              {msg.response.structured.postIdeas.map((idea) => {
+                                const ideaKey = `${idea.title}-${idea.platform}-${idea.contentType}`
+                                return (
+                                  <article
+                                    key={ideaKey}
+                                    className="rounded-xl border border-border/70 bg-background p-4"
+                                  >
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="text-sm font-semibold text-foreground">{idea.title}</p>
+                                      <CategoryBadge>{idea.platform}</CategoryBadge>
+                                      <Badge variant="info">{idea.contentType}</Badge>
+                                      {idea.format && <Badge variant="category">{idea.format}</Badge>}
                                     </div>
-                                    <div className="space-y-2">
-                                      <div>
-                                        <p className="font-semibold uppercase tracking-wide text-foreground">Best time</p>
-                                        <p className="mt-1 text-muted-foreground">{idea.bestTime || '—'}</p>
+                                    {idea.imageIdea && (
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <p className="text-xs text-muted-foreground">📷 {idea.imageIdea}</p>
+                                        {UNSPLASH_KEY ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => setImageSearchKey(imageSearchKey === ideaKey ? null : ideaKey)}
+                                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                          >
+                                            <Image className="h-3 w-3" />
+                                            {imageSearchKey === ideaKey ? 'Hide images' : 'Find images'}
+                                          </button>
+                                        ) : (
+                                          <a
+                                            href={`https://unsplash.com/s/photos/${encodeURIComponent(idea.imageIdea)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                            Search Unsplash
+                                          </a>
+                                        )}
                                       </div>
+                                    )}
+                                    {imageSearchKey === ideaKey && (
+                                      <ImageSearchPanel
+                                        query={idea.imageIdea ?? idea.title}
+                                        onClose={() => setImageSearchKey(null)}
+                                      />
+                                    )}
+                                    <div className="mt-3 grid gap-3 text-xs md:grid-cols-2">
                                       <div>
-                                        <p className="font-semibold uppercase tracking-wide text-foreground">CTA</p>
-                                        <p className="mt-1 text-muted-foreground">{idea.cta || '—'}</p>
+                                        <p className="font-semibold uppercase tracking-wide text-foreground">Caption</p>
+                                        <p className="mt-1 whitespace-pre-wrap leading-relaxed text-muted-foreground">{idea.caption}</p>
                                       </div>
-                                      {idea.hashtags.length > 0 && (
+                                      <div className="space-y-2">
                                         <div>
-                                          <p className="font-semibold uppercase tracking-wide text-foreground">Hashtags</p>
-                                          <p className="mt-1 text-muted-foreground">{idea.hashtags.map(normalizeHashtag).join(' ')}</p>
+                                          <p className="font-semibold uppercase tracking-wide text-foreground">Best time</p>
+                                          <p className="mt-1 text-muted-foreground">{idea.bestTime || '—'}</p>
                                         </div>
-                                      )}
+                                        <div>
+                                          <p className="font-semibold uppercase tracking-wide text-foreground">CTA</p>
+                                          <p className="mt-1 text-muted-foreground">{idea.cta || '—'}</p>
+                                        </div>
+                                        {idea.hashtags.length > 0 && (
+                                          <div>
+                                            <p className="font-semibold uppercase tracking-wide text-foreground">Hashtags</p>
+                                            <p className="mt-1 text-muted-foreground">{idea.hashtags.map(normalizeHashtag).join(' ')}</p>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                  {idea.whyItFits && (
-                                    <p className="mt-3 text-xs italic text-muted-foreground">{idea.whyItFits}</p>
-                                  )}
-                                </article>
-                              ))}
+                                    {idea.whyItFits && (
+                                      <p className="mt-3 text-xs italic text-muted-foreground">{idea.whyItFits}</p>
+                                    )}
+                                  </article>
+                                )
+                              })}
                             </div>
                           </section>
                         )}
@@ -586,8 +1029,8 @@ export function SocialPlannerPage() {
               </div>
             )}
 
-            {/* Input bar — shown once conversation started */}
-            {hasStarted && (
+            {/* Input bar — shown in chat mode or once conversation started */}
+            {showChatView && (
               <div className="border-t border-border px-5 py-4">
                 <div className="flex gap-3">
                   <textarea
@@ -595,6 +1038,39 @@ export function SocialPlannerPage() {
                     className={`${input} min-h-[2.75rem] flex-1 resize-none`}
                     rows={2}
                     placeholder="Ask a follow-up, refine the plan, or request more posts… (Ctrl/Cmd + Enter to send)"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault()
+                        void submitPrompt()
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={`${btnPrimary} self-end inline-flex items-center gap-2 px-3 py-2.5`}
+                    onClick={() => void submitPrompt()}
+                    disabled={loading || draft.trim().length === 0}
+                  >
+                    {loading
+                      ? <LoaderCircle className="h-4 w-4 animate-spin" />
+                      : <SendHorizonal className="h-4 w-4" />}
+                    Send
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Input bar for landing quick/brief modes (for typing custom prompt) */}
+            {!showChatView && (startMode === 'quick') && (
+              <div className="border-t border-border px-5 py-4">
+                <div className="flex gap-3">
+                  <textarea
+                    ref={inputRef}
+                    className={`${input} min-h-[2.75rem] flex-1 resize-none`}
+                    rows={2}
+                    placeholder="Or type your own goal… (Ctrl/Cmd + Enter to send)"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
@@ -683,7 +1159,47 @@ export function SocialPlannerPage() {
                   <article key={post.id} className="rounded-xl border border-border bg-background p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <p className="text-sm font-semibold leading-snug text-foreground">{post.title}</p>
-                      <StatusBadge status={post.status} />
+                      <div className="flex items-center gap-1.5">
+                        <StatusBadge status={post.status} />
+                        {/* Edit button */}
+                        <button
+                          type="button"
+                          title="Edit post"
+                          className="rounded-md p-1 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          onClick={() => setEditingPost(post)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        {/* Delete button / confirm */}
+                        {deletingId === post.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void deletePost(post.id)}
+                              disabled={savingIds.has(`delete-${post.id}`)}
+                              className="rounded-md bg-destructive px-2 py-0.5 text-[10px] font-semibold text-white disabled:opacity-50"
+                            >
+                              {savingIds.has(`delete-${post.id}`) ? '…' : 'Delete'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingId(null)}
+                              className="rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            title="Delete post"
+                            className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => setDeletingId(post.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       <CategoryBadge>{post.platform}</CategoryBadge>
@@ -694,6 +1210,42 @@ export function SocialPlannerPage() {
                       <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
                         {post.caption}
                       </p>
+                    )}
+
+                    {post.imageIdea && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground/70">📷 {post.imageIdea}</p>
+                        {UNSPLASH_KEY ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const k = `queue-${post.id}`
+                              setImageSearchKey(imageSearchKey === k ? null : k)
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          >
+                            <Image className="h-3 w-3" />
+                            Images
+                          </button>
+                        ) : (
+                          <a
+                            href={`https://unsplash.com/s/photos/${encodeURIComponent(post.imageIdea)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Unsplash
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {imageSearchKey === `queue-${post.id}` && post.imageIdea && (
+                      <ImageSearchPanel
+                        query={post.imageIdea}
+                        onClose={() => setImageSearchKey(null)}
+                      />
                     )}
 
                     <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">

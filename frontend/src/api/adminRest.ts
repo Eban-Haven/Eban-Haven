@@ -434,6 +434,31 @@ export async function deleteHomeVisitation(id: number): Promise<void> {
   if (!res.ok) throw new Error(`Delete home visitation failed: ${res.status}`)
 }
 
+export async function deletePlannedSocialPost(id: number): Promise<void> {
+  const res = await apiFetch(`${base}/social-planner/posts/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`Delete planned post failed: ${res.status}`)
+}
+
+export async function updatePlannedSocialPost(
+  id: number,
+  body: {
+    title?: string
+    caption?: string
+    hashtags?: string
+    notes?: string
+    imageIdea?: string
+    cta?: string
+    suggestedTime?: string
+  },
+): Promise<T.PlannedSocialPost> {
+  return parseJson<T.PlannedSocialPost>(
+    await apiFetch(`${base}/social-planner/posts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  )
+}
+
 export async function listEducationRecords(residentId?: number): Promise<T.EducationRecord[]> {
   const q = residentId != null ? `?residentId=${residentId}` : ''
   return parseJson<T.EducationRecord[]>(await apiFetch(`${base}/education-records${q}`))

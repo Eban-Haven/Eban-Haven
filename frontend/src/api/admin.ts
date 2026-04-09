@@ -44,6 +44,8 @@ export {
   requestSchedulePlannedSocialPost,
   schedulePlannedSocialPostToFacebook,
   patchPlannedSocialPostStatus,
+  deletePlannedSocialPost,
+  updatePlannedSocialPost,
   getReportsSummary,
   listEducationRecords,
   createEducationRecord,

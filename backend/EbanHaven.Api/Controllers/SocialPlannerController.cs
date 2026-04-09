@@ -77,6 +77,29 @@ public sealed class SocialPlannerController(
         return updated is null ? NotFound() : Ok(updated);
     }
 
+    [HttpPatch("posts/{id:int}")]
+    [ProducesResponseType(typeof(PlannedSocialPostDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdatePost(int id, [FromBody] UpdatePlannedSocialPostRequest request, CancellationToken cancellationToken)
+    {
+        var updated = await store.UpdateAsync(id, new UpdatePlannedSocialPostCommand(
+            Title: request.Title,
+            Caption: request.Caption,
+            Hashtags: request.Hashtags,
+            Notes: request.Notes,
+            ImageIdea: request.ImageIdea,
+            Cta: request.Cta,
+            SuggestedTime: request.SuggestedTime), cancellationToken);
+        return updated is null ? NotFound() : Ok(updated);
+    }
+
+    [HttpDelete("posts/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> DeletePost(int id, CancellationToken cancellationToken)
+    {
+        var deleted = await store.DeleteAsync(id, cancellationToken);
+        return deleted ? NoContent() : NotFound();
+    }
+
     public sealed record CreatePlannedSocialPostsRequest(
         IReadOnlyList<CreatePlannedSocialPostItem> Posts,
         string? SourcePrompt);
@@ -96,4 +119,13 @@ public sealed class SocialPlannerController(
         string? Notes);
 
     public sealed record UpdatePlannedSocialPostStatusRequest(string Status);
+
+    public sealed record UpdatePlannedSocialPostRequest(
+        string? Title,
+        string? Caption,
+        string? Hashtags,
+        string? Notes,
+        string? ImageIdea,
+        string? Cta,
+        string? SuggestedTime);
 }
