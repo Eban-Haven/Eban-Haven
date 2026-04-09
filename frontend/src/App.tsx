@@ -24,6 +24,7 @@ import { ResidentPipelinePage } from './pages/admin/tools/ResidentPipelinePage'
 import { ProcessRecordingsPage } from './pages/admin/databases/ProcessRecordingsPage'
 import { HomeVisitationsAdminPage } from './pages/admin/databases/HomeVisitationsAdminPage'
 import { CaseConferencesAdminPage } from './pages/admin/databases/CaseConferencesAdminPage'
+import { ReintegrationReadinessPage } from './pages/admin/databases/ReintegrationReadinessPage'
 import { ReportsPage } from './pages/admin/dashboards/ReportsPage'
 import { SocialPlannerPage } from './pages/admin/tools/SocialPlannerPage'
 import { SocialWorkerDashboardPage } from './pages/admin/dashboards/SocialWorkerDashboardPage'
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="donor-dashboard" element={<DonorDashboardAdminPage />} />
         <Route path="donor-all" element={<DonorAllPage />} />
         <Route path="resident-information" element={<ResidentInformationPage />} />
+        <Route path="reintigration-readiness" element={<ReintegrationReadinessPage />} />
         <Route path="marketing-analytics" element={<MarketingAnalyticsPage />} />
         <Route path="email-hub" element={<EmailHubPage />} />
         <Route path="contributions" element={<ContributionsAdminPage />} />

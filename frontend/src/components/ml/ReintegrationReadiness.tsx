@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiFetch, getStaffToken, parseJson } from '../../api/client'
 import {
+  deriveReadinessPrediction,
+  deriveReadinessTier,
   formatFeatureValue,
   type ImprovementArea,
   type ReintegrationResult,
+  READINESS_READY_THRESHOLD,
   TIER_CONFIG,
 } from './reintegrationReadinessShared'
 
@@ -174,9 +177,10 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
 
   if (!result) return null
 
-  const tier = result.risk_tier
+  const tier = deriveReadinessTier(result.reintegration_probability)
+  const prediction = deriveReadinessPrediction(result.reintegration_probability)
   const config = TIER_CONFIG[tier]
-  const isReady = result.prediction === 'Ready'
+  const isReady = prediction === 'Ready'
 
   return (
     <div className={`rounded-2xl border shadow-sm overflow-hidden ${isReady ? "border-emerald-200" : "border-gray-200"} bg-white`}>
@@ -188,14 +192,14 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
             Reintegration Readiness
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            GBM model · threshold {Math.round(result.threshold_used * 100)}%
+            GBM model · threshold {Math.round(READINESS_READY_THRESHOLD * 100)}%
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold ${config.badge}`}>
             <span className={`w-2 h-2 rounded-full ${config.dot}`} />
-            {result.prediction}
+            {prediction}
           </span>
           <button
             onClick={fetchResult}
@@ -208,7 +212,7 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
 
       {/* ── Body ── */}
       <div className="px-5 py-4 space-y-4">
-        <ReadinessGauge probability={result.reintegration_probability} thresholdUsed={result.threshold_used} tier={tier} />
+        <ReadinessGauge probability={result.reintegration_probability} thresholdUsed={READINESS_READY_THRESHOLD} tier={tier} />
 
         <div className={`rounded-xl px-4 py-3 ${config.bg} border ${config.border}`}>
           <p className={`text-xs font-semibold uppercase tracking-wide ${config.text}`}>

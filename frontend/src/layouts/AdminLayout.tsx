@@ -48,6 +48,7 @@ const navGroups: NavGroup[] = [
     items: [
       { to: '/admin/social-worker-dashboard', label: 'Social Worker Dashboard', icon: UserCheck },
       { to: '/admin/resident-information', label: 'Resident Information', icon: Layers },
+      { to: '/admin/reintigration-readiness', label: 'Reintigration Readiness', icon: Layers },
     ],
   },
   {

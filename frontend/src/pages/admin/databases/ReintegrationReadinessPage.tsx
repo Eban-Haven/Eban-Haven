@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getReintegrationReadinessCohort, type ResidentSummary } from '../../../api/admin'
 import {
+  deriveReadinessPrediction,
+  deriveReadinessTier,
   formatFeatureValue,
+  READINESS_READY_THRESHOLD,
   type ReintegrationResult,
   TIER_CONFIG,
   topImprovementLabel,
@@ -107,7 +110,9 @@ function PriorityCard({
         <div className="space-y-3">
           {residents.map((resident) => {
             const readinessPct = Math.round(resident.readiness.reintegration_probability * 100)
-            const tierConfig = TIER_CONFIG[resident.readiness.risk_tier]
+            const tier = deriveReadinessTier(resident.readiness.reintegration_probability)
+            const prediction = deriveReadinessPrediction(resident.readiness.reintegration_probability)
+            const tierConfig = TIER_CONFIG[tier]
             const topArea = resident.readiness.top_improvements[0]
             return (
               <div key={resident.id} className="rounded-xl border border-border bg-background px-4 py-3">
@@ -123,7 +128,7 @@ function PriorityCard({
                   <div className="text-right">
                     <p className="text-lg font-semibold text-foreground">{readinessPct}%</p>
                     <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${tierConfig.badge}`}>
-                      {resident.readiness.prediction}
+                      {prediction}
                     </span>
                   </div>
                 </div>
@@ -210,7 +215,7 @@ export function ReintegrationReadinessPage() {
     return rows
       .filter((row) => {
         if (safehouseFilter !== 'all' && (row.safehouseName ?? '') !== safehouseFilter) return false
-        if (tierFilter !== 'all' && row.readiness.risk_tier !== tierFilter) return false
+        if (tierFilter !== 'all' && deriveReadinessTier(row.readiness.reintegration_probability) !== tierFilter) return false
         if (workerFilter !== 'all' && (row.assignedSocialWorker ?? '') !== workerFilter) return false
         if (search.trim()) {
           const haystack = `${row.internalCode} ${row.safehouseName ?? ''} ${row.assignedSocialWorker ?? ''} ${topImprovementLabel(row.readiness)}`.toLowerCase()
@@ -224,7 +229,7 @@ export function ReintegrationReadinessPage() {
   const tierCounts = useMemo(() => {
     return filteredRows.reduce<Record<ReintegrationResult['risk_tier'], number>>(
       (counts, row) => {
-        counts[row.readiness.risk_tier] += 1
+        counts[deriveReadinessTier(row.readiness.reintegration_probability)] += 1
         return counts
       },
       {
@@ -239,9 +244,7 @@ export function ReintegrationReadinessPage() {
     () =>
       filteredRows
         .filter(
-          (row) =>
-            row.readiness.prediction === 'Ready' &&
-            row.readiness.reintegration_probability >= row.readiness.threshold_used,
+          (row) => deriveReadinessPrediction(row.readiness.reintegration_probability) === 'Ready',
         )
         .slice(0, 5),
     [filteredRows],
@@ -250,7 +253,7 @@ export function ReintegrationReadinessPage() {
   const needsAttention = useMemo(
     () =>
       filteredRows
-        .filter((row) => row.readiness.risk_tier === 'Low Readiness')
+        .filter((row) => deriveReadinessTier(row.readiness.reintegration_probability) === 'Low Readiness')
         .sort((a, b) => a.readiness.reintegration_probability - b.readiness.reintegration_probability)
         .slice(0, 5),
     [filteredRows],
@@ -260,9 +263,9 @@ export function ReintegrationReadinessPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className={pageTitle}>Reintegration Readiness</h2>
+          <h2 className={pageTitle}>Reintigration Readiness</h2>
           <p className={pageDesc}>
-            Population view of resident readiness predictions so staff can spot transition candidates and urgent support needs in one place.
+            Population view of resident readiness predictions using the 70% / 50% cohort thresholds for quick triage and transition planning.
           </p>
         </div>
         <button type="button" className={btnPrimary} onClick={() => void load()}>
@@ -352,7 +355,7 @@ export function ReintegrationReadinessPage() {
               <div>
                 <h3 className="text-base font-semibold text-foreground">Readiness leaderboard</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Ranked active residents with their current readiness prediction and top improvement area.
+                  Ranked active residents using these thresholds: high readiness at {Math.round(READINESS_READY_THRESHOLD * 100)}%+, medium at 50% to under 70%, and low below 50%.
                 </p>
               </div>
               {lastUpdated && <p className="text-xs text-muted-foreground">Updated {lastUpdated.toLocaleTimeString()}</p>}
@@ -378,7 +381,9 @@ export function ReintegrationReadinessPage() {
                     </tr>
                   ) : (
                     filteredRows.map((row) => {
-                      const tierConfig = TIER_CONFIG[row.readiness.risk_tier]
+                      const tier = deriveReadinessTier(row.readiness.reintegration_probability)
+                      const prediction = deriveReadinessPrediction(row.readiness.reintegration_probability)
+                      const tierConfig = TIER_CONFIG[tier]
                       const topArea = row.readiness.top_improvements[0]
                       return (
                         <tr key={row.id} className={tableRowHover}>
@@ -395,10 +400,10 @@ export function ReintegrationReadinessPage() {
                           </td>
                           <td className="px-3 py-3 align-top">
                             <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${tierConfig.badge}`}>
-                              {row.readiness.risk_tier}
+                              {tier}
                             </span>
                           </td>
-                          <td className="px-3 py-3 align-top text-foreground">{row.readiness.prediction}</td>
+                          <td className="px-3 py-3 align-top text-foreground">{prediction}</td>
                           <td className="px-3 py-3 align-top">
                             {topArea ? (
                               <div>

@@ -16,6 +16,9 @@ export interface ReintegrationResult {
   top_improvements: ImprovementArea[]
 }
 
+export const READINESS_READY_THRESHOLD = 0.7
+export const READINESS_MODERATE_THRESHOLD = 0.5
+
 export const TIER_CONFIG: Record<
   ReintegrationResult['risk_tier'],
   {
@@ -76,4 +79,14 @@ export function formatFeatureValue(feature: string, value: number): string {
 
 export function topImprovementLabel(result: ReintegrationResult): string {
   return result.top_improvements[0]?.label ?? 'Maintain current support plan'
+}
+
+export function deriveReadinessTier(probability: number): ReintegrationResult['risk_tier'] {
+  if (probability >= READINESS_READY_THRESHOLD) return 'High Readiness'
+  if (probability >= READINESS_MODERATE_THRESHOLD) return 'Moderate Readiness'
+  return 'Low Readiness'
+}
+
+export function deriveReadinessPrediction(probability: number): ReintegrationResult['prediction'] {
+  return probability >= READINESS_READY_THRESHOLD ? 'Ready' : 'Not Ready'
 }
