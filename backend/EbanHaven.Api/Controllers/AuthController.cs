@@ -21,7 +21,8 @@ public sealed class AuthController(
     HavenDbContext db,
     IConfiguration config,
     IHttpClientFactory httpClientFactory,
-    IOptions<GoogleAuthOptions> googleAuthOptions) : ControllerBase
+    IOptions<GoogleAuthOptions> googleAuthOptions,
+    IOptions<IdentityOptions> identityOptions) : ControllerBase
 {
     private static readonly string[] AllowedRoles = ["admin", "social_worker", "staff", "donor", "resident"];
 
@@ -60,7 +61,7 @@ public sealed class AuthController(
         if (string.IsNullOrWhiteSpace(body.Email) || string.IsNullOrWhiteSpace(body.Password))
             return BadRequest(new { error = "Email and password are required." });
 
-        var passwordError = PasswordPolicy.Validate(body.Password);
+        var passwordError = PasswordPolicy.Validate(body.Password, identityOptions.Value.Password);
         if (passwordError is not null)
             return BadRequest(new { error = passwordError });
 

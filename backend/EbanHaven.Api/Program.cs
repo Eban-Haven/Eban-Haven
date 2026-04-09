@@ -7,6 +7,7 @@ using EbanHaven.Api.Lighthouse;
 using EbanHaven.Api.SocialChat;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Net.Http.Headers;
 
@@ -18,6 +19,18 @@ builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection(OpenA
 builder.Services.Configure<GmailOptions>(builder.Configuration.GetSection(GmailOptions.SectionName));
 builder.Services.Configure<MetaOptions>(builder.Configuration.GetSection(MetaOptions.SectionName));
 builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
+
+// Lab-aligned password rules (same shape as ASP.NET Identity PasswordOptions). Validation runs in PasswordPolicy + Register.
+builder.Services.Configure<IdentityOptions>(options =>
+{
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequiredLength = 14;
+    options.Password.RequiredUniqueChars = 1;
+});
+
 builder.Services.AddControllers();
 
 var conn =
