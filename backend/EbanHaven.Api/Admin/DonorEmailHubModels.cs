@@ -20,7 +20,6 @@ public sealed record GenerateDonorEmailRequest(
     string? Goal,
     string? Tone,
     string? SenderName,
-    string? SenderTitle,
     string? SenderOrganization,
     string? SenderContact,
     bool PreferAi = true);

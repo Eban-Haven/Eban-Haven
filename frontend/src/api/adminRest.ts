@@ -87,7 +87,6 @@ export async function generateDonorEmail(
     goal?: string
     tone?: string
     senderName?: string
-    senderTitle?: string
     senderOrganization?: string
     senderContact?: string
     preferAi?: boolean

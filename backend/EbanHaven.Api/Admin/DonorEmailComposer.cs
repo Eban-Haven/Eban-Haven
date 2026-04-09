@@ -121,7 +121,6 @@ public sealed class DonorEmailComposer(
             sender = new
             {
                 name = request.SenderName?.Trim(),
-                title = request.SenderTitle?.Trim(),
                 organization = request.SenderOrganization?.Trim(),
                 contact = request.SenderContact?.Trim()
             },
@@ -296,7 +295,6 @@ public sealed class DonorEmailComposer(
         var signatureLines = new[]
         {
             request.SenderName?.Trim(),
-            request.SenderTitle?.Trim(),
             request.SenderOrganization?.Trim(),
             request.SenderContact?.Trim()
         }
@@ -356,7 +354,6 @@ public sealed class DonorEmailComposer(
         var signatureLines = new[]
         {
             request.SenderName?.Trim(),
-            request.SenderTitle?.Trim(),
             request.SenderOrganization?.Trim(),
             request.SenderContact?.Trim()
         }
@@ -389,7 +386,6 @@ public sealed class DonorEmailComposer(
         var signatureLines = new[]
         {
             request.SenderName?.Trim(),
-            request.SenderTitle?.Trim(),
             request.SenderOrganization?.Trim(),
             request.SenderContact?.Trim()
         }

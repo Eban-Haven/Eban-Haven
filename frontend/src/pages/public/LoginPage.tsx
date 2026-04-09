@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Lock } from 'lucide-react'
+import { CircleHelp, Eye, EyeOff, Lock } from 'lucide-react'
 import { login, loginWithGoogle, type GoogleAuthMode } from '../../api/auth'
 import { registerDonorAccount } from '../../api/registration'
 import { SITE_DISPLAY_NAME } from '../../site'
@@ -52,6 +52,7 @@ declare global {
             parent: HTMLElement,
             options: Record<string, string | number | boolean>,
           ) => void
+          prompt: (momentListener?: (notification: unknown) => void) => void
         }
       }
     }

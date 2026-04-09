@@ -28,7 +28,6 @@ const goalPresets = [
 
 type SignatureFields = {
   senderName: string
-  senderTitle: string
   senderOrganization: string
   senderContact: string
 }
@@ -43,7 +42,6 @@ type SentEmailLogEntry = {
 function defaultSignature(): SignatureFields {
   return {
     senderName: '',
-    senderTitle: 'Development Team',
     senderOrganization: SITE_DISPLAY_NAME,
     senderContact: PUBLIC_CONTACT.infoEmail,
   }
@@ -56,7 +54,6 @@ function loadStoredSignature(): SignatureFields {
     const parsed = JSON.parse(raw) as Partial<SignatureFields>
     return {
       senderName: parsed.senderName ?? '',
-      senderTitle: parsed.senderTitle ?? 'Development Team',
       senderOrganization: parsed.senderOrganization ?? SITE_DISPLAY_NAME,
       senderContact: parsed.senderContact ?? PUBLIC_CONTACT.infoEmail,
     }
@@ -240,7 +237,6 @@ export function EmailHubPage() {
         tone,
         preferAi,
         senderName: signature.senderName,
-        senderTitle: signature.senderTitle,
         senderOrganization: signature.senderOrganization,
         senderContact: signature.senderContact,
       })
@@ -633,15 +629,6 @@ export function EmailHubPage() {
                           />
                         </label>
                         <label className={label}>
-                          Sender title
-                          <input
-                            className={input}
-                            value={signature.senderTitle}
-                            onChange={(event) => updateSignature('senderTitle', event.target.value)}
-                            placeholder="Development Director"
-                          />
-                        </label>
-                        <label className={label}>
                           Organization
                           <input
                             className={input}
@@ -649,7 +636,7 @@ export function EmailHubPage() {
                             onChange={(event) => updateSignature('senderOrganization', event.target.value)}
                           />
                         </label>
-                        <label className={label}>
+                        <label className={`${label} md:col-span-2`}>
                           Contact line
                           <input
                             className={input}
