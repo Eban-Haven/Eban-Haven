@@ -30,10 +30,11 @@ import {
 } from 'recharts'
 import { Button } from '../../components/ui/button'
 import { getImpactSnapshots, getImpactSummary, type PublicImpactSnapshot, type PublicImpactSummary } from '../../api/impact'
-import { SITE_DISPLAY_NAME } from '../../site'
+import { IMPACT_PAGE_IMAGES, SITE_DISPLAY_NAME } from '../../site'
 
 /**
  * Impact page — layout matches https://haven-hope-flow.base44.app/impact (Haven of Hope reference).
+ * Images: `IMPACT_PAGE_IMAGES` in `site.ts` (same Unsplash URLs as that page).
  * Hero copy preserved per product request. KPIs, growth line, and optional snapshot metrics come from
  * /api/impact/summary and published public_impact_snapshots (who_*, outcome_* keys).
  */
@@ -44,12 +45,6 @@ const fadeUp = {
 }
 
 const stagger = { visible: { transition: { staggerChildren: 0.1 } } }
-
-const HERO_IMG = 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1600&q=80'
-const QUOTE_BREAK_IMG = 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=1600&q=80'
-const LIFE_IMG_A = 'https://images.unsplash.com/photo-1526976668912-1a811878dd37?w=600&q=80'
-const LIFE_IMG_B = 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600&q=80'
-const FINAL_CTA_IMG = 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1400&q=80'
 
 const problemStats = [
   { value: '1 in 3', label: 'girls in Ghana experiences violence before age 18' },
@@ -273,7 +268,7 @@ export function ImpactPage() {
       {/* ── HERO (wording: current product hero; layout: reference) ── */}
       <section className="relative overflow-hidden py-28 lg:py-40">
         <div className="absolute inset-0">
-          <img src={HERO_IMG} alt="" className="h-full w-full object-cover" />
+          <img src={IMPACT_PAGE_IMAGES.hero} alt="Children" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-foreground/90 via-foreground/65 to-foreground/20" />
         </div>
         <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
@@ -396,7 +391,11 @@ export function ImpactPage() {
 
       {/* ── FULL-BLEED PHOTO BREAK ── */}
       <div className="relative h-72 overflow-hidden lg:h-96">
-        <img src={QUOTE_BREAK_IMG} alt="" className="h-full w-full object-cover object-center" />
+        <img
+          src={IMPACT_PAGE_IMAGES.quoteBreak}
+          alt="Girls studying together"
+          className="h-full w-full object-cover object-center"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 via-foreground/20 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 mx-auto max-w-7xl p-8 lg:p-12">
           <motion.div
@@ -473,74 +472,6 @@ export function ImpactPage() {
                     activeDot={{ r: 7 }}
                   />
                 </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── OUTCOMES ── */}
-      <section className="py-20 lg:py-28">
-        <div className="mx-auto max-w-6xl px-6 lg:px-8">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            className="mb-12 text-center"
-          >
-            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Anonymized Outcomes</span>
-            <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
-              What happens after rehabilitation?
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Outcome data from all closed cases — aggregated and anonymized to protect privacy.
-              {usingOutcomeFallback && outcomeRows.length === 0 && summary ? (
-                <span className="block pt-2 text-xs">
-                  Showing program reintegration rate vs. remainder; add <code className="rounded bg-muted px-1">outcome_*</code>{' '}
-                  snapshot fields for a full breakdown.
-                </span>
-              ) : null}
-              {usingOutcomeFallback && !summary ? (
-                <span className="block pt-2 text-xs">Illustrative distribution until live data loads.</span>
-              ) : null}
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            className="rounded-2xl border border-border bg-card p-6 lg:p-8"
-          >
-            <h3 className="mb-1 flex items-center gap-2 font-heading text-lg font-semibold text-foreground">
-              <BarChart2 className="h-4 w-4 text-primary" aria-hidden />
-              Post-Rehabilitation Outcomes
-            </h3>
-            <p className="mb-6 text-xs text-muted-foreground">% of girls by outcome upon case closure</p>
-            <div className="h-60 w-full min-w-0 sm:h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={outcomeData} layout="vertical" margin={{ left: 10, right: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    domain={[0, 100]}
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                    unit="%"
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="category"
-                    width={155}
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <Tooltip
-                    formatter={(v: number | string) => [`${v}%`, 'Share']}
-                    contentStyle={{ ...tooltipStyle, fontSize: 12 }}
-                  />
-                  <Bar dataKey="pct" fill="hsl(var(--primary))" radius={[0, 6, 6, 0]} />
-                </BarChart>
               </ResponsiveContainer>
             </div>
           </motion.div>
@@ -631,8 +562,8 @@ export function ImpactPage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                src={LIFE_IMG_A}
-                alt=""
+                src={IMPACT_PAGE_IMAGES.lifeA}
+                alt="Caregiver with child"
                 className="h-52 w-full rounded-2xl object-cover lg:h-64"
               />
               <motion.img
@@ -640,8 +571,8 @@ export function ImpactPage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6, delay: 0.15 }}
-                src={LIFE_IMG_B}
-                alt=""
+                src={IMPACT_PAGE_IMAGES.lifeB}
+                alt="Girls together"
                 className="mt-6 h-52 w-full rounded-2xl object-cover lg:h-64"
               />
             </div>
@@ -748,7 +679,7 @@ export function ImpactPage() {
       {/* ── FINAL CTA ── */}
       <section className="relative overflow-hidden py-24 lg:py-36">
         <div className="absolute inset-0">
-          <img src={FINAL_CTA_IMG} alt="" className="h-full w-full object-cover" />
+          <img src={IMPACT_PAGE_IMAGES.finalCta} alt="" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-foreground/80" />
         </div>
         <div className="relative mx-auto max-w-4xl px-6 text-center lg:px-8">

@@ -13,14 +13,7 @@ export type KPICardModel = {
 }
 
 function DeltaBadge({ deltaPct, tone }: { deltaPct: number | null; tone: KPICardModel['tone'] }) {
-  if (deltaPct == null) {
-    return (
-      <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
-        <Minus className="h-3 w-3" aria-hidden />
-        No comparison
-      </span>
-    )
-  }
+  if (deltaPct == null) return null
   const up = deltaPct > 0.5
   const down = deltaPct < -0.5
   const Icon = up ? ArrowUpRight : down ? ArrowDownRight : Minus
@@ -63,9 +56,7 @@ export function KPIOverviewCards({ cards }: { cards: KPICardModel[] }) {
           <p className="pr-8 text-xs font-medium uppercase tracking-wide text-muted-foreground">{c.label}</p>
           <p className="font-heading text-2xl font-bold tabular-nums text-foreground sm:text-3xl">{c.value}</p>
           {c.sublabel ? <p className="text-xs text-muted-foreground">{c.sublabel}</p> : null}
-          <div className="mt-auto pt-1">
-            <DeltaBadge deltaPct={c.deltaPct} tone={c.tone} />
-          </div>
+          {c.deltaPct != null ? <div className="mt-auto pt-1"><DeltaBadge deltaPct={c.deltaPct} tone={c.tone} /></div> : null}
           {c.helper ? (
             <p className="text-[11px] leading-snug text-muted-foreground" title={c.helper}>
               {c.helper}

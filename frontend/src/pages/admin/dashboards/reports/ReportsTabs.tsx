@@ -3,11 +3,8 @@ import type { ReportTabId } from './reportTypes'
 
 const TAB_DEF: { id: ReportTabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'donors', label: 'Donors & Donations' },
-  { id: 'residents', label: 'Residents & Outcomes' },
-  { id: 'safehouses', label: 'Safehouses' },
-  { id: 'social', label: 'Social Media' },
-  { id: 'impact', label: 'Impact Reporting' },
+  { id: 'donors', label: 'Donors' },
+  { id: 'residents', label: 'Residents' },
 ]
 
 type Props = {

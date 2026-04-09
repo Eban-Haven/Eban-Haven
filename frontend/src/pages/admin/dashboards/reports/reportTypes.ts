@@ -1,5 +1,5 @@
 /** Tab ids for Reports & Insights command center. */
-export type ReportTabId = 'overview' | 'donors' | 'residents' | 'safehouses' | 'social' | 'impact'
+export type ReportTabId = 'overview' | 'donors' | 'residents'
 
 export type DateRangePreset = '30d' | '90d' | '12m' | 'custom'
 

@@ -1,7 +1,6 @@
 import type { ReportsSummary, DashboardSummary, MarketingAnalyticsSummary, SafehousePerformance } from '../../../../../api/adminTypes'
 import { ChartCard, SimpleHorizontalBarChart, SimpleLineChart } from '../ChartCard'
 import { InsightsSummaryPanel, type InsightCallout } from '../InsightsSummaryPanel'
-import { MLInsightCard } from '../MLInsightCard'
 import { ReportEmptyState } from '../ReportEmptyState'
 import type { ReportTabId } from '../reportTypes'
 
@@ -13,7 +12,6 @@ function formatMonthLabel(month: string) {
 
 type Props = {
   filteredTrends: ReportsSummary['donationTrends']
-  reports: ReportsSummary
   dashboard: DashboardSummary
   marketing: MarketingAnalyticsSummary | null
   safehousesFiltered: SafehousePerformance[]
@@ -23,17 +21,12 @@ type Props = {
   incidentTrendUp: boolean | null
   bestSafehouseName: string | null
   weakSafehouseName: string | null
-  bestSocialPlatform: string | null
-  topAtRiskIds: { supporterId: number; label: string }[]
-  topUpgradeIds: { supporterId: number; label: string }[]
-  upgradeBatchCount: number
   onSetTab: (t: ReportTabId) => void
   onPickSafehouse: (id: number) => void
 }
 
 export function OverviewReportTab({
   filteredTrends,
-  reports,
   dashboard,
   marketing,
   safehousesFiltered,
@@ -43,10 +36,6 @@ export function OverviewReportTab({
   incidentTrendUp,
   bestSafehouseName,
   weakSafehouseName,
-  bestSocialPlatform,
-  topAtRiskIds,
-  topUpgradeIds,
-  upgradeBatchCount,
   onSetTab,
   onPickSafehouse,
 }: Props) {
@@ -71,13 +60,6 @@ export function OverviewReportTab({
     callouts.push({
       id: 'sh',
       text: `Safehouse comparison: strongest composite signals at ${bestSafehouseName}; watch ${weakSafehouseName} for targeted support.`,
-    })
-  }
-  if (bestSocialPlatform) {
-    callouts.push({
-      id: 'social',
-      text: `Donation-attributed social performance is strongest on ${bestSocialPlatform} in marketing analytics.`,
-      variant: 'success',
     })
   }
   if (callouts.length === 0) {
@@ -115,35 +97,34 @@ export function OverviewReportTab({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
         <InsightsSummaryPanel
           callouts={callouts}
           actions={[
             { id: 'outreach', label: 'Donor outreach', to: '/admin/email-hub' },
             { id: 'residents', label: 'High-risk residents', to: '/admin/residents' },
-            { id: 'sh', label: 'Safehouse comparison', onClick: () => onSetTab('safehouses') },
-            { id: 'social', label: 'Post performance', onClick: () => onSetTab('social') },
+            { id: 'details', label: 'Resident details', onClick: () => onSetTab('residents') },
           ]}
         />
 
-        <MLInsightCard
-          title="Donor ML — at a glance"
-          subtitle="Churn / lapse model outputs for prioritization"
-          statusLabel="Model-assisted"
-          summaryMetric={String(atRiskCount)}
-          summaryCaption="Supporters flagged in current at-risk batch (threshold set by API)"
-          distribution={[
-            { label: 'In at-risk list', count: atRiskCount, colorClass: 'bg-amber-500' },
-            { label: 'Upgrade batch size', count: upgradeBatchCount, colorClass: 'bg-emerald-500' },
-          ]}
-          topCases={topAtRiskIds.slice(0, 3).map((x) => ({
-            id: String(x.supporterId),
-            title: x.label,
-            detail: 'Elevated lapse risk in ML cohort — confirm before outreach.',
-            href: `/admin/donors/${x.supporterId}`,
-            actionLabel: 'View donor',
-          }))}
-        />
+        <ChartCard title="Current focus" description="A quick read on the biggest operational pressure points.">
+          <div className="space-y-3">
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs font-medium uppercase text-muted-foreground">At-risk donors</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">{atRiskCount}</p>
+              <p className="text-xs text-muted-foreground">Prioritize outreach for likely lapsing supporters.</p>
+            </div>
+            <div className="rounded-xl border border-border bg-muted/20 p-4">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Reintegration success</p>
+              <p className="mt-2 text-3xl font-bold text-foreground">
+                {dashboard.reintegration.successRatePercent.toFixed(1)}%
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {dashboard.reintegration.completedCount} completed residents in the current cohort.
+              </p>
+            </div>
+          </div>
+        </ChartCard>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -207,23 +188,19 @@ export function OverviewReportTab({
         </ChartCard>
 
         <ChartCard
-          title="Reintegration success"
-          description="Program-level completion rate from dashboard summary."
+          title="Safehouse education proxy"
+          description="Latest education progress snapshot for the strongest visible sites."
         >
-          <div className="space-y-3">
-            <p className="font-heading text-4xl font-bold text-foreground">
-              {dashboard.reintegration.successRatePercent.toFixed(1)}%
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Completed {dashboard.reintegration.completedCount} · In progress {dashboard.reintegration.inProgressCount}
-            </p>
-            <div className="h-3 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
-                style={{ width: `${Math.min(100, dashboard.reintegration.successRatePercent)}%` }}
-              />
-            </div>
-          </div>
+          {shBars.length === 0 ? (
+            <ReportEmptyState />
+          ) : (
+            <SimpleHorizontalBarChart
+              rows={shBars}
+              formatValue={(n) => `${n.toFixed(1)}%`}
+              onBarClick={(key) => onPickSafehouse(Number(key))}
+              ariaLabel="Education progress by safehouse"
+            />
+          )}
         </ChartCard>
       </div>
 
@@ -242,38 +219,6 @@ export function OverviewReportTab({
           </ul>
         </ChartCard>
       ) : null}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Outcome snapshot" description="Resident record aggregates (org-wide).">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-muted/20 p-4">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Education</p>
-              <p className="mt-2 text-2xl font-bold">{reports.outcomeMetrics.avgEducationProgressPercent.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground">{reports.outcomeMetrics.educationRecordsCount} records</p>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-4">
-              <p className="text-xs font-medium uppercase text-muted-foreground">Wellbeing</p>
-              <p className="mt-2 text-2xl font-bold">{reports.outcomeMetrics.avgHealthScore.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground">{reports.outcomeMetrics.healthRecordsCount} records</p>
-            </div>
-          </div>
-        </ChartCard>
-
-        <MLInsightCard
-          title="Upgrade propensity (batch)"
-          subtitle="Donors scored likely to increase giving"
-          statusLabel="Batch scoring"
-          summaryMetric={String(topUpgradeIds.length)}
-          summaryCaption="Candidates in the current upgrade API response"
-          topCases={topUpgradeIds.slice(0, 3).map((x) => ({
-            id: String(x.supporterId),
-            title: x.label,
-            detail: 'Model suggests stronger upgrade propensity — pair with relationship context.',
-            href: `/admin/donors/${x.supporterId}`,
-            actionLabel: 'Contact',
-          }))}
-        />
-      </div>
     </div>
   )
 }

@@ -20,7 +20,7 @@ export function InsightsSummaryPanel({ callouts, actions }: Props) {
     <aside className={`${card} border-primary/20 bg-gradient-to-br from-card to-primary/[0.03]`}>
       <div className="flex items-center gap-2">
         <Lightbulb className="h-5 w-5 text-primary" aria-hidden />
-        <h2 className="text-sm font-semibold text-foreground">Insight summary</h2>
+        <h2 className="text-sm font-semibold text-foreground">What needs attention</h2>
       </div>
       <ul className="mt-4 space-y-2 text-sm leading-relaxed">
         {callouts.map((c) => (

@@ -35,7 +35,6 @@ import {
   type ResidentSummary,
   type Supporter,
 } from '../../../../api/admin'
-import { getImpactSnapshots, type PublicImpactSnapshot } from '../../../../api/impact'
 import { alertError } from '../../shared/adminStyles'
 import { KPIOverviewCards, type KPICardModel } from './KPIOverviewCards'
 import { ReportLoadingSkeleton } from './ReportLoadingSkeleton'
@@ -50,9 +49,6 @@ import { pctDelta, priorPeriodMonths, rangeBoundsMs, selectMonthsForPreset, sumT
 import { OverviewReportTab } from './tabs/OverviewReportTab'
 import { DonorsReportTab } from './tabs/DonorsReportTab'
 import { ResidentsReportTab } from './tabs/ResidentsReportTab'
-import { SafehousesReportTab } from './tabs/SafehousesReportTab'
-import { SocialMediaInsightsTab } from './tabs/SocialMediaInsightsTab'
-import { ImpactReportingTab } from './tabs/ImpactReportingTab'
 
 import type { ReintegrationResult } from '../../../../components/ml/reintegrationReadinessShared'
 
@@ -82,8 +78,6 @@ export function ReportsInsightsPage() {
   const [educationRecords, setEducationRecords] = useState<EducationRecord[]>([])
   const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([])
   const [readiness, setReadiness] = useState<ReadinessState>(null)
-  const [impactSnapshots, setImpactSnapshots] = useState<PublicImpactSnapshot[]>([])
-
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -105,7 +99,6 @@ export function ReportsInsightsPage() {
         edu,
         hl,
         rd,
-        snaps,
       ] = await Promise.all([
         getMarketingAnalyticsSummary().catch(() => null),
         getSupporters().catch(() => [] as Supporter[]),
@@ -119,7 +112,6 @@ export function ReportsInsightsPage() {
         listEducationRecords().catch(() => [] as EducationRecord[]),
         listHealthRecords().catch(() => [] as HealthRecord[]),
         getReintegrationReadinessCohort().catch(() => null),
-        getImpactSnapshots().catch(() => [] as PublicImpactSnapshot[]),
       ])
       setMarketing(mkt)
       setSupporters(sup)
@@ -133,8 +125,6 @@ export function ReportsInsightsPage() {
       setEducationRecords(edu)
       setHealthRecords(hl)
       setReadiness(rd)
-      setImpactSnapshots(snaps)
-
       const allocParams =
         filters.safehouseId === 'all' ? undefined : { safehouseId: filters.safehouseId }
       const allocs = await getAllocations(allocParams).catch(() => [] as DonationAllocation[])
@@ -255,19 +245,6 @@ export function ReportsInsightsPage() {
     [healthRecords, startMs, endMs],
   )
 
-  const plannedPostsFiltered = useMemo(() => {
-    let p = plannedPosts
-    if (filters.socialPlatform !== 'all') {
-      p = p.filter((x) => (x.platform ?? '').trim() === filters.socialPlatform)
-    }
-    return p.filter((x) => {
-      const raw = x.scheduledForUtc || x.createdAtUtc
-      if (!raw) return true
-      const t = new Date(raw).getTime()
-      return !Number.isNaN(t) && t >= startMs && t <= endMs
-    })
-  }, [plannedPosts, filters.socialPlatform, startMs, endMs])
-
   const safehousesFiltered = useMemo(() => {
     const perf = reports?.safehousePerformance ?? []
     if (filters.safehouseId === 'all') return perf
@@ -278,11 +255,6 @@ export function ReportsInsightsPage() {
     if (filters.safehouseId === 'all') return allocations
     return allocations.filter((a) => a.safehouseId === filters.safehouseId)
   }, [allocations, filters.safehouseId])
-
-  const activeSupporterCount = useMemo(
-    () => supporters.filter((s) => (s.status ?? '').toLowerCase() !== 'inactive').length,
-    [supporters],
-  )
 
   const atRiskIdSet = useMemo(() => {
     const s = new Set<number>()
@@ -338,72 +310,26 @@ export function ReportsInsightsPage() {
     }
   }, [safehousesFiltered])
 
-  const bestSocialPlatform = useMemo(() => {
-    const ch = marketing?.channels
-    if (ch && ch.length > 0) {
-      const top = [...ch].sort((a, b) => b.totalPhp - a.totalPhp)[0]
-      return top.channelSource
-    }
-    const c = marketing?.causalEstimates?.social_media_spotlight
-    if (c && typeof c === 'object') {
-      const keys = Object.keys(c).filter((k) => typeof c[k] === 'number' && (c[k] as number) > 0)
-      return keys[0] ?? null
-    }
-    return null
-  }, [marketing])
-
-  const topAtRiskIds = useMemo(() => {
-    return atRisk
-      .filter((a) => a.supporter_id != null)
-      .slice(0, 8)
-      .map((a) => ({
-        supporterId: a.supporter_id as number,
-        label: supporterLabel(a.supporter_id as number),
-      }))
-  }, [atRisk, supporterLabel])
-
-  const topUpgradeIds = useMemo(() => {
-    return upgrades
-      .filter((u) => u.supporter_id != null)
-      .sort((a, b) => b.upgrade_probability - a.upgrade_probability)
-      .slice(0, 8)
-      .map((u) => ({
-        supporterId: u.supporter_id as number,
-        label: supporterLabel(u.supporter_id as number),
-      }))
-  }, [upgrades, supporterLabel])
-
   const donationDeltaPct = pctDelta(currSum.php, priorSum.php)
 
   const kpiCards: KPICardModel[] = useMemo(() => {
     if (!reports || !dashboard) return []
-    const spotlight = marketing?.socialMediaSpotlight
     return [
       {
         id: 'don',
-        label: 'Donations (PHP, window)',
+        label: 'Donations',
         value: `₱${Math.round(currSum.php).toLocaleString()}`,
         sublabel: `${currSum.count} gifts in selected months`,
         deltaPct: donationDeltaPct,
         tone: donationDeltaPct != null && donationDeltaPct < -5 ? 'negative' : 'neutral',
-        helper: 'Monetary monthly trends from reports API; filters control which months are included.',
-      },
-      {
-        id: 'sup',
-        label: 'Active supporters',
-        value: String(activeSupporterCount),
-        sublabel: 'Non-inactive status in supporter list',
-        deltaPct: null,
-        helper: 'TODO: filter by supporter created_at in range when API exposes it.',
       },
       {
         id: 'risk',
-        label: 'At-risk donors (ML batch)',
+        label: 'At-risk donors',
         value: String(atRisk.length),
-        sublabel: `${atRiskOverlapCount} overlap loaded supporter profiles`,
+        sublabel: `${atRiskOverlapCount} matched supporter records`,
         deltaPct: null,
         tone: atRisk.length > 0 ? 'alert' : 'neutral',
-        helper: 'From /api/donors/at-risk — not deduplicated against filters beyond supporter overlap.',
       },
       {
         id: 'res',
@@ -426,41 +352,22 @@ export function ReportsInsightsPage() {
         value: `${dashboard.reintegration.successRatePercent.toFixed(1)}%`,
         sublabel: `Completed ${dashboard.reintegration.completedCount}`,
         deltaPct: null,
-        helper: 'Dashboard-wide rate; not recomputed per date filter yet.',
-      },
-      {
-        id: 'posts',
-        label: 'Social posts (planner)',
-        value: String(plannedPostsFiltered.length),
-        sublabel: 'Filtered by platform + date',
-        deltaPct: null,
-      },
-      {
-        id: 'socd',
-        label: 'Social-attributed gifts',
-        value: spotlight ? String(spotlight.donationCount) : '—',
-        sublabel: spotlight ? `₱${Math.round(spotlight.totalPhp).toLocaleString()}` : 'Marketing API unavailable',
-        deltaPct: null,
-        helper: 'From marketing analytics spotlight aggregate (not date-filtered server-side).',
       },
     ]
   }, [
     reports,
     dashboard,
-    marketing,
     currSum,
     donationDeltaPct,
-    activeSupporterCount,
     atRisk.length,
     atRiskOverlapCount,
     residentsFiltered,
     highRiskResidents.length,
-    plannedPostsFiltered.length,
   ])
 
   const pickSafehouse = useCallback((id: number) => {
     setFilters((f) => ({ ...f, safehouseId: id }))
-    setTab('safehouses')
+    setTab('residents')
   }, [])
 
   const donationTypeOptions = useMemo(() => {
@@ -504,7 +411,6 @@ export function ReportsInsightsPage() {
         <ReportTabPanel id="overview" active={tab}>
           <OverviewReportTab
             filteredTrends={filteredTrends}
-            reports={reports}
             dashboard={dashboard}
             marketing={marketing}
             safehousesFiltered={safehousesFiltered}
@@ -514,10 +420,6 @@ export function ReportsInsightsPage() {
             incidentTrendUp={incidentTrendUp}
             bestSafehouseName={bestSafehouseName}
             weakSafehouseName={weakSafehouseName}
-            bestSocialPlatform={bestSocialPlatform}
-            topAtRiskIds={topAtRiskIds}
-            topUpgradeIds={topUpgradeIds}
-            upgradeBatchCount={upgrades.length}
             onSetTab={setTab}
             onPickSafehouse={pickSafehouse}
           />
@@ -545,22 +447,6 @@ export function ReportsInsightsPage() {
             educationFiltered={educationFiltered}
             healthFiltered={healthFiltered}
             readiness={readiness}
-          />
-        </ReportTabPanel>
-
-        <ReportTabPanel id="safehouses" active={tab}>
-          <SafehousesReportTab safehousesFiltered={safehousesFiltered} onPickSafehouse={pickSafehouse} />
-        </ReportTabPanel>
-
-        <ReportTabPanel id="social" active={tab}>
-          <SocialMediaInsightsTab marketing={marketing} plannedPostsFiltered={plannedPostsFiltered} />
-        </ReportTabPanel>
-
-        <ReportTabPanel id="impact" active={tab}>
-          <ImpactReportingTab
-            reports={reports}
-            allocationsFiltered={allocationsFiltered}
-            impactSnapshots={impactSnapshots}
           />
         </ReportTabPanel>
       </ReportsTabs>

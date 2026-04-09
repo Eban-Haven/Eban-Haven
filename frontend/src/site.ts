@@ -15,6 +15,18 @@ export const IMAGES = {
     'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=80',
 } as const
 
+/**
+ * Impact page visuals — same Unsplash sources as haven-hope-flow.base44.app /impact.
+ * Swap to `/images/...` under public/ when you have licensed brand photography.
+ */
+export const IMPACT_PAGE_IMAGES = {
+  hero: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1600&q=80',
+  quoteBreak: 'https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=1600&q=80',
+  lifeA: 'https://images.unsplash.com/photo-1526976668912-1a811878dd37?w=600&q=80',
+  lifeB: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=600&q=80',
+  finalCta: 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1400&q=80',
+} as const
+
 /** Display name in nav, footer, and body copy */
 export const SITE_DISPLAY_NAME = 'Eban Haven'
 
