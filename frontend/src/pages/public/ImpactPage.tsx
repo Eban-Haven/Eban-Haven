@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { GraduationCap, Heart, Home, UserCheck, Users } from 'lucide-react'
 import { getImpactSnapshots, getImpactSummary, type PublicImpactSnapshot, type PublicImpactSummary } from '../../api/impact'
-import { SITE_DISPLAY_NAME } from '../../site'
+import { IMAGES, SITE_DISPLAY_NAME } from '../../site'
 
 const fade = {
   hidden: { opacity: 0, y: 20 },
@@ -123,13 +123,15 @@ function buildChart(points: GrowthPoint[]) {
   const values = points.map((point) => point.value)
   const min = Math.min(...values)
   const max = Math.max(...values)
-  const range = Math.max(max - min, 1)
+  const paddedMin = min === max ? Math.max(0, min - 1) : min
+  const paddedMax = min === max ? max + 1 : max
+  const range = Math.max(paddedMax - paddedMin, 1)
   const chartHeight = height - paddingTop - paddingBottom
   const chartWidth = width - paddingX * 2
 
   const plotted = points.map((point, index) => {
     const x = paddingX + (points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth)
-    const y = paddingTop + (1 - (point.value - min) / range) * chartHeight
+    const y = paddingTop + (1 - (point.value - paddedMin) / range) * chartHeight
     return { ...point, x, y }
   })
 
@@ -137,7 +139,7 @@ function buildChart(points: GrowthPoint[]) {
   const areaPath = `${path} L ${plotted[plotted.length - 1]?.x ?? paddingX} ${height - paddingBottom} L ${plotted[0]?.x ?? paddingX} ${height - paddingBottom} Z`
   const gridLines = [0, 0.5, 1].map((ratio) => paddingTop + ratio * chartHeight)
 
-  return { path, areaPath, points: plotted, gridLines, min, max, width, height, paddingBottom }
+  return { path, areaPath, points: plotted, gridLines, min: paddedMin, max: paddedMax, width, height, paddingBottom }
 }
 
 export function ImpactPage() {
@@ -164,7 +166,7 @@ export function ImpactPage() {
   }, [])
 
   const stats = buildStats(summary)
-  const growthPoints = useMemo(() => parseGrowthPoints(snapshots).slice(-8), [snapshots])
+  const growthPoints = useMemo(() => parseGrowthPoints(snapshots).slice(-12), [snapshots])
   const chart = useMemo(() => buildChart(growthPoints), [growthPoints])
   const growthDelta =
     growthPoints.length > 1 ? growthPoints[growthPoints.length - 1].value - growthPoints[0].value : null
@@ -328,6 +330,44 @@ export function ImpactPage() {
                 </div>
               )}
             </motion.div>
+          </div>
+
+          <div className="mt-14 overflow-hidden rounded-[2rem] border border-border bg-[linear-gradient(135deg,hsl(174_55%_28%),hsl(32_80%_55%))]">
+            <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="p-8 text-primary-foreground sm:p-10 lg:p-12">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/75">Inside the journey</p>
+                <h3 className="mt-3 font-heading text-3xl font-bold lg:text-4xl">
+                  Progress is built in ordinary, beautiful moments
+                </h3>
+                <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/82 sm:text-base">
+                  A warm meal, a quiet place to sleep, tutoring after school, counseling, and trusted adults who stay.
+                  Recovery is not only measured in reports. It is also visible in routines, friendships, and the return
+                  of confidence.
+                </p>
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/18 bg-white/12 p-4 backdrop-blur-sm">
+                    <p className="text-2xl font-bold">Safe</p>
+                    <p className="mt-1 text-xs text-white/75">Stable homes that reduce crisis and create room for healing.</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/18 bg-white/12 p-4 backdrop-blur-sm">
+                    <p className="text-2xl font-bold">Seen</p>
+                    <p className="mt-1 text-xs text-white/75">Care teams who know each girl by story, not only by statistic.</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/18 bg-white/12 p-4 backdrop-blur-sm">
+                    <p className="text-2xl font-bold">Supported</p>
+                    <p className="mt-1 text-xs text-white/75">Education, health, and reintegration planning moving together.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="relative min-h-[20rem]">
+                <img
+                  src={IMAGES.mission}
+                  alt="Girls and caregivers sharing a hopeful moment together"
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-foreground/25" />
+              </div>
+            </div>
           </div>
 
           <div className="mt-14">

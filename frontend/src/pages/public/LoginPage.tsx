@@ -280,12 +280,12 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-5rem)] bg-[radial-gradient(circle_at_top,_hsl(37_65%_90%/_0.55),_transparent_40%),linear-gradient(180deg,hsl(40_33%_98%),hsl(40_20%_95%))] py-16 lg:py-24">
+    <div className="min-h-[calc(100vh-5rem)] bg-background py-16 lg:py-24">
       <div className={`mx-auto px-6 ${tab === 'register' ? 'max-w-5xl' : 'max-w-md'}`}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-[1.75rem] border border-border/80 bg-card/95 p-6 shadow-[0_24px_80px_-40px_rgba(26,55,49,0.45)] backdrop-blur sm:p-8"
+          className="rounded-[1.75rem] border border-border bg-card p-6 shadow-[0_24px_60px_-42px_rgba(26,55,49,0.28)] sm:p-8"
         >
           <div className="mb-6 flex gap-2 rounded-xl bg-muted/60 p-1">
             <button
@@ -314,7 +314,7 @@ export function LoginPage() {
             </button>
           </div>
 
-          <div className={`mb-8 ${tab === 'register' ? 'grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end' : ''}`}>
+          <div className="mb-8">
             <div className={tab === 'register' ? '' : 'flex flex-col items-center text-center'}>
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
                 <Lock className="h-6 w-6 text-primary-foreground" />
@@ -328,16 +328,6 @@ export function LoginPage() {
                   : 'Join the donor community with a cleaner setup flow for your contact details, giving preferences, and supporter profile.'}
               </p>
             </div>
-
-            {tab === 'register' && (
-              <div className="rounded-2xl border border-secondary/60 bg-secondary/45 p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-accent">What you can do next</p>
-                <p className="mt-2 text-sm text-foreground">
-                  Register once, then track your giving history, log donations, and stay connected to the programs you
-                  support.
-                </p>
-              </div>
-            )}
           </div>
 
           {error && (
@@ -351,14 +341,8 @@ export function LoginPage() {
 
           {tab === 'login' ? (
             <form onSubmit={onSubmit} className="space-y-5" noValidate>
-              <GoogleAuthBlock
-                mode="login"
-                disabled={submitting}
-                onError={setError}
-                onCredential={completeGoogleAuth}
-              />
               <div className="relative py-1 text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                <span className="relative z-10 bg-card px-3">or use email</span>
+                <span className="relative z-10 bg-card px-3">sign in with email</span>
                 <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
               </div>
               <div>
@@ -401,17 +385,17 @@ export function LoginPage() {
               >
                 {submitting ? 'Signing in…' : 'Sign in'}
               </button>
-            </form>
-          ) : (
-            <form onSubmit={onRegister} className="space-y-6">
               <GoogleAuthBlock
-                mode="register"
+                mode="login"
                 disabled={submitting}
                 onError={setError}
                 onCredential={completeGoogleAuth}
               />
+            </form>
+          ) : (
+            <form onSubmit={onRegister} className="space-y-6">
               <div className="relative py-1 text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                <span className="relative z-10 bg-card px-3">or register with details</span>
+                <span className="relative z-10 bg-card px-3">create account with details</span>
                 <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
               </div>
 
@@ -537,6 +521,12 @@ export function LoginPage() {
               >
                 {submitting ? 'Creating account…' : 'Create account'}
               </button>
+              <GoogleAuthBlock
+                mode="register"
+                disabled={submitting}
+                onError={setError}
+                onCredential={completeGoogleAuth}
+              />
             </form>
           )}
         </motion.div>
