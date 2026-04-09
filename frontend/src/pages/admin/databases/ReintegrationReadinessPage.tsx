@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowUpDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getReintegrationReadinessCohort, type ResidentSummary } from '../../../api/admin'
 import {
@@ -352,7 +353,7 @@ export function ReintegrationReadinessPage() {
                 <div className="h-4 w-40 rounded bg-muted" />
                 <div className="h-3 w-64 rounded bg-muted" />
               </div>
-              <div className="h-10 w-44 rounded bg-muted" />
+              <div className="h-6 w-24 rounded bg-muted" />
             </div>
             <div className="h-48 rounded-xl bg-muted" />
           </div>
@@ -375,20 +376,7 @@ export function ReintegrationReadinessPage() {
                   Ranked active residents using these thresholds: high readiness at {Math.round(READINESS_READY_THRESHOLD * 100)}%+, medium at 50% to under 70%, and low below 50%.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className={`${label} min-w-[11rem]`}>
-                  Ranking order
-                  <select
-                    className={input}
-                    value={rankingOrder}
-                    onChange={(event) => setRankingOrder(event.target.value as 'desc' | 'asc')}
-                  >
-                    <option value="desc">Highest readiness first</option>
-                    <option value="asc">Lowest readiness first</option>
-                  </select>
-                </label>
-                {lastUpdated && <p className="text-xs text-muted-foreground">Updated {lastUpdated.toLocaleTimeString()}</p>}
-              </div>
+              {lastUpdated && <p className="text-xs text-muted-foreground">Updated {lastUpdated.toLocaleTimeString()}</p>}
             </div>
 
             <div className={tableWrap}>
@@ -397,7 +385,21 @@ export function ReintegrationReadinessPage() {
                   <tr>
                     <th className="px-3 py-2">Resident</th>
                     <th className="px-3 py-2">Score</th>
-                    <th className="px-3 py-2">Tier</th>
+                    <th className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span>Tier</span>
+                        <button
+                          type="button"
+                          onClick={() => setRankingOrder((current) => (current === 'desc' ? 'asc' : 'desc'))}
+                          className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 text-[11px] font-medium normal-case tracking-normal text-foreground transition-colors hover:bg-muted"
+                          title={rankingOrder === 'desc' ? 'Switch to lowest readiness first' : 'Switch to highest readiness first'}
+                          aria-label={rankingOrder === 'desc' ? 'Switch to lowest readiness first' : 'Switch to highest readiness first'}
+                        >
+                          <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
+                          {rankingOrder === 'desc' ? 'Desc' : 'Asc'}
+                        </button>
+                      </div>
+                    </th>
                     <th className="px-3 py-2">Prediction</th>
                     <th className="px-3 py-2">Top improvement area</th>
                   </tr>
