@@ -286,47 +286,6 @@ export function ReintegrationReadinessPage() {
       {error && <div className={alertError}>{error}</div>}
       {partialError && <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">{partialError}</div>}
 
-      <div className={`${card} grid gap-4 lg:grid-cols-4`}>
-        <label className={label}>
-          Safehouse
-          <select className={input} value={safehouseFilter} onChange={(event) => setSafehouseFilter(event.target.value)}>
-            {safehouseOptions.map((option) => (
-              <option key={option} value={option}>
-                {option === 'all' ? 'All safehouses' : option}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={label}>
-          Risk tier
-          <select className={input} value={tierFilter} onChange={(event) => setTierFilter(event.target.value as TierFilter)}>
-            <option value="all">All tiers</option>
-            <option value="High Readiness">High Readiness</option>
-            <option value="Moderate Readiness">Moderate Readiness</option>
-            <option value="Low Readiness">Low Readiness</option>
-          </select>
-        </label>
-        <label className={label}>
-          Assigned worker
-          <select className={input} value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)}>
-            {workerOptions.map((option) => (
-              <option key={option} value={option}>
-                {option === 'all' ? 'All workers' : option}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={label}>
-          Search
-          <input
-            className={input}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Resident code, worker, gap area…"
-          />
-        </label>
-      </div>
-
       {loading ? (
         <div className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-3">
@@ -367,6 +326,47 @@ export function ReintegrationReadinessPage() {
           </div>
 
           <ReadinessDistributionBar counts={tierCounts} total={filteredRows.length} />
+
+          <div className={`${card} grid gap-4 lg:grid-cols-4`}>
+            <label className={label}>
+              Safehouse
+              <select className={input} value={safehouseFilter} onChange={(event) => setSafehouseFilter(event.target.value)}>
+                {safehouseOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'all' ? 'All safehouses' : option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={label}>
+              Risk tier
+              <select className={input} value={tierFilter} onChange={(event) => setTierFilter(event.target.value as TierFilter)}>
+                <option value="all">All tiers</option>
+                <option value="High Readiness">High Readiness</option>
+                <option value="Moderate Readiness">Moderate Readiness</option>
+                <option value="Low Readiness">Low Readiness</option>
+              </select>
+            </label>
+            <label className={label}>
+              Assigned worker
+              <select className={input} value={workerFilter} onChange={(event) => setWorkerFilter(event.target.value)}>
+                {workerOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'all' ? 'All workers' : option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={label}>
+              Search
+              <input
+                className={input}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Resident code, worker, gap area…"
+              />
+            </label>
+          </div>
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
