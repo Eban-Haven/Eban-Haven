@@ -24,7 +24,7 @@ import {
   type ProcessRecording,
   type ResidentSummary,
 } from '../../../api/admin'
-import { alertError, card, statCardInner, statCardSub, statCardValue } from '../shared/adminStyles'
+import { alertError, card, pageDesc, pageTitle, statCardInner, statCardSub, statCardValue } from '../shared/adminStyles'
 
 const shortcuts = [
   {
@@ -76,6 +76,36 @@ function daysUntil(value: string | null | undefined) {
 
 function residentLabel(resident: ResidentSummary) {
   return resident.internalCode || resident.caseControlNo
+}
+
+function KpiCard({
+  label,
+  value,
+  sub,
+  accentClass,
+  icon: Icon,
+}: {
+  label: string
+  value: string
+  sub: string
+  accentClass: string
+  icon: React.ElementType
+}) {
+  return (
+    <div className={`${card} relative overflow-hidden`}>
+      <div className={`absolute left-0 top-0 h-full w-1 ${accentClass}`} />
+      <div className="flex items-start justify-between gap-2 pl-3">
+        <div className="min-w-0">
+          <p className={statCardInner}>{label}</p>
+          <p className={statCardValue}>{value}</p>
+          <p className={statCardSub}>{sub}</p>
+        </div>
+        <div className="shrink-0 rounded-lg bg-muted/60 p-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function SocialWorkerDashboardPage() {
@@ -185,67 +215,50 @@ export function SocialWorkerDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-[1.75rem] border border-border bg-card shadow-sm">
-        <div className="border-b border-border bg-[radial-gradient(circle_at_top_right,_rgba(21,128,61,0.12),_transparent_28%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(12,74,110,0.93))] px-6 py-7 text-white lg:px-8">
-          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/80">
-                <HeartHandshake className="h-3.5 w-3.5" />
-                Social Worker Dashboard
-              </div>
-              <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight sm:text-4xl">
-                Caseload priorities, follow-up work, and documentation cues for daily practice
-              </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">
-                Use this space to track active cases, reintegration work, recent visits, upcoming conferences, and follow-up items that need attention.
-              </p>
-            </div>
+      <div>
+        <h2 className={pageTitle}>Social Worker Dashboard</h2>
+        <p className={pageDesc}>
+          Caseload priorities, follow-up work, and documentation cues for daily practice.
+        </p>
+      </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[34rem]">
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">Open cases</p>
-                <p className="mt-2 text-3xl font-bold">{openCases.length}</p>
-                <p className="mt-1 text-xs text-white/65">Residents currently active in program records</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">Reintegration</p>
-                <p className="mt-2 text-3xl font-bold">{reintegrationInProgress.length}</p>
-                <p className="mt-1 text-xs text-white/65">
-                  Success rate {dashboard.reintegration.successRatePercent.toFixed(0)}%
-                </p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/65">Documentation volume</p>
-                <p className="mt-2 text-3xl font-bold">{dashboard.processRecordingsCount}</p>
-                <p className="mt-1 text-xs text-white/65">{dashboard.homeVisitationsLast90Days} home visits in the last 90 days</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-4 bg-card px-6 py-6 md:grid-cols-2 xl:grid-cols-4 xl:px-8">
-          <div className="rounded-2xl border border-border bg-background/70 p-4">
-            <p className={statCardInner}>High-risk residents</p>
-            <p className={statCardValue}>{highRiskResidents.length}</p>
-            <p className={statCardSub}>Residents marked high or critical in current risk level</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-background/70 p-4">
-            <p className={statCardInner}>Upcoming conferences</p>
-            <p className={statCardValue}>{dashboard.upcomingCaseConferences.length}</p>
-            <p className={statCardSub}>Conference-linked intervention plans already on the calendar</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-background/70 p-4">
-            <p className={statCardInner}>Recent visit activity</p>
-            <p className={statCardValue}>{recentVisits.length}</p>
-            <p className={statCardSub}>Most recent field or family visit entries surfaced below</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-background/70 p-4">
-            <p className={statCardInner}>Safehouse load</p>
-            <p className={statCardValue}>{dashboard.activeResidentsTotal}</p>
-            <p className={statCardSub}>Active residents across all safehouses in the current dataset</p>
-          </div>
-        </div>
-      </section>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiCard
+          label="Open cases"
+          value={String(openCases.length)}
+          sub="Residents currently active in program records"
+          accentClass="bg-primary"
+          icon={HeartHandshake}
+        />
+        <KpiCard
+          label="High-risk residents"
+          value={String(highRiskResidents.length)}
+          sub="Current risk marked high or critical"
+          accentClass="bg-destructive"
+          icon={TriangleAlert}
+        />
+        <KpiCard
+          label="Reintegration"
+          value={String(reintegrationInProgress.length)}
+          sub={`Success rate ${dashboard.reintegration.successRatePercent.toFixed(0)}%`}
+          accentClass="bg-sky-500"
+          icon={Waypoints}
+        />
+        <KpiCard
+          label="Upcoming conferences"
+          value={String(dashboard.upcomingCaseConferences.length)}
+          sub="Conference-linked plans already scheduled"
+          accentClass="bg-amber-500"
+          icon={CalendarDays}
+        />
+        <KpiCard
+          label="Home visits (90 d)"
+          value={String(dashboard.homeVisitationsLast90Days)}
+          sub="Recent field and family contact volume"
+          accentClass="bg-emerald-500"
+          icon={Home}
+        />
+      </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
         <div className={`${card} space-y-5`}>
