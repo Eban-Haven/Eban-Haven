@@ -35,28 +35,7 @@ type CohortResident = ResidentSummary & {
   readiness: ReintegrationResult
 }
 
-function ReadinessTierCard({
-  label,
-  count,
-  total,
-  tone,
-}: {
-  label: string
-  count: number
-  total: number
-  tone: string
-}) {
-  const percent = total > 0 ? Math.round((count / total) * 100) : 0
-  return (
-    <div className={`${card} space-y-2`}>
-      <p className={statCardInner}>{label}</p>
-      <p className={statCardValue}>{count}</p>
-      <p className={`${statCardSub} ${tone}`}>{percent}% of scored residents</p>
-    </div>
-  )
-}
-
-function ReadinessDistributionBar({
+function CohortOverviewCard({
   counts,
   total,
 }: {
@@ -67,10 +46,29 @@ function ReadinessDistributionBar({
   return (
     <div className={`${card} space-y-4`}>
       <div>
-        <h3 className="text-base font-semibold text-foreground">Cohort distribution</h3>
+        <h3 className="text-base font-semibold text-foreground">Cohort Overview</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Snapshot across residents with a current readiness prediction.
+          Current readiness mix across residents with a live prediction score.
         </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {segments.map((tier) => {
+          const percent = total > 0 ? Math.round((counts[tier] / total) * 100) : 0
+          const tone =
+            tier === 'High Readiness'
+              ? 'text-emerald-700'
+              : tier === 'Moderate Readiness'
+                ? 'text-amber-700'
+                : 'text-red-700'
+
+          return (
+            <div key={tier} className={`rounded-xl border px-4 py-4 ${TIER_CONFIG[tier].border} ${TIER_CONFIG[tier].bg}`}>
+              <p className={statCardInner}>{tier}</p>
+              <p className={statCardValue}>{counts[tier]}</p>
+              <p className={`${statCardSub} ${tone}`}>{percent}% of scored residents</p>
+            </div>
+          )
+        })}
       </div>
       <div className="flex h-4 overflow-hidden rounded-full bg-muted">
         {segments.map((tier) => {
@@ -78,14 +76,7 @@ function ReadinessDistributionBar({
           return <div key={tier} className={`h-full ${TIER_CONFIG[tier].bar}`} style={{ width: `${width}%` }} />
         })}
       </div>
-      <div className="grid gap-3 md:grid-cols-3">
-        {segments.map((tier) => (
-          <div key={tier} className={`rounded-xl border px-4 py-3 ${TIER_CONFIG[tier].border} ${TIER_CONFIG[tier].bg}`}>
-            <p className={`text-xs font-semibold uppercase tracking-wide ${TIER_CONFIG[tier].text}`}>{tier}</p>
-            <p className="mt-2 text-xl font-semibold text-foreground">{counts[tier]}</p>
-          </div>
-        ))}
-      </div>
+      <p className="text-xs text-muted-foreground">{total} residents currently scored.</p>
     </div>
   )
 }
@@ -288,23 +279,15 @@ export function ReintegrationReadinessPage() {
 
       {loading ? (
         <div className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className={`${card} animate-pulse space-y-3`}>
-                <div className="h-4 w-28 rounded bg-muted" />
-                <div className="h-8 w-20 rounded bg-muted" />
-                <div className="h-3 w-36 rounded bg-muted" />
-              </div>
-            ))}
-          </div>
           <div className={`${card} animate-pulse space-y-4`}>
             <div className="h-4 w-40 rounded bg-muted" />
-            <div className="h-4 w-full rounded bg-muted" />
             <div className="grid gap-3 md:grid-cols-3">
               {Array.from({ length: 3 }).map((_, index) => (
                 <div key={index} className="h-20 rounded-xl bg-muted" />
               ))}
             </div>
+            <div className="h-4 w-full rounded bg-muted" />
+            <div className="h-3 w-36 rounded bg-muted" />
           </div>
           <div className={`${card} animate-pulse space-y-4`}>
             <div className="flex items-center justify-between gap-4">
@@ -319,13 +302,7 @@ export function ReintegrationReadinessPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <ReadinessTierCard label="High readiness" count={tierCounts['High Readiness']} total={filteredRows.length} tone="text-emerald-700" />
-            <ReadinessTierCard label="Moderate readiness" count={tierCounts['Moderate Readiness']} total={filteredRows.length} tone="text-amber-700" />
-            <ReadinessTierCard label="Low readiness" count={tierCounts['Low Readiness']} total={filteredRows.length} tone="text-red-700" />
-          </div>
-
-          <ReadinessDistributionBar counts={tierCounts} total={filteredRows.length} />
+          <CohortOverviewCard counts={tierCounts} total={filteredRows.length} />
 
           <div className={`${card} grid gap-4 lg:grid-cols-4`}>
             <label className={label}>
