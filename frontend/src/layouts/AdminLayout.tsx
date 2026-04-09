@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom'
 import {
   BarChart3,
   Bot,
+  Coins,
   Layers,
   LayoutDashboard,
   LineChart,
@@ -40,6 +41,7 @@ const navGroups: NavGroup[] = [
     title: 'All',
     items: [
       { to: '/admin', label: 'Admin Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/admin/my-donations', label: 'My Donations', icon: Coins },
       { to: '/admin/reports', label: 'Reports & Analytics', icon: BarChart3 },
     ],
   },
