@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Bot, LineChart, RefreshCw, TrendingUp, Users, Megaphone, Share2 } from 'lucide-react'
+import { ArrowRight, Bot, CalendarDays, Hash, LineChart, Megaphone, RefreshCw, Share2, Target, TrendingUp, Users } from 'lucide-react'
 import { card, linkTile, pageDesc, pageTitle } from '../shared/adminStyles'
 import { getMarketingAnalyticsSummary } from '../../../api/adminRest'
 import type {
-  MarketingAnalyticsSummary,
   CampaignPerformance,
   ChannelAttribution,
+  EffectivenessRanking,
+  MarketingAnalyticsSummary,
 } from '../../../api/adminTypes'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -18,6 +19,10 @@ function php(n: number) {
 
 function pct(n: number) {
   return `${n.toFixed(1)}%`
+}
+
+function fmtScore(n: number) {
+  return `${n.toFixed(1)}`
 }
 
 // ── Campaign Revenue Bar Chart ────────────────────────────────────────────────
@@ -154,6 +159,88 @@ function SocialSpotlight({ data }: { data: MarketingAnalyticsSummary['socialMedi
   )
 }
 
+// ── Effectiveness Rankings ────────────────────────────────────────────────────
+
+function EffectivenessChart({
+  rows,
+  emptyLabel,
+}: {
+  rows: EffectivenessRanking[]
+  emptyLabel: string
+}) {
+  const maxScore = rows[0]?.effectivenessScore ?? 1
+
+  if (rows.length === 0) {
+    return <p className="text-sm text-muted-foreground">{emptyLabel}</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row, i) => (
+        <div key={row.label} className="group flex items-center gap-4">
+          <div className="w-36 shrink-0 text-right">
+            <span className="text-sm text-foreground">{row.label}</span>
+            <span className="block text-xs text-muted-foreground">{row.postCount} posts</span>
+          </div>
+
+          <div className="flex flex-1 items-center gap-3">
+            <div className="relative h-9 flex-1 overflow-hidden rounded-md bg-primary/10">
+              <motion.div
+                className="h-full rounded-md bg-primary/80 group-hover:bg-primary"
+                style={{ originX: 0 }}
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: row.effectivenessScore / maxScore }}
+                transition={{ duration: 0.6, delay: i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+              />
+            </div>
+            <motion.span
+              className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: i * 0.08 + 0.3 }}
+            >
+              {fmtScore(row.effectivenessScore)}
+            </motion.span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EffectivenessCard({
+  title,
+  subtitle,
+  rows,
+  icon,
+}: {
+  title: string
+  subtitle: string
+  rows: EffectivenessRanking[]
+  icon: ReactNode
+}) {
+  const leader = rows[0]
+
+  return (
+    <div className={card}>
+      <div className="mb-5 flex items-center gap-2">
+        {icon}
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <span className="ml-auto text-xs text-muted-foreground">{subtitle}</span>
+      </div>
+      <EffectivenessChart rows={rows} emptyLabel="No ranking data available yet." />
+      {leader && (
+        <p className="mt-4 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{leader.label}</span> currently leads with score{' '}
+          <span className="font-medium text-foreground">{fmtScore(leader.effectivenessScore)}</span>, averaging{' '}
+          <span className="font-medium text-foreground">{php(leader.avgRevenuePerPostPhp)}</span> per post and{' '}
+          <span className="font-medium text-foreground">{leader.avgDonationReferrals.toFixed(1)}</span> donation referrals.
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function MarketingAnalyticsPage() {
@@ -243,9 +330,42 @@ export function MarketingAnalyticsPage() {
             </div>
             <SocialSpotlight data={data.socialMediaSpotlight} />
             <p className="mt-4 text-xs text-muted-foreground">
-              Platform-level breakdowns (impressions, reach, post-level attribution) will appear here once
-              the social media posts table is added to the database.
+              Effectiveness rankings below use the live `social_media_posts` table and blend revenue, referrals,
+              revenue efficiency, and click-through rate into a single score for comparison.
             </p>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Effectiveness Rankings</h3>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              <EffectivenessCard
+                title="Top Platforms"
+                subtitle="effectiveness score"
+                rows={data.effectiveness.platforms}
+                icon={<TrendingUp className="h-4 w-4 text-primary" />}
+              />
+              <EffectivenessCard
+                title="Best Days To Post"
+                subtitle="effectiveness score"
+                rows={data.effectiveness.daysOfWeek}
+                icon={<CalendarDays className="h-4 w-4 text-primary" />}
+              />
+              <EffectivenessCard
+                title="Top Content Topics"
+                subtitle="effectiveness score"
+                rows={data.effectiveness.contentTopics}
+                icon={<Megaphone className="h-4 w-4 text-primary" />}
+              />
+              <EffectivenessCard
+                title="Top Hashtags"
+                subtitle="minimum 3 posts"
+                rows={data.effectiveness.hashtags}
+                icon={<Hash className="h-4 w-4 text-primary" />}
+              />
+            </div>
           </div>
 
         </>

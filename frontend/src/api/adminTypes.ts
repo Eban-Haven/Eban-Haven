@@ -354,6 +354,16 @@ export type SocialMediaSpotlight = {
   avgLtvAllDonorsPhp: number
 }
 
+export type EffectivenessRanking = {
+  label: string
+  postCount: number
+  avgRevenuePerPostPhp: number
+  avgDonationReferrals: number
+  revenuePerThousandReachPhp: number
+  clickThroughRatePct: number
+  effectivenessScore: number
+}
+
 export type CausalEstimate = {
   coefficient: number
   ci_lower: number
@@ -367,6 +377,12 @@ export type MarketingAnalyticsSummary = {
   campaigns: CampaignPerformance[]
   channels: ChannelAttribution[]
   socialMediaSpotlight: SocialMediaSpotlight
+  effectiveness: {
+    platforms: EffectivenessRanking[]
+    daysOfWeek: EffectivenessRanking[]
+    contentTopics: EffectivenessRanking[]
+    hashtags: EffectivenessRanking[]
+  }
   causalEstimates: {
     pipeline_version: string
     last_run: string

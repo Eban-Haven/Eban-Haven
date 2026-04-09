@@ -44,10 +44,28 @@ file record SocialMediaSpotlight(
     [property: JsonPropertyName("avgLtvAllDonorsPhp")]     decimal  AvgLtvAllDonorsPhp
 );
 
+record EffectivenessRankingRow(
+    [property: JsonPropertyName("label")]                     string  Label,
+    [property: JsonPropertyName("postCount")]                 int     PostCount,
+    [property: JsonPropertyName("avgRevenuePerPostPhp")]      decimal AvgRevenuePerPostPhp,
+    [property: JsonPropertyName("avgDonationReferrals")]      decimal AvgDonationReferrals,
+    [property: JsonPropertyName("revenuePerThousandReachPhp")] decimal RevenuePerThousandReachPhp,
+    [property: JsonPropertyName("clickThroughRatePct")]       decimal ClickThroughRatePct,
+    [property: JsonPropertyName("effectivenessScore")]        double  EffectivenessScore
+);
+
+record MarketingEffectivenessSummary(
+    [property: JsonPropertyName("platforms")]     IEnumerable<EffectivenessRankingRow> Platforms,
+    [property: JsonPropertyName("daysOfWeek")]    IEnumerable<EffectivenessRankingRow> DaysOfWeek,
+    [property: JsonPropertyName("contentTopics")] IEnumerable<EffectivenessRankingRow> ContentTopics,
+    [property: JsonPropertyName("hashtags")]      IEnumerable<EffectivenessRankingRow> Hashtags
+);
+
 file record MarketingAnalyticsSummary(
     [property: JsonPropertyName("campaigns")]             IEnumerable<CampaignPerformanceRow> Campaigns,
     [property: JsonPropertyName("channels")]              IEnumerable<ChannelAttributionRow>  Channels,
     [property: JsonPropertyName("socialMediaSpotlight")]  SocialMediaSpotlight                SocialMediaSpotlight,
+    [property: JsonPropertyName("effectiveness")]         MarketingEffectivenessSummary       Effectiveness,
     [property: JsonPropertyName("causalEstimates")]       object?                             CausalEstimates,
     [property: JsonPropertyName("lastAnalysisRun")]       string?                             LastAnalysisRun
 );
@@ -160,6 +178,141 @@ public sealed class MarketingAnalyticsController(
         WHERE s.acquisition_channel = 'SocialMedia'
         """;
 
+    private const string PlatformEffectivenessSql = """
+        SELECT
+            COALESCE(platform, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(AVG(COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS avg_revenue_per_post_php,
+            ROUND(AVG(COALESCE(donation_referrals, 0))::numeric, 2) AS avg_donation_referrals,
+            ROUND(AVG(CASE WHEN COALESCE(reach, 0) > 0
+                THEN 1000.0 * COALESCE(estimated_donation_value_php, 0) / reach
+                ELSE 0 END)::numeric, 2) AS revenue_per_thousand_reach_php,
+            ROUND(AVG(CASE WHEN COALESCE(reach, 0) > 0
+                THEN 100.0 * COALESCE(click_throughs, 0) / reach
+                ELSE 0 END)::numeric, 2) AS click_through_rate_pct
+        FROM social_media_posts
+        GROUP BY COALESCE(platform, 'Unknown')
+        ORDER BY avg_revenue_per_post_php DESC, post_count DESC
+        """;
+
+    private const string DayOfWeekEffectivenessSql = """
+        SELECT
+            COALESCE(day_of_week, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(AVG(COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS avg_revenue_per_post_php,
+            ROUND(AVG(COALESCE(donation_referrals, 0))::numeric, 2) AS avg_donation_referrals,
+            ROUND(AVG(CASE WHEN COALESCE(reach, 0) > 0
+                THEN 1000.0 * COALESCE(estimated_donation_value_php, 0) / reach
+                ELSE 0 END)::numeric, 2) AS revenue_per_thousand_reach_php,
+            ROUND(AVG(CASE WHEN COALESCE(reach, 0) > 0
+                THEN 100.0 * COALESCE(click_throughs, 0) / reach
+                ELSE 0 END)::numeric, 2) AS click_through_rate_pct
+        FROM social_media_posts
+        GROUP BY COALESCE(day_of_week, 'Unknown')
+        ORDER BY avg_revenue_per_post_php DESC, post_count DESC
+        """;
+
+    private const string ContentTopicEffectivenessSql = """
+        SELECT
+            COALESCE(content_topic, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(AVG(COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS avg_revenue_per_post_php,
+            ROUND(AVG(COALESCE(donation_referrals, 0))::numeric, 2) AS avg_donation_referrals,
+            ROUND(AVG(CASE WHEN COALESCE(reach, 0) > 0
+                THEN 1000.0 * COALESCE(estimated_donation_value_php, 0) / reach
+                ELSE 0 END)::numeric, 2) AS revenue_per_thousand_reach_php,
+            ROUND(AVG(CASE WHEN COALESCE(reach, 0) > 0
+                THEN 100.0 * COALESCE(click_throughs, 0) / reach
+                ELSE 0 END)::numeric, 2) AS click_through_rate_pct
+        FROM social_media_posts
+        GROUP BY COALESCE(content_topic, 'Unknown')
+        ORDER BY avg_revenue_per_post_php DESC, post_count DESC
+        """;
+
+    private const string HashtagEffectivenessSql = """
+        WITH exploded AS (
+            SELECT
+                LOWER(TRIM(tag)) AS label,
+                COALESCE(estimated_donation_value_php, 0) AS estimated_donation_value_php,
+                COALESCE(donation_referrals, 0) AS donation_referrals,
+                COALESCE(reach, 0) AS reach,
+                COALESCE(click_throughs, 0) AS click_throughs
+            FROM social_media_posts
+            CROSS JOIN LATERAL regexp_split_to_table(COALESCE(hashtags, ''), '\s*,\s*') AS tag
+            WHERE NULLIF(TRIM(tag), '') IS NOT NULL
+        )
+        SELECT
+            label,
+            COUNT(*)::int AS post_count,
+            ROUND(AVG(estimated_donation_value_php)::numeric, 2) AS avg_revenue_per_post_php,
+            ROUND(AVG(donation_referrals)::numeric, 2) AS avg_donation_referrals,
+            ROUND(AVG(CASE WHEN reach > 0
+                THEN 1000.0 * estimated_donation_value_php / reach
+                ELSE 0 END)::numeric, 2) AS revenue_per_thousand_reach_php,
+            ROUND(AVG(CASE WHEN reach > 0
+                THEN 100.0 * click_throughs / reach
+                ELSE 0 END)::numeric, 2) AS click_through_rate_pct
+        FROM exploded
+        GROUP BY label
+        HAVING COUNT(*) >= 3
+        ORDER BY avg_revenue_per_post_php DESC, post_count DESC
+        LIMIT 12
+        """;
+
+    private static IReadOnlyList<EffectivenessRankingRow> BuildEffectivenessRows(IEnumerable<dynamic> rows, int take = 8)
+    {
+        var raw = rows.Select(r => new
+        {
+            Label = (string)(r.label ?? "Unknown"),
+            PostCount = (int)(r.post_count ?? 0),
+            AvgRevenuePerPostPhp = (decimal)(r.avg_revenue_per_post_php ?? 0m),
+            AvgDonationReferrals = (decimal)(r.avg_donation_referrals ?? 0m),
+            RevenuePerThousandReachPhp = (decimal)(r.revenue_per_thousand_reach_php ?? 0m),
+            ClickThroughRatePct = (decimal)(r.click_through_rate_pct ?? 0m),
+        }).ToList();
+
+        if (raw.Count == 0)
+            return [];
+
+        var maxRevenue = Math.Max(raw.Max(x => ToDouble(x.AvgRevenuePerPostPhp)), 1d);
+        var maxReferrals = Math.Max(raw.Max(x => ToDouble(x.AvgDonationReferrals)), 1d);
+        var maxRevenueEfficiency = Math.Max(raw.Max(x => ToDouble(x.RevenuePerThousandReachPhp)), 1d);
+        var maxCtr = Math.Max(raw.Max(x => ToDouble(x.ClickThroughRatePct)), 1d);
+
+        return raw
+            .Select(x =>
+            {
+                var revenueScore = ToDouble(x.AvgRevenuePerPostPhp) / maxRevenue;
+                var referralScore = ToDouble(x.AvgDonationReferrals) / maxReferrals;
+                var revenueEfficiencyScore = ToDouble(x.RevenuePerThousandReachPhp) / maxRevenueEfficiency;
+                var ctrScore = ToDouble(x.ClickThroughRatePct) / maxCtr;
+                var effectivenessScore = Math.Round(
+                    100 * (
+                        0.45 * revenueScore +
+                        0.25 * referralScore +
+                        0.20 * revenueEfficiencyScore +
+                        0.10 * ctrScore
+                    ),
+                    1
+                );
+
+                return new EffectivenessRankingRow(
+                    Label: x.Label,
+                    PostCount: x.PostCount,
+                    AvgRevenuePerPostPhp: x.AvgRevenuePerPostPhp,
+                    AvgDonationReferrals: x.AvgDonationReferrals,
+                    RevenuePerThousandReachPhp: x.RevenuePerThousandReachPhp,
+                    ClickThroughRatePct: x.ClickThroughRatePct,
+                    EffectivenessScore: effectivenessScore
+                );
+            })
+            .OrderByDescending(x => x.EffectivenessScore)
+            .ThenByDescending(x => x.AvgRevenuePerPostPhp)
+            .ThenByDescending(x => x.PostCount)
+            .Take(take)
+            .ToArray();
+    }
+
     [HttpGet("summary")]
     public async Task<IActionResult> GetSummary(CancellationToken ct)
     {
@@ -207,6 +360,23 @@ public sealed class MarketingAnalyticsController(
             AvgLtvAllDonorsPhp: (decimal)(ltvRow.avg_ltv ?? 0m)
         );
 
+        IReadOnlyList<EffectivenessRankingRow> platforms = [];
+        IReadOnlyList<EffectivenessRankingRow> daysOfWeek = [];
+        IReadOnlyList<EffectivenessRankingRow> contentTopics = [];
+        IReadOnlyList<EffectivenessRankingRow> hashtags = [];
+        try
+        {
+            platforms = BuildEffectivenessRows(await conn.QueryAsync<dynamic>(PlatformEffectivenessSql), take: 7);
+            daysOfWeek = BuildEffectivenessRows(await conn.QueryAsync<dynamic>(DayOfWeekEffectivenessSql), take: 7);
+            contentTopics = BuildEffectivenessRows(await conn.QueryAsync<dynamic>(ContentTopicEffectivenessSql), take: 8);
+            hashtags = BuildEffectivenessRows(await conn.QueryAsync<dynamic>(HashtagEffectivenessSql), take: 8);
+        }
+        catch
+        {
+            // Social media posts table may not be present/populated in some environments yet.
+            // Keep the rest of the marketing dashboard available.
+        }
+
         // Attempt to fetch causal estimates from Python ML service
         object? causalEstimates = null;
         string? lastAnalysisRun = null;
@@ -232,6 +402,12 @@ public sealed class MarketingAnalyticsController(
             Campaigns:            campaigns,
             Channels:             channels,
             SocialMediaSpotlight: spotlight,
+            Effectiveness:        new MarketingEffectivenessSummary(
+                Platforms: platforms,
+                DaysOfWeek: daysOfWeek,
+                ContentTopics: contentTopics,
+                Hashtags: hashtags
+            ),
             CausalEstimates:      causalEstimates,
             LastAnalysisRun:      lastAnalysisRun
         ));
