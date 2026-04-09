@@ -1,0 +1,88 @@
+-- Verify + import Home Visitations from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-home-visitations.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.home_visitations column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='home_visitations'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import home_visitations.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_home_visitations;
+CREATE TEMP TABLE stage_home_visitations
+(
+  visitation_id text,
+  resident_id text,
+  visit_date text,
+  social_worker text,
+  visit_type text,
+  location_visited text,
+  family_members_present text,
+  purpose text,
+  observations text,
+  family_cooperation_level text,
+  safety_concerns_noted text,
+  follow_up_needed text,
+  follow_up_notes text,
+  visit_outcome text
+);
+COMMIT;
+
+\copy stage_home_visitations FROM 'backend/EbanHaven.Api/Data/lighthouse/home_visitations.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.home_visitations =='
+
+BEGIN;
+INSERT INTO public.home_visitations
+(
+  visitation_id, resident_id, visit_date, social_worker, visit_type, location_visited,
+  family_members_present, purpose, observations, family_cooperation_level, safety_concerns_noted,
+  follow_up_needed, follow_up_notes, visit_outcome
+)
+SELECT
+  nullif(visitation_id,'')::int,
+  nullif(resident_id,'')::int,
+  nullif(visit_date,'')::date,
+  coalesce(social_worker,''),
+  coalesce(visit_type,''),
+  nullif(location_visited,''),
+  nullif(family_members_present,''),
+  nullif(purpose,''),
+  nullif(observations,''),
+  nullif(family_cooperation_level,''),
+  coalesce(nullif(safety_concerns_noted,''), 'false')::boolean,
+  coalesce(nullif(follow_up_needed,''), 'false')::boolean,
+  nullif(follow_up_notes,''),
+  nullif(visit_outcome,'')
+FROM stage_home_visitations
+WHERE nullif(visitation_id,'') IS NOT NULL
+ON CONFLICT (visitation_id) DO UPDATE SET
+  resident_id = EXCLUDED.resident_id,
+  visit_date = EXCLUDED.visit_date,
+  social_worker = EXCLUDED.social_worker,
+  visit_type = EXCLUDED.visit_type,
+  location_visited = EXCLUDED.location_visited,
+  family_members_present = EXCLUDED.family_members_present,
+  purpose = EXCLUDED.purpose,
+  observations = EXCLUDED.observations,
+  family_cooperation_level = EXCLUDED.family_cooperation_level,
+  safety_concerns_noted = EXCLUDED.safety_concerns_noted,
+  follow_up_needed = EXCLUDED.follow_up_needed,
+  follow_up_notes = EXCLUDED.follow_up_notes,
+  visit_outcome = EXCLUDED.visit_outcome;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.home_visitations =='
+SELECT count(*) AS home_visitations_count FROM public.home_visitations;
+

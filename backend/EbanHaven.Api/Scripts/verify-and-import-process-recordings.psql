@@ -1,0 +1,91 @@
+-- Verify + import Process Recordings from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-process-recordings.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.process_recordings column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='process_recordings'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import process_recordings.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_process_recordings;
+CREATE TEMP TABLE stage_process_recordings
+(
+  recording_id text,
+  resident_id text,
+  session_date text,
+  social_worker text,
+  session_type text,
+  session_duration_minutes text,
+  emotional_state_observed text,
+  emotional_state_end text,
+  session_narrative text,
+  interventions_applied text,
+  follow_up_actions text,
+  progress_noted text,
+  concerns_flagged text,
+  referral_made text,
+  notes_restricted text
+);
+COMMIT;
+
+\copy stage_process_recordings FROM 'backend/EbanHaven.Api/Data/lighthouse/process_recordings.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.process_recordings =='
+
+BEGIN;
+INSERT INTO public.process_recordings
+(
+  recording_id, resident_id, session_date, social_worker, session_type, session_duration_minutes,
+  emotional_state_observed, emotional_state_end, session_narrative, interventions_applied, follow_up_actions,
+  progress_noted, concerns_flagged, referral_made, notes_restricted
+)
+SELECT
+  nullif(recording_id,'')::int,
+  nullif(resident_id,'')::int,
+  nullif(session_date,'')::date,
+  coalesce(social_worker,''),
+  coalesce(session_type,''),
+  nullif(session_duration_minutes,'')::int,
+  nullif(emotional_state_observed,''),
+  nullif(emotional_state_end,''),
+  coalesce(session_narrative,''),
+  nullif(interventions_applied,''),
+  nullif(follow_up_actions,''),
+  coalesce(nullif(progress_noted,''), 'false')::boolean,
+  coalesce(nullif(concerns_flagged,''), 'false')::boolean,
+  coalesce(nullif(referral_made,''), 'false')::boolean,
+  nullif(notes_restricted,'')
+FROM stage_process_recordings
+WHERE nullif(recording_id,'') IS NOT NULL
+ON CONFLICT (recording_id) DO UPDATE SET
+  resident_id = EXCLUDED.resident_id,
+  session_date = EXCLUDED.session_date,
+  social_worker = EXCLUDED.social_worker,
+  session_type = EXCLUDED.session_type,
+  session_duration_minutes = EXCLUDED.session_duration_minutes,
+  emotional_state_observed = EXCLUDED.emotional_state_observed,
+  emotional_state_end = EXCLUDED.emotional_state_end,
+  session_narrative = EXCLUDED.session_narrative,
+  interventions_applied = EXCLUDED.interventions_applied,
+  follow_up_actions = EXCLUDED.follow_up_actions,
+  progress_noted = EXCLUDED.progress_noted,
+  concerns_flagged = EXCLUDED.concerns_flagged,
+  referral_made = EXCLUDED.referral_made,
+  notes_restricted = EXCLUDED.notes_restricted;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.process_recordings =='
+SELECT count(*) AS process_recordings_count FROM public.process_recordings;
+

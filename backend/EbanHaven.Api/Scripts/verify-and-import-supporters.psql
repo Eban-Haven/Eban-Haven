@@ -1,0 +1,90 @@
+-- Verify + import Supporters from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-supporters.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.supporters column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='supporters'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import supporters.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_supporters;
+CREATE TEMP TABLE stage_supporters
+(
+  supporter_id text,
+  supporter_type text,
+  display_name text,
+  organization_name text,
+  first_name text,
+  last_name text,
+  relationship_type text,
+  region text,
+  country text,
+  email text,
+  phone text,
+  status text,
+  created_at text,
+  first_donation_date text,
+  acquisition_channel text
+);
+COMMIT;
+
+\copy stage_supporters FROM 'backend/EbanHaven.Api/Data/lighthouse/supporters.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.supporters =='
+
+BEGIN;
+INSERT INTO public.supporters
+(
+  supporter_id, supporter_type, display_name, organization_name, first_name, last_name,
+  relationship_type, region, country, email, phone, status, created_at, first_donation_date, acquisition_channel
+)
+SELECT
+  nullif(supporter_id,'')::int,
+  coalesce(supporter_type,''),
+  coalesce(display_name,''),
+  nullif(organization_name,''),
+  nullif(first_name,''),
+  nullif(last_name,''),
+  nullif(relationship_type,''),
+  nullif(region,''),
+  nullif(country,''),
+  nullif(email,''),
+  nullif(phone,''),
+  coalesce(status,''),
+  nullif(created_at,'')::timestamp,
+  nullif(first_donation_date,'')::date,
+  nullif(acquisition_channel,'')
+FROM stage_supporters
+WHERE nullif(supporter_id,'') IS NOT NULL
+ON CONFLICT (supporter_id) DO UPDATE SET
+  supporter_type = EXCLUDED.supporter_type,
+  display_name = EXCLUDED.display_name,
+  organization_name = EXCLUDED.organization_name,
+  first_name = EXCLUDED.first_name,
+  last_name = EXCLUDED.last_name,
+  relationship_type = EXCLUDED.relationship_type,
+  region = EXCLUDED.region,
+  country = EXCLUDED.country,
+  email = EXCLUDED.email,
+  phone = EXCLUDED.phone,
+  status = EXCLUDED.status,
+  created_at = EXCLUDED.created_at,
+  first_donation_date = EXCLUDED.first_donation_date,
+  acquisition_channel = EXCLUDED.acquisition_channel;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.supporters =='
+SELECT count(*) AS supporters_count FROM public.supporters;
+

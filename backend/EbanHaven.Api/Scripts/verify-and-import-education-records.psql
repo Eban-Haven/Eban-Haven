@@ -1,0 +1,75 @@
+-- Verify + import Education Records from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-education-records.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.education_records column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='education_records'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import education_records.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_education_records;
+CREATE TEMP TABLE stage_education_records
+(
+  education_record_id text,
+  resident_id text,
+  record_date text,
+  education_level text,
+  school_name text,
+  enrollment_status text,
+  attendance_rate text,
+  progress_percent text,
+  completion_status text,
+  notes text
+);
+COMMIT;
+
+\copy stage_education_records FROM 'backend/EbanHaven.Api/Data/lighthouse/education_records.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.education_records =='
+
+BEGIN;
+INSERT INTO public.education_records
+(
+  education_record_id, resident_id, record_date, education_level, school_name,
+  enrollment_status, attendance_rate, progress_percent, completion_status, notes
+)
+SELECT
+  nullif(education_record_id,'')::int,
+  nullif(resident_id,'')::int,
+  nullif(record_date,'')::date,
+  nullif(education_level,''),
+  nullif(school_name,''),
+  nullif(enrollment_status,''),
+  nullif(attendance_rate,'')::double precision,
+  nullif(progress_percent,'')::double precision,
+  nullif(completion_status,''),
+  nullif(notes,'')
+FROM stage_education_records
+WHERE nullif(education_record_id,'') IS NOT NULL
+ON CONFLICT (education_record_id) DO UPDATE SET
+  resident_id = EXCLUDED.resident_id,
+  record_date = EXCLUDED.record_date,
+  education_level = EXCLUDED.education_level,
+  school_name = EXCLUDED.school_name,
+  enrollment_status = EXCLUDED.enrollment_status,
+  attendance_rate = EXCLUDED.attendance_rate,
+  progress_percent = EXCLUDED.progress_percent,
+  completion_status = EXCLUDED.completion_status,
+  notes = EXCLUDED.notes;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.education_records =='
+SELECT count(*) AS education_records_count FROM public.education_records;
+

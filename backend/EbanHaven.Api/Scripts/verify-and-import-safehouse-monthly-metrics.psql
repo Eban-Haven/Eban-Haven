@@ -1,0 +1,78 @@
+-- Verify + import Safehouse Monthly Metrics from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-safehouse-monthly-metrics.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.safehouse_monthly_metrics column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='safehouse_monthly_metrics'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import safehouse_monthly_metrics.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_safehouse_monthly_metrics;
+CREATE TEMP TABLE stage_safehouse_monthly_metrics
+(
+  metric_id text,
+  safehouse_id text,
+  month_start text,
+  month_end text,
+  active_residents text,
+  avg_education_progress text,
+  avg_health_score text,
+  process_recording_count text,
+  home_visitation_count text,
+  incident_count text,
+  notes text
+);
+COMMIT;
+
+\copy stage_safehouse_monthly_metrics FROM 'backend/EbanHaven.Api/Data/lighthouse/safehouse_monthly_metrics.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.safehouse_monthly_metrics =='
+
+BEGIN;
+INSERT INTO public.safehouse_monthly_metrics
+(
+  metric_id, safehouse_id, month_start, month_end, active_residents, avg_education_progress, avg_health_score,
+  process_recording_count, home_visitation_count, incident_count, notes
+)
+SELECT
+  nullif(metric_id,'')::int,
+  nullif(safehouse_id,'')::int,
+  nullif(month_start,'')::date,
+  nullif(month_end,'')::date,
+  nullif(active_residents,'')::int,
+  nullif(avg_education_progress,'')::double precision,
+  nullif(avg_health_score,'')::double precision,
+  nullif(process_recording_count,'')::int,
+  nullif(home_visitation_count,'')::int,
+  nullif(incident_count,'')::int,
+  nullif(notes,'')
+FROM stage_safehouse_monthly_metrics
+WHERE nullif(metric_id,'') IS NOT NULL
+ON CONFLICT (metric_id) DO UPDATE SET
+  safehouse_id = EXCLUDED.safehouse_id,
+  month_start = EXCLUDED.month_start,
+  month_end = EXCLUDED.month_end,
+  active_residents = EXCLUDED.active_residents,
+  avg_education_progress = EXCLUDED.avg_education_progress,
+  avg_health_score = EXCLUDED.avg_health_score,
+  process_recording_count = EXCLUDED.process_recording_count,
+  home_visitation_count = EXCLUDED.home_visitation_count,
+  incident_count = EXCLUDED.incident_count,
+  notes = EXCLUDED.notes;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.safehouse_monthly_metrics =='
+SELECT count(*) AS safehouse_monthly_metrics_count FROM public.safehouse_monthly_metrics;
+

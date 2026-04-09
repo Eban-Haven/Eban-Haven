@@ -1,0 +1,166 @@
+-- Verify + import Social Media Posts from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-social-media-posts.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.social_media_posts column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='social_media_posts'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import social_media_posts.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_social_media_posts;
+CREATE TEMP TABLE stage_social_media_posts
+(
+  post_id text,
+  platform text,
+  platform_post_id text,
+  post_url text,
+  created_at text,
+  day_of_week text,
+  post_hour text,
+  post_type text,
+  media_type text,
+  caption text,
+  hashtags text,
+  num_hashtags text,
+  mentions_count text,
+  has_call_to_action text,
+  call_to_action_type text,
+  content_topic text,
+  sentiment_tone text,
+  caption_length text,
+  features_resident_story text,
+  campaign_name text,
+  is_boosted text,
+  boost_budget_php text,
+  impressions text,
+  reach text,
+  likes text,
+  comments text,
+  shares text,
+  saves text,
+  click_throughs text,
+  video_views text,
+  engagement_rate text,
+  profile_visits text,
+  donation_referrals text,
+  estimated_donation_value_php text,
+  follower_count_at_post text,
+  watch_time_seconds text,
+  avg_view_duration_seconds text,
+  subscriber_count_at_post text,
+  forwards text
+);
+COMMIT;
+
+\copy stage_social_media_posts FROM 'backend/EbanHaven.Api/Data/lighthouse/social_media_posts.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.social_media_posts =='
+
+BEGIN;
+INSERT INTO public.social_media_posts
+(
+  post_id, platform, platform_post_id, post_url, created_at, day_of_week, post_hour, post_type, media_type,
+  caption, hashtags, num_hashtags, mentions_count, has_call_to_action, call_to_action_type, content_topic,
+  sentiment_tone, caption_length, features_resident_story, campaign_name, is_boosted, boost_budget_php,
+  impressions, reach, likes, comments, shares, saves, click_throughs, video_views, engagement_rate,
+  profile_visits, donation_referrals, estimated_donation_value_php, follower_count_at_post,
+  watch_time_seconds, avg_view_duration_seconds, subscriber_count_at_post, forwards
+)
+SELECT
+  nullif(post_id,'')::int,
+  coalesce(platform,''),
+  nullif(platform_post_id,''),
+  nullif(post_url,''),
+  nullif(created_at,'')::timestamp,
+  nullif(day_of_week,''),
+  nullif(post_hour,'')::int,
+  nullif(post_type,''),
+  nullif(media_type,''),
+  nullif(caption,''),
+  nullif(hashtags,''),
+  nullif(num_hashtags,'')::int,
+  nullif(mentions_count,'')::int,
+  nullif(has_call_to_action,'')::boolean,
+  nullif(call_to_action_type,''),
+  nullif(content_topic,''),
+  nullif(sentiment_tone,''),
+  nullif(caption_length,'')::int,
+  nullif(features_resident_story,'')::boolean,
+  nullif(campaign_name,''),
+  nullif(is_boosted,'')::boolean,
+  nullif(boost_budget_php,'')::numeric,
+  nullif(impressions,'')::int,
+  nullif(reach,'')::int,
+  nullif(likes,'')::int,
+  nullif(comments,'')::int,
+  nullif(shares,'')::int,
+  nullif(saves,'')::int,
+  nullif(click_throughs,'')::int,
+  nullif(video_views,'')::int,
+  nullif(engagement_rate,'')::double precision,
+  nullif(profile_visits,'')::int,
+  nullif(donation_referrals,'')::int,
+  nullif(estimated_donation_value_php,'')::numeric,
+  nullif(follower_count_at_post,'')::int,
+  nullif(watch_time_seconds,'')::int,
+  nullif(avg_view_duration_seconds,'')::int,
+  nullif(subscriber_count_at_post,'')::int,
+  nullif(forwards,'')::int
+FROM stage_social_media_posts
+WHERE nullif(post_id,'') IS NOT NULL
+ON CONFLICT (post_id) DO UPDATE SET
+  platform = EXCLUDED.platform,
+  platform_post_id = EXCLUDED.platform_post_id,
+  post_url = EXCLUDED.post_url,
+  created_at = EXCLUDED.created_at,
+  day_of_week = EXCLUDED.day_of_week,
+  post_hour = EXCLUDED.post_hour,
+  post_type = EXCLUDED.post_type,
+  media_type = EXCLUDED.media_type,
+  caption = EXCLUDED.caption,
+  hashtags = EXCLUDED.hashtags,
+  num_hashtags = EXCLUDED.num_hashtags,
+  mentions_count = EXCLUDED.mentions_count,
+  has_call_to_action = EXCLUDED.has_call_to_action,
+  call_to_action_type = EXCLUDED.call_to_action_type,
+  content_topic = EXCLUDED.content_topic,
+  sentiment_tone = EXCLUDED.sentiment_tone,
+  caption_length = EXCLUDED.caption_length,
+  features_resident_story = EXCLUDED.features_resident_story,
+  campaign_name = EXCLUDED.campaign_name,
+  is_boosted = EXCLUDED.is_boosted,
+  boost_budget_php = EXCLUDED.boost_budget_php,
+  impressions = EXCLUDED.impressions,
+  reach = EXCLUDED.reach,
+  likes = EXCLUDED.likes,
+  comments = EXCLUDED.comments,
+  shares = EXCLUDED.shares,
+  saves = EXCLUDED.saves,
+  click_throughs = EXCLUDED.click_throughs,
+  video_views = EXCLUDED.video_views,
+  engagement_rate = EXCLUDED.engagement_rate,
+  profile_visits = EXCLUDED.profile_visits,
+  donation_referrals = EXCLUDED.donation_referrals,
+  estimated_donation_value_php = EXCLUDED.estimated_donation_value_php,
+  follower_count_at_post = EXCLUDED.follower_count_at_post,
+  watch_time_seconds = EXCLUDED.watch_time_seconds,
+  avg_view_duration_seconds = EXCLUDED.avg_view_duration_seconds,
+  subscriber_count_at_post = EXCLUDED.subscriber_count_at_post,
+  forwards = EXCLUDED.forwards;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.social_media_posts =='
+SELECT count(*) AS social_media_posts_count FROM public.social_media_posts;
+

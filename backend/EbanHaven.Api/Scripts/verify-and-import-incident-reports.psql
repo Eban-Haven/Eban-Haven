@@ -1,0 +1,81 @@
+-- Verify + import Incident Reports from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-incident-reports.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.incident_reports column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='incident_reports'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import incident_reports.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_incident_reports;
+CREATE TEMP TABLE stage_incident_reports
+(
+  incident_id text,
+  resident_id text,
+  safehouse_id text,
+  incident_date text,
+  incident_type text,
+  severity text,
+  description text,
+  response_taken text,
+  resolved text,
+  resolution_date text,
+  reported_by text,
+  follow_up_required text
+);
+COMMIT;
+
+\copy stage_incident_reports FROM 'backend/EbanHaven.Api/Data/lighthouse/incident_reports.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.incident_reports =='
+
+BEGIN;
+INSERT INTO public.incident_reports
+(
+  incident_id, resident_id, safehouse_id, incident_date, incident_type, severity, description,
+  response_taken, resolved, resolution_date, reported_by, follow_up_required
+)
+SELECT
+  nullif(incident_id,'')::int,
+  nullif(resident_id,'')::int,
+  nullif(safehouse_id,'')::int,
+  nullif(incident_date,'')::date,
+  coalesce(incident_type,''),
+  coalesce(severity,''),
+  nullif(description,''),
+  nullif(response_taken,''),
+  coalesce(nullif(resolved,''), 'false')::boolean,
+  nullif(resolution_date,'')::date,
+  nullif(reported_by,''),
+  coalesce(nullif(follow_up_required,''), 'false')::boolean
+FROM stage_incident_reports
+WHERE nullif(incident_id,'') IS NOT NULL
+ON CONFLICT (incident_id) DO UPDATE SET
+  resident_id = EXCLUDED.resident_id,
+  safehouse_id = EXCLUDED.safehouse_id,
+  incident_date = EXCLUDED.incident_date,
+  incident_type = EXCLUDED.incident_type,
+  severity = EXCLUDED.severity,
+  description = EXCLUDED.description,
+  response_taken = EXCLUDED.response_taken,
+  resolved = EXCLUDED.resolved,
+  resolution_date = EXCLUDED.resolution_date,
+  reported_by = EXCLUDED.reported_by,
+  follow_up_required = EXCLUDED.follow_up_required;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.incident_reports =='
+SELECT count(*) AS incident_reports_count FROM public.incident_reports;
+

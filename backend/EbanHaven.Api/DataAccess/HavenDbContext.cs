@@ -20,6 +20,10 @@ public sealed class HavenDbContext(DbContextOptions<HavenDbContext> options) : D
     public DbSet<SafehouseMonthlyMetric> SafehouseMonthlyMetrics => Set<SafehouseMonthlyMetric>();
     public DbSet<IncidentReport> IncidentReports => Set<IncidentReport>();
     public DbSet<PlannedSocialPost> PlannedSocialPosts => Set<PlannedSocialPost>();
+    public DbSet<Partner> Partners => Set<Partner>();
+    public DbSet<PartnerAssignment> PartnerAssignments => Set<PartnerAssignment>();
+    public DbSet<InKindDonationItem> InKindDonationItems => Set<InKindDonationItem>();
+    public DbSet<SocialMediaPost> SocialMediaPosts => Set<SocialMediaPost>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,5 +44,9 @@ public sealed class HavenDbContext(DbContextOptions<HavenDbContext> options) : D
         modelBuilder.Entity<SafehouseMonthlyMetric>().ToTable("safehouse_monthly_metrics").HasKey(x => x.MetricId);
         modelBuilder.Entity<IncidentReport>().ToTable("incident_reports").HasKey(x => x.IncidentId);
         modelBuilder.Entity<PlannedSocialPost>().ToTable("planned_social_posts").HasKey(x => x.PlannedSocialPostId);
+        modelBuilder.Entity<Partner>().ToTable("partners").HasKey(x => x.PartnerId);
+        modelBuilder.Entity<PartnerAssignment>().ToTable("partner_assignments").HasKey(x => x.AssignmentId);
+        modelBuilder.Entity<InKindDonationItem>().ToTable("in_kind_donation_items").HasKey(x => x.ItemId);
+        modelBuilder.Entity<SocialMediaPost>().ToTable("social_media_posts").HasKey(x => x.PostId);
     }
 }

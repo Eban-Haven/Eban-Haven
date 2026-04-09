@@ -17,5 +17,6 @@ public sealed class Donation
     [Column("estimated_value")] public decimal? EstimatedValue { get; set; }
     [Column("impact_unit")] public string? ImpactUnit { get; set; }
     [Column("notes")] public string? Notes { get; set; }
+    [Column("referral_post_id")] public int? ReferralPostId { get; set; }
 }
 

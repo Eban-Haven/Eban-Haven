@@ -1,0 +1,65 @@
+-- Verify + import Donation Allocations from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-donation-allocations.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.donation_allocations column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='donation_allocations'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import donation_allocations.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_donation_allocations;
+CREATE TEMP TABLE stage_donation_allocations
+(
+  allocation_id text,
+  donation_id text,
+  safehouse_id text,
+  program_area text,
+  amount_allocated text,
+  allocation_date text,
+  allocation_notes text
+);
+COMMIT;
+
+\copy stage_donation_allocations FROM 'backend/EbanHaven.Api/Data/lighthouse/donation_allocations.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.donation_allocations =='
+
+BEGIN;
+INSERT INTO public.donation_allocations
+(
+  allocation_id, donation_id, safehouse_id, program_area, amount_allocated, allocation_date, allocation_notes
+)
+SELECT
+  nullif(allocation_id,'')::int,
+  nullif(donation_id,'')::int,
+  nullif(safehouse_id,'')::int,
+  coalesce(program_area,''),
+  nullif(amount_allocated,'')::numeric,
+  nullif(allocation_date,'')::date,
+  nullif(allocation_notes,'')
+FROM stage_donation_allocations
+WHERE nullif(allocation_id,'') IS NOT NULL
+ON CONFLICT (allocation_id) DO UPDATE SET
+  donation_id = EXCLUDED.donation_id,
+  safehouse_id = EXCLUDED.safehouse_id,
+  program_area = EXCLUDED.program_area,
+  amount_allocated = EXCLUDED.amount_allocated,
+  allocation_date = EXCLUDED.allocation_date,
+  allocation_notes = EXCLUDED.allocation_notes;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.donation_allocations =='
+SELECT count(*) AS donation_allocations_count FROM public.donation_allocations;
+

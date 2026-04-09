@@ -121,6 +121,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
     {
         return db.Supporters
             .OrderBy(s => s.SupporterId)
+            .AsEnumerable()
             .Select(s => new SupporterDto(
                 s.SupporterId,
                 s.SupporterType,
@@ -133,7 +134,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 NullIfEmpty(s.Email),
                 NullIfEmpty(s.Phone),
                 s.Status,
-                NullIfEmpty(s.FirstDonationDate),
+                s.FirstDonationDate?.ToString("yyyy-MM-dd"),
                 NullIfEmpty(s.AcquisitionChannel),
                 NullIfEmpty(s.RelationshipType)))
             .ToList();

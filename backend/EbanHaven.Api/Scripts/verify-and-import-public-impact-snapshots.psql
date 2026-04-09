@@ -1,0 +1,65 @@
+-- Verify + import Public Impact Snapshots from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-public-impact-snapshots.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.public_impact_snapshots column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='public_impact_snapshots'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import public_impact_snapshots.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_public_impact_snapshots;
+CREATE TEMP TABLE stage_public_impact_snapshots
+(
+  snapshot_id text,
+  snapshot_date text,
+  headline text,
+  summary_text text,
+  metric_payload_json text,
+  is_published text,
+  published_at text
+);
+COMMIT;
+
+\copy stage_public_impact_snapshots FROM 'backend/EbanHaven.Api/Data/lighthouse/public_impact_snapshots.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.public_impact_snapshots =='
+
+BEGIN;
+INSERT INTO public.public_impact_snapshots
+(
+  snapshot_id, snapshot_date, headline, summary_text, metric_payload_json, is_published, published_at
+)
+SELECT
+  nullif(snapshot_id,'')::int,
+  nullif(snapshot_date,'')::date,
+  coalesce(headline,''),
+  coalesce(summary_text,''),
+  nullif(metric_payload_json,''),
+  coalesce(nullif(is_published,''), 'false')::boolean,
+  nullif(published_at,'')::timestamp
+FROM stage_public_impact_snapshots
+WHERE nullif(snapshot_id,'') IS NOT NULL
+ON CONFLICT (snapshot_id) DO UPDATE SET
+  snapshot_date = EXCLUDED.snapshot_date,
+  headline = EXCLUDED.headline,
+  summary_text = EXCLUDED.summary_text,
+  metric_payload_json = EXCLUDED.metric_payload_json,
+  is_published = EXCLUDED.is_published,
+  published_at = EXCLUDED.published_at;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.public_impact_snapshots =='
+SELECT count(*) AS public_impact_snapshots_count FROM public.public_impact_snapshots;
+

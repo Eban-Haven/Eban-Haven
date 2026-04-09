@@ -1,0 +1,78 @@
+-- Verify + import Intervention Plans from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-intervention-plans.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.intervention_plans column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='intervention_plans'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import intervention_plans.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_intervention_plans;
+CREATE TEMP TABLE stage_intervention_plans
+(
+  plan_id text,
+  resident_id text,
+  plan_category text,
+  plan_description text,
+  services_provided text,
+  target_value text,
+  target_date text,
+  status text,
+  case_conference_date text,
+  created_at text,
+  updated_at text
+);
+COMMIT;
+
+\copy stage_intervention_plans FROM 'backend/EbanHaven.Api/Data/lighthouse/intervention_plans.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.intervention_plans =='
+
+BEGIN;
+INSERT INTO public.intervention_plans
+(
+  plan_id, resident_id, plan_category, plan_description, services_provided,
+  target_value, target_date, status, case_conference_date, created_at, updated_at
+)
+SELECT
+  nullif(plan_id,'')::int,
+  nullif(resident_id,'')::int,
+  coalesce(plan_category,''),
+  coalesce(plan_description,''),
+  nullif(services_provided,''),
+  nullif(target_value,'')::double precision,
+  nullif(target_date,'')::date,
+  coalesce(status,''),
+  nullif(case_conference_date,'')::date,
+  nullif(created_at,'')::timestamp,
+  nullif(updated_at,'')::timestamp
+FROM stage_intervention_plans
+WHERE nullif(plan_id,'') IS NOT NULL
+ON CONFLICT (plan_id) DO UPDATE SET
+  resident_id = EXCLUDED.resident_id,
+  plan_category = EXCLUDED.plan_category,
+  plan_description = EXCLUDED.plan_description,
+  services_provided = EXCLUDED.services_provided,
+  target_value = EXCLUDED.target_value,
+  target_date = EXCLUDED.target_date,
+  status = EXCLUDED.status,
+  case_conference_date = EXCLUDED.case_conference_date,
+  created_at = EXCLUDED.created_at,
+  updated_at = EXCLUDED.updated_at;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.intervention_plans =='
+SELECT count(*) AS intervention_plans_count FROM public.intervention_plans;
+

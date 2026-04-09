@@ -1,0 +1,85 @@
+-- Verify + import Donations from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-donations.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.donations column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='donations'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import donations.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_donations;
+CREATE TEMP TABLE stage_donations
+(
+  donation_id text,
+  supporter_id text,
+  donation_type text,
+  donation_date text,
+  is_recurring text,
+  campaign_name text,
+  channel_source text,
+  currency_code text,
+  amount text,
+  estimated_value text,
+  impact_unit text,
+  notes text,
+  referral_post_id text
+);
+COMMIT;
+
+\copy stage_donations FROM 'backend/EbanHaven.Api/Data/lighthouse/donations.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.donations =='
+
+BEGIN;
+INSERT INTO public.donations
+(
+  donation_id, supporter_id, donation_type, donation_date, is_recurring, campaign_name, channel_source, currency_code,
+  amount, estimated_value, impact_unit, notes, referral_post_id
+)
+SELECT
+  nullif(donation_id,'')::int,
+  nullif(supporter_id,'')::int,
+  coalesce(donation_type,''),
+  -- CSV is date-only; cast to timestamptz at midnight UTC if the DB column is timestamptz
+  (nullif(donation_date,'')::date)::timestamp,
+  coalesce(nullif(is_recurring,''), 'false')::boolean,
+  nullif(campaign_name,''),
+  nullif(channel_source,''),
+  nullif(currency_code,''),
+  nullif(amount,'')::numeric,
+  nullif(estimated_value,'')::numeric,
+  nullif(impact_unit,''),
+  nullif(notes,''),
+  nullif(referral_post_id,'')::int
+FROM stage_donations
+WHERE nullif(donation_id,'') IS NOT NULL
+ON CONFLICT (donation_id) DO UPDATE SET
+  supporter_id = EXCLUDED.supporter_id,
+  donation_type = EXCLUDED.donation_type,
+  donation_date = EXCLUDED.donation_date,
+  is_recurring = EXCLUDED.is_recurring,
+  campaign_name = EXCLUDED.campaign_name,
+  channel_source = EXCLUDED.channel_source,
+  currency_code = EXCLUDED.currency_code,
+  amount = EXCLUDED.amount,
+  estimated_value = EXCLUDED.estimated_value,
+  impact_unit = EXCLUDED.impact_unit,
+  notes = EXCLUDED.notes,
+  referral_post_id = EXCLUDED.referral_post_id;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.donations =='
+SELECT count(*) AS donations_count FROM public.donations;
+

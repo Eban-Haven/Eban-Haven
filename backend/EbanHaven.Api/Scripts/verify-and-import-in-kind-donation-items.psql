@@ -1,0 +1,71 @@
+-- Verify + import In-Kind Donation Items from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-in-kind-donation-items.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.in_kind_donation_items column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='in_kind_donation_items'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import in_kind_donation_items.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_in_kind_donation_items;
+CREATE TEMP TABLE stage_in_kind_donation_items
+(
+  item_id text,
+  donation_id text,
+  item_name text,
+  item_category text,
+  quantity text,
+  unit_of_measure text,
+  estimated_unit_value text,
+  intended_use text,
+  received_condition text
+);
+COMMIT;
+
+\copy stage_in_kind_donation_items FROM 'backend/EbanHaven.Api/Data/lighthouse/in_kind_donation_items.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.in_kind_donation_items =='
+
+BEGIN;
+INSERT INTO public.in_kind_donation_items
+(
+  item_id, donation_id, item_name, item_category, quantity, unit_of_measure, estimated_unit_value, intended_use, received_condition
+)
+SELECT
+  nullif(item_id,'')::int,
+  nullif(donation_id,'')::int,
+  coalesce(item_name,''),
+  nullif(item_category,''),
+  nullif(quantity,'')::double precision,
+  nullif(unit_of_measure,''),
+  nullif(estimated_unit_value,'')::numeric,
+  nullif(intended_use,''),
+  nullif(received_condition,'')
+FROM stage_in_kind_donation_items
+WHERE nullif(item_id,'') IS NOT NULL
+ON CONFLICT (item_id) DO UPDATE SET
+  donation_id = EXCLUDED.donation_id,
+  item_name = EXCLUDED.item_name,
+  item_category = EXCLUDED.item_category,
+  quantity = EXCLUDED.quantity,
+  unit_of_measure = EXCLUDED.unit_of_measure,
+  estimated_unit_value = EXCLUDED.estimated_unit_value,
+  intended_use = EXCLUDED.intended_use,
+  received_condition = EXCLUDED.received_condition;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.in_kind_donation_items =='
+SELECT count(*) AS in_kind_donation_items_count FROM public.in_kind_donation_items;
+

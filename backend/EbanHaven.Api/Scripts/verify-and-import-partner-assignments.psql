@@ -1,0 +1,72 @@
+-- Verify + import Partner Assignments from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-partner-assignments.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.partner_assignments column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='partner_assignments'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import partner_assignments.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_partner_assignments;
+CREATE TEMP TABLE stage_partner_assignments
+(
+  assignment_id text,
+  partner_id text,
+  safehouse_id text,
+  program_area text,
+  assignment_start text,
+  assignment_end text,
+  responsibility_notes text,
+  is_primary text,
+  status text
+);
+COMMIT;
+
+\copy stage_partner_assignments FROM 'backend/EbanHaven.Api/Data/lighthouse/partner_assignments.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.partner_assignments =='
+
+BEGIN;
+INSERT INTO public.partner_assignments
+(
+  assignment_id, partner_id, safehouse_id, program_area, assignment_start, assignment_end,
+  responsibility_notes, is_primary, status
+)
+SELECT
+  nullif(assignment_id,'')::int,
+  nullif(partner_id,'')::int,
+  nullif(safehouse_id,'')::int,
+  nullif(program_area,''),
+  nullif(assignment_start,'')::date,
+  nullif(assignment_end,'')::date,
+  nullif(responsibility_notes,''),
+  nullif(is_primary,'')::boolean,
+  nullif(status,'')
+FROM stage_partner_assignments
+WHERE nullif(assignment_id,'') IS NOT NULL
+ON CONFLICT (assignment_id) DO UPDATE SET
+  partner_id = EXCLUDED.partner_id,
+  safehouse_id = EXCLUDED.safehouse_id,
+  program_area = EXCLUDED.program_area,
+  assignment_start = EXCLUDED.assignment_start,
+  assignment_end = EXCLUDED.assignment_end,
+  responsibility_notes = EXCLUDED.responsibility_notes,
+  is_primary = EXCLUDED.is_primary,
+  status = EXCLUDED.status;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.partner_assignments =='
+SELECT count(*) AS partner_assignments_count FROM public.partner_assignments;
+

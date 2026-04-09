@@ -1,0 +1,80 @@
+-- Verify + import Partners from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-partners.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.partners column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='partners'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import partners.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_partners;
+CREATE TEMP TABLE stage_partners
+(
+  partner_id text,
+  partner_name text,
+  partner_type text,
+  role_type text,
+  contact_name text,
+  email text,
+  phone text,
+  region text,
+  status text,
+  start_date text,
+  end_date text,
+  notes text
+);
+COMMIT;
+
+\copy stage_partners FROM 'backend/EbanHaven.Api/Data/lighthouse/partners.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.partners =='
+
+BEGIN;
+INSERT INTO public.partners
+(
+  partner_id, partner_name, partner_type, role_type, contact_name, email, phone, region, status, start_date, end_date, notes
+)
+SELECT
+  nullif(partner_id,'')::int,
+  coalesce(partner_name,''),
+  coalesce(partner_type,''),
+  nullif(role_type,''),
+  nullif(contact_name,''),
+  nullif(email,''),
+  nullif(phone,''),
+  nullif(region,''),
+  coalesce(status,''),
+  nullif(start_date,'')::date,
+  nullif(end_date,'')::date,
+  nullif(notes,'')
+FROM stage_partners
+WHERE nullif(partner_id,'') IS NOT NULL
+ON CONFLICT (partner_id) DO UPDATE SET
+  partner_name = EXCLUDED.partner_name,
+  partner_type = EXCLUDED.partner_type,
+  role_type = EXCLUDED.role_type,
+  contact_name = EXCLUDED.contact_name,
+  email = EXCLUDED.email,
+  phone = EXCLUDED.phone,
+  region = EXCLUDED.region,
+  status = EXCLUDED.status,
+  start_date = EXCLUDED.start_date,
+  end_date = EXCLUDED.end_date,
+  notes = EXCLUDED.notes;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.partners =='
+SELECT count(*) AS partners_count FROM public.partners;
+

@@ -8,8 +8,14 @@ public sealed class Safehouse
     [Column("safehouse_code")] public string SafehouseCode { get; set; } = "";
     [Column("name")] public string Name { get; set; } = "";
     [Column("region")] public string Region { get; set; } = "";
+    [Column("city")] public string? City { get; set; }
+    [Column("province")] public string? Province { get; set; }
+    [Column("country")] public string? Country { get; set; }
+    [Column("open_date")] public DateOnly? OpenDate { get; set; }
     [Column("status")] public string Status { get; set; } = "";
     [Column("capacity_girls")] public int CapacityGirls { get; set; }
+    [Column("capacity_staff")] public int? CapacityStaff { get; set; }
     [Column("current_occupancy")] public int CurrentOccupancy { get; set; }
+    [Column("notes")] public string? Notes { get; set; }
 }
 

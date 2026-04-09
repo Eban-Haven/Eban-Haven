@@ -1,0 +1,87 @@
+-- Verify + import Health Wellbeing Records from CSV into Postgres (Azure).
+--
+-- Run from repo root:
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-health-wellbeing-records.psql"
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+\echo
+\echo '== public.health_wellbeing_records column types (current DB) =='
+SELECT ordinal_position, column_name, data_type, udt_name, is_nullable
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='health_wellbeing_records'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Import health_wellbeing_records.csv into staging =='
+
+BEGIN;
+DROP TABLE IF EXISTS stage_health_wellbeing_records;
+CREATE TEMP TABLE stage_health_wellbeing_records
+(
+  health_record_id text,
+  resident_id text,
+  record_date text,
+  general_health_score text,
+  nutrition_score text,
+  sleep_quality_score text,
+  energy_level_score text,
+  height_cm text,
+  weight_kg text,
+  bmi text,
+  medical_checkup_done text,
+  dental_checkup_done text,
+  psychological_checkup_done text,
+  notes text
+);
+COMMIT;
+
+\copy stage_health_wellbeing_records FROM 'backend/EbanHaven.Api/Data/lighthouse/health_wellbeing_records.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.health_wellbeing_records =='
+
+BEGIN;
+INSERT INTO public.health_wellbeing_records
+(
+  health_record_id, resident_id, record_date, general_health_score, nutrition_score, sleep_quality_score,
+  energy_level_score, height_cm, weight_kg, bmi, medical_checkup_done, dental_checkup_done, psychological_checkup_done, notes
+)
+SELECT
+  nullif(health_record_id,'')::int,
+  nullif(resident_id,'')::int,
+  nullif(record_date,'')::date,
+  nullif(general_health_score,'')::double precision,
+  nullif(nutrition_score,'')::double precision,
+  nullif(sleep_quality_score,'')::double precision,
+  nullif(energy_level_score,'')::double precision,
+  nullif(height_cm,'')::double precision,
+  nullif(weight_kg,'')::double precision,
+  nullif(bmi,'')::double precision,
+  nullif(medical_checkup_done,'')::boolean,
+  nullif(dental_checkup_done,'')::boolean,
+  nullif(psychological_checkup_done,'')::boolean,
+  nullif(notes,'')
+FROM stage_health_wellbeing_records
+WHERE nullif(health_record_id,'') IS NOT NULL
+ON CONFLICT (health_record_id) DO UPDATE SET
+  resident_id = EXCLUDED.resident_id,
+  record_date = EXCLUDED.record_date,
+  general_health_score = EXCLUDED.general_health_score,
+  nutrition_score = EXCLUDED.nutrition_score,
+  sleep_quality_score = EXCLUDED.sleep_quality_score,
+  energy_level_score = EXCLUDED.energy_level_score,
+  height_cm = EXCLUDED.height_cm,
+  weight_kg = EXCLUDED.weight_kg,
+  bmi = EXCLUDED.bmi,
+  medical_checkup_done = EXCLUDED.medical_checkup_done,
+  dental_checkup_done = EXCLUDED.dental_checkup_done,
+  psychological_checkup_done = EXCLUDED.psychological_checkup_done,
+  notes = EXCLUDED.notes;
+COMMIT;
+
+\echo
+\echo '== Done. Rowcount in public.health_wellbeing_records =='
+SELECT count(*) AS health_wellbeing_records_count FROM public.health_wellbeing_records;
+

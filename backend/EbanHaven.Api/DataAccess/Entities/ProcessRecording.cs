@@ -18,5 +18,6 @@ public sealed class ProcessRecording
     [Column("progress_noted")] public bool ProgressNoted { get; set; }
     [Column("concerns_flagged")] public bool ConcernsFlagged { get; set; }
     [Column("referral_made")] public bool ReferralMade { get; set; }
+    [Column("notes_restricted")] public string? NotesRestricted { get; set; }
 }
 

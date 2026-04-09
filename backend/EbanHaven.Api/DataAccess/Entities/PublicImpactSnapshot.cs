@@ -10,5 +10,6 @@ public sealed class PublicImpactSnapshot
     [Column("summary_text")] public string SummaryText { get; set; } = "";
     [Column("metric_payload_json")] public string? MetricPayloadJson { get; set; }
     [Column("is_published")] public bool IsPublished { get; set; }
+    [Column("published_at")] public DateTime? PublishedAt { get; set; }
 }
 
