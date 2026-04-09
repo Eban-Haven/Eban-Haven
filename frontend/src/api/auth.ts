@@ -26,6 +26,17 @@ export async function logoutAndReload(redirectTo = '/'): Promise<void> {
   window.location.assign(redirectTo)
 }
 
+export type GoogleAuthMode = 'login' | 'register'
+
+export async function loginWithGoogle(credential: string, mode: GoogleAuthMode): Promise<void> {
+  const res = await apiFetch('/api/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential, mode }),
+  })
+  const data = await parseJson<{ token: string }>(res)
+  setStaffToken(data.token)
+}
+
 export type SessionUser = {
   user: string
   role: string

@@ -12,6 +12,7 @@ export function DonorDashboardPage() {
   const [supporter, setSupporter] = useState<Supporter | null>(null)
   const [donations, setDonations] = useState<Donation[]>([])
   const [allocations, setAllocations] = useState<DonationAllocation[]>([])
+  const [designationOptions, setDesignationOptions] = useState<string[]>(['General Fund'])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedAmt, setSelectedAmt] = useState<number | null>(500)
@@ -31,6 +32,8 @@ export function DonorDashboardPage() {
       setSupporter(data.supporter)
       setDonations(data.donations)
       setAllocations(data.allocations)
+      setDesignationOptions(data.designationOptions)
+      setDesignate((current) => (data.designationOptions.includes(current) ? current : data.designationOptions[0] ?? 'General Fund'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -54,6 +57,11 @@ export function DonorDashboardPage() {
       new Set(allocations.map((allocation) => allocation.programArea?.trim()).filter(Boolean)),
     ) as string[]
   }, [allocations])
+  const totalAllocated = useMemo(
+    () => allocations.reduce((sum, allocation) => sum + (allocation.amountAllocated ?? 0), 0),
+    [allocations],
+  )
+  const mostRecentAllocation = allocations[0]
 
   async function onDonate(e: React.FormEvent) {
     e.preventDefault()
@@ -150,23 +158,46 @@ export function DonorDashboardPage() {
               <section className="rounded-xl border border-border bg-background p-6">
                 <h2 className="font-heading text-lg font-semibold text-foreground">Your impact</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  This donor view is read-only and limited to your own giving history and allocation impact.
+                  Here is where your giving has been directed so far, based on the allocations currently recorded by the team.
                 </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <div className="rounded-xl border border-border bg-card p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Supported program areas
+                      Total allocated
                     </p>
-                    <p className="mt-2 text-sm text-foreground">
-                      {impactedPrograms.length > 0 ? impactedPrograms.join(', ') : 'No allocation details yet.'}
+                    <p className="mt-2 font-heading text-2xl font-bold text-primary">
+                      {allocations.length > 0 ? moneyPhp.format(totalAllocated) : '—'}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {allocations.length > 0
+                        ? 'Amount linked to specific program allocations in your record.'
+                        : 'No allocation details have been recorded yet.'}
                     </p>
                   </div>
                   <div className="rounded-xl border border-border bg-card p-4">
                     <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Allocation records
+                      Supported program areas
                     </p>
-                    <p className="mt-2 text-sm text-foreground">
-                      {allocations.length > 0 ? `${allocations.length} recorded allocation(s)` : 'No allocations recorded yet.'}
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {impactedPrograms.length > 0 ? impactedPrograms.join(', ') : 'Awaiting allocation details'}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {impactedPrograms.length > 0
+                        ? `${impactedPrograms.length} program area${impactedPrograms.length === 1 ? '' : 's'} represented so far.`
+                        : 'Once staff assigns your donations, those areas will appear here.'}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Latest allocation activity
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-foreground">
+                      {mostRecentAllocation
+                        ? `${mostRecentAllocation.programArea} · ${new Date(mostRecentAllocation.allocationDate).toLocaleDateString()}`
+                        : 'No allocations recorded yet.'}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {allocations.length > 0 ? `${allocations.length} recorded allocation(s)` : 'Your donation history is available below.'}
                     </p>
                   </div>
                 </div>
@@ -211,11 +242,17 @@ export function DonorDashboardPage() {
                 </label>
                 <label className="block text-sm">
                   <span className="text-muted-foreground">Designate to</span>
-                  <input
-                    className="mt-1 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm"
+                  <select
+                    className="mt-1 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     value={designate}
                     onChange={(e) => setDesignate(e.target.value)}
-                  />
+                  >
+                    {designationOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block text-sm">
                   <span className="text-muted-foreground">Message (optional)</span>

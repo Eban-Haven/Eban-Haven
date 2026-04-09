@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiFetch, getStaffToken, parseJson } from "../../api/client";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ImprovementArea {
+  feature:         string;
+  label:           string;
+  resident_value:  number;
+  benchmark_value: number;
+  gap_score:       number;
+  suggestion:      string;
+}
 
 interface ReintegrationResult {
   resident_id:               number | null;
@@ -9,29 +18,29 @@ interface ReintegrationResult {
   prediction:                "Ready" | "Not Ready";
   risk_tier:                 "High Readiness" | "Moderate Readiness" | "Low Readiness";
   threshold_used:            number;
+  top_improvements:          ImprovementArea[];
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const TIER_STYLES: Record<ReintegrationResult["risk_tier"], {
-  badge: string; dot: string; bar: string; bg: string;
+const TIER_CONFIG: Record<ReintegrationResult["risk_tier"], {
+  badge: string; text: string; border: string; dot: string; bar: string; bg: string; icon: string;
 }> = {
-  "High Readiness":     { badge: "bg-emerald-100 text-emerald-800 border-emerald-300", dot: "bg-emerald-500", bar: "bg-emerald-500", bg: "bg-emerald-50" },
-  "Moderate Readiness": { badge: "bg-amber-100 text-amber-800 border-amber-300",       dot: "bg-amber-400",   bar: "bg-amber-400",   bg: "bg-amber-50"   },
-  "Low Readiness":      { badge: "bg-red-100 text-red-800 border-red-300",             dot: "bg-red-500",     bar: "bg-red-400",     bg: "bg-red-50"     },
-};
-
-const TIER_ICONS: Record<ReintegrationResult["risk_tier"], string> = {
-  "High Readiness":     "✅",
-  "Moderate Readiness": "⏳",
-  "Low Readiness":      "⚠️",
+  "High Readiness":     { badge: "bg-emerald-100 text-emerald-800 border-emerald-300", text: "text-emerald-800", border: "border-emerald-300", dot: "bg-emerald-500", bar: "bg-emerald-500", bg: "bg-emerald-50",  icon: "✅" },
+  "Moderate Readiness": { badge: "bg-amber-100 text-amber-800 border-amber-300",       text: "text-amber-800",   border: "border-amber-300",   dot: "bg-amber-400",   bar: "bg-amber-400",   bg: "bg-amber-50",   icon: "⏳" },
+  "Low Readiness":      { badge: "bg-red-100 text-red-800 border-red-300",             text: "text-red-800",     border: "border-red-300",     dot: "bg-red-500",     bar: "bg-red-400",     bg: "bg-red-50",     icon: "⚠️" },
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ReadinessGauge({ probability, tier }: { probability: number; tier: ReintegrationResult["risk_tier"] }) {
-  const pct    = Math.round(probability * 100);
-  const styles = TIER_STYLES[tier];
+function ReadinessGauge({ probability, thresholdUsed, tier }: {
+  probability:   number;
+  thresholdUsed: number;
+  tier:          ReintegrationResult["risk_tier"];
+}) {
+  const pct       = Math.round(probability    * 100);
+  const threshold = Math.round(thresholdUsed  * 100);
+  const config    = TIER_CONFIG[tier];
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -40,14 +49,57 @@ function ReadinessGauge({ probability, tier }: { probability: number; tier: Rein
       </div>
       <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
         <div
-          className={`h-full rounded-full ${styles.bar} transition-all duration-700`}
+          className={`h-full rounded-full ${config.bar} transition-all duration-700`}
           style={{ width: `${pct}%` }}
         />
       </div>
       <div className="flex justify-between text-[10px] text-gray-400">
         <span>0%</span>
-        <span className="text-gray-500 font-medium">Threshold {Math.round(probability >= 0 ? 70 : 0)}%</span>
+        <span className="text-gray-500 font-medium">Threshold {threshold}%</span>
         <span>100%</span>
+      </div>
+    </div>
+  );
+}
+
+// Features with a percentage/rate display (0–1 stored, shown as %)
+const PERCENT_FEATURES = new Set([
+  "pct_progress_noted", "pct_concerns_flagged", "latest_attendance_rate",
+  "pct_psych_checkup_done", "pct_plans_achieved",
+]);
+
+// Features with a 0–100 display
+const PCT100_FEATURES = new Set(["avg_progress_percent"]);
+
+function formatFeatureValue(feature: string, value: number): string {
+  if (PERCENT_FEATURES.has(feature))  return `${Math.round(value * 100)}%`;
+  if (PCT100_FEATURES.has(feature))   return `${Math.round(value)}%`;
+  if (feature === "avg_general_health_score") return `${value.toFixed(1)} / 10`;
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function ImprovementCard({ area, rank }: { area: ImprovementArea; rank: number }) {
+  const residentFmt  = formatFeatureValue(area.feature, area.resident_value);
+  const benchmarkFmt = formatFeatureValue(area.feature, area.benchmark_value);
+  const isLowerBetter = area.feature === "total_incidents"    ||
+                        area.feature === "num_severe_incidents" ||
+                        area.feature === "pct_concerns_flagged";
+
+  return (
+    <div className="flex gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200">
+      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center mt-0.5">
+        {rank}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-800">{area.label}</span>
+          <div className="flex items-center gap-1.5 text-[11px] shrink-0">
+            <span className="text-red-600 font-medium">{isLowerBetter && area.resident_value > area.benchmark_value ? "▲ " : "▼ "}{residentFmt}</span>
+            <span className="text-gray-400">→</span>
+            <span className="text-emerald-700 font-medium">{benchmarkFmt}</span>
+          </div>
+        </div>
+        <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{area.suggestion}</p>
       </div>
     </div>
   );
@@ -78,6 +130,7 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const fetchResult = useCallback(() => {
     if (!getStaffToken()) {
@@ -87,10 +140,14 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
       return;
     }
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
 
-    apiFetch(`/api/residents/${residentId}/reintegration-readiness`)
+    apiFetch(`/api/residents/${residentId}/reintegration-readiness`, { signal: controller.signal })
       .then(async (res) => {
         if (res.status === 401 || res.status === 403) {
           throw new Error("Session expired. Sign in again to load this prediction.");
@@ -98,7 +155,6 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
         if (res.status === 404) {
           throw new Error("Resident record not found.");
         }
-        // For all other non-2xx: extract the detail field from ASP.NET ProblemDetails if present
         if (!res.ok) {
           const text = await res.text();
           try {
@@ -112,14 +168,23 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
         return parseJson<ReintegrationResult>(res);
       })
       .then((data) => {
-        setResult(data);
-        setLastFetch(new Date());
+        if (!controller.signal.aborted) {
+          setResult(data);
+          setLastFetch(new Date());
+        }
       })
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err: Error) => {
+        if (!controller.signal.aborted) setError(err.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
   }, [residentId]);
 
-  useEffect(() => { fetchResult(); }, [fetchResult]);
+  useEffect(() => {
+    fetchResult();
+    return () => abortRef.current?.abort();
+  }, [fetchResult]);
 
   if (loading) return <SkeletonCard />;
 
@@ -146,8 +211,7 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
   if (!result) return null;
 
   const tier    = result.risk_tier;
-  const styles  = TIER_STYLES[tier];
-  const icon    = TIER_ICONS[tier];
+  const config  = TIER_CONFIG[tier];
   const isReady = result.prediction === "Ready";
 
   return (
@@ -156,7 +220,7 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
       <div className={`px-5 py-4 border-b flex items-center justify-between ${isReady ? "border-emerald-100 bg-emerald-50/40" : "border-gray-100"}`}>
         <div>
           <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
-            <span className="text-lg">{icon}</span>
+            <span className="text-lg">{config.icon}</span>
             Reintegration Readiness
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">
@@ -165,8 +229,8 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold ${styles.badge}`}>
-            <span className={`w-2 h-2 rounded-full ${styles.dot}`} />
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-semibold ${config.badge}`}>
+            <span className={`w-2 h-2 rounded-full ${config.dot}`} />
             {result.prediction}
           </span>
           <button
@@ -180,26 +244,34 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
 
       {/* ── Body ── */}
       <div className="px-5 py-4 space-y-4">
-        {/* Gauge */}
-        <ReadinessGauge probability={result.reintegration_probability} tier={tier} />
+        <ReadinessGauge
+          probability={result.reintegration_probability}
+          thresholdUsed={result.threshold_used}
+          tier={tier}
+        />
 
-        {/* Risk tier card */}
-        <div className={`rounded-xl px-4 py-3 ${styles.bg} border ${styles.badge.split(" ")[2]}`}>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className={`text-xs font-semibold uppercase tracking-wide ${styles.badge.split(" ")[1]}`}>
-                {tier}
-              </p>
-              <p className="text-xs text-gray-600 mt-0.5">
-                {tier === "High Readiness" && "This resident shows strong indicators for successful reintegration."}
-                {tier === "Moderate Readiness" && "Some readiness indicators present — continued support recommended before transition."}
-                {tier === "Low Readiness" && "Key readiness factors are below threshold. Focused intervention advised before planning reintegration."}
-              </p>
-            </div>
-          </div>
+        <div className={`rounded-xl px-4 py-3 ${config.bg} border ${config.border}`}>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${config.text}`}>
+            {tier}
+          </p>
+          <p className="text-xs text-gray-600 mt-0.5">
+            {tier === "High Readiness"     && "This resident shows strong indicators for successful reintegration."}
+            {tier === "Moderate Readiness" && "Some readiness indicators present — continued support recommended before transition."}
+            {tier === "Low Readiness"      && "Key readiness factors are below threshold. Focused intervention advised before planning reintegration."}
+          </p>
         </div>
 
-        {/* Disclaimer */}
+        {result.top_improvements.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-gray-700">
+              🎯 Top areas to address
+            </p>
+            {result.top_improvements.map((area, i) => (
+              <ImprovementCard key={area.feature} area={area} rank={i + 1} />
+            ))}
+          </div>
+        )}
+
         <p className="text-[11px] text-gray-400 leading-relaxed">
           This prediction is generated by a gradient boosting model trained on program outcomes.
           It is an advisory tool only and should be considered alongside direct professional assessment.

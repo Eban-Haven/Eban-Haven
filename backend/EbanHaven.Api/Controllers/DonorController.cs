@@ -19,6 +19,18 @@ public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
             ?? User.FindFirst("email")?.Value
             ?? User.FindFirst("sub")?.Value;
 
+        var designationOptions = repo.ListAllocations(null, null)
+            .Select(a => a.ProgramArea?.Trim())
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .Concat(
+                repo.ListDonations(null)
+                    .Select(d => d.CampaignName?.Trim())
+                    .Where(c => !string.IsNullOrWhiteSpace(c)))
+            .Append("General Fund")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value)
+            .ToArray();
+
         if (string.IsNullOrWhiteSpace(email))
             return Unauthorized(new { error = "A valid donor email claim is required." });
 
@@ -33,6 +45,7 @@ public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
                 supporter = (object?)null,
                 donations = Array.Empty<DonationDto>(),
                 allocations = Array.Empty<DonationAllocationDto>(),
+                designationOptions,
             });
         }
 
@@ -52,6 +65,7 @@ public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
             supporter,
             donations,
             allocations,
+            designationOptions,
         });
     }
 

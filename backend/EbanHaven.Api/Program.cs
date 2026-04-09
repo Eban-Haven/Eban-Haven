@@ -17,6 +17,7 @@ builder.Services.Configure<CorsOptions>(builder.Configuration.GetSection(CorsOpt
 builder.Services.Configure<OpenAIOptions>(builder.Configuration.GetSection(OpenAIOptions.SectionName));
 builder.Services.Configure<GmailOptions>(builder.Configuration.GetSection(GmailOptions.SectionName));
 builder.Services.Configure<MetaOptions>(builder.Configuration.GetSection(MetaOptions.SectionName));
+builder.Services.Configure<GoogleAuthOptions>(builder.Configuration.GetSection(GoogleAuthOptions.SectionName));
 builder.Services.AddControllers();
 
 var conn =

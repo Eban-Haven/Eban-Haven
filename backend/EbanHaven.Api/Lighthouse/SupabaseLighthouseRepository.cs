@@ -746,7 +746,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         return ListDonations(null).FirstOrDefault(x => x.Id == id);
     }
 
-    public DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes)
+    public DonationAllocationDto CreateAllocation(int donationId, int safehouseId, decimal? amount, string? notes, string? programArea)
     {
         var row = new DonationAllocation
         {
@@ -754,7 +754,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             SafehouseId = safehouseId,
             AmountAllocated = amount ?? 0m,
             AllocationNotes = notes,
-            ProgramArea = "General",
+            ProgramArea = string.IsNullOrWhiteSpace(programArea) ? "General" : programArea.Trim(),
             AllocationDate = DateOnly.FromDateTime(DateTime.UtcNow),
         };
         db.DonationAllocations.Add(row);
@@ -1112,4 +1112,3 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         return d;
     }
 }
-

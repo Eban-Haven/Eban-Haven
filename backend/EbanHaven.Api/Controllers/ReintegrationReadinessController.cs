@@ -30,12 +30,22 @@ file record ReintegrationFeaturesPayload(
     [property: JsonPropertyName("pct_plans_achieved")]       double PctPlansAchieved
 );
 
+file record ImprovementArea(
+    [property: JsonPropertyName("feature")]         string Feature,
+    [property: JsonPropertyName("label")]           string Label,
+    [property: JsonPropertyName("resident_value")]  double ResidentValue,
+    [property: JsonPropertyName("benchmark_value")] double BenchmarkValue,
+    [property: JsonPropertyName("gap_score")]       double GapScore,
+    [property: JsonPropertyName("suggestion")]      string Suggestion
+);
+
 file record ReintegrationPredictionResponse(
-    [property: JsonPropertyName("resident_id")]               int?   ResidentId,
-    [property: JsonPropertyName("reintegration_probability")] double ReintegrationProbability,
-    [property: JsonPropertyName("prediction")]                string Prediction,
-    [property: JsonPropertyName("risk_tier")]                 string RiskTier,
-    [property: JsonPropertyName("threshold_used")]            double ThresholdUsed
+    [property: JsonPropertyName("resident_id")]               int?                ResidentId,
+    [property: JsonPropertyName("reintegration_probability")] double              ReintegrationProbability,
+    [property: JsonPropertyName("prediction")]                string              Prediction,
+    [property: JsonPropertyName("risk_tier")]                 string              RiskTier,
+    [property: JsonPropertyName("threshold_used")]            double              ThresholdUsed,
+    [property: JsonPropertyName("top_improvements")]          List<ImprovementArea> TopImprovements
 );
 
 // ── Controller ────────────────────────────────────────────────────────────────
@@ -105,8 +115,8 @@ public sealed class ReintegrationReadinessController(HavenDbContext db, IHttpCli
           END                                                                                   AS age_at_entry,
           GREATEST(0,
             CASE
-              WHEN r.date_of_admission IS NOT NULL AND r.date_of_admission ~ '^\d{4}-\d{2}-\d{2}'
-                THEN EXTRACT(EPOCH FROM (NOW() - r.date_of_admission::date))::int / 86400
+              WHEN r.date_of_admission IS NOT NULL
+                THEN EXTRACT(EPOCH FROM (NOW() - r.date_of_admission))::int / 86400
               ELSE 0
             END
           )                                                                                     AS days_in_program,
@@ -151,33 +161,25 @@ public sealed class ReintegrationReadinessController(HavenDbContext db, IHttpCli
         if (row is null)
             return NotFound(new { message = $"Resident {residentId} not found." });
 
-        ReintegrationFeaturesPayload payload;
-        try
-        {
-            payload = new ReintegrationFeaturesPayload(
-                ResidentId:             residentId,
-                SafehouseId:            (string)(row.safehouse_code ?? "Unknown"),
-                AgeAtEntry:             (int)ToDouble(row.age_at_entry, 15),
-                DaysInProgram:          (int)ToDouble(row.days_in_program, 0),
-                ReferralSource:         "Unknown",
-                TotalSessions:          ToDouble(row.total_sessions, 0),
-                PctProgressNoted:       ToDouble(row.pct_progress_noted, 0),
-                PctConcernsFlagged:     ToDouble(row.pct_concerns_flagged, 0),
-                LatestAttendanceRate:   0.0,
-                AvgProgressPercent:     ToDouble(row.avg_progress_percent, 0),
-                AvgGeneralHealthScore:  ToDouble(row.avg_general_health_score, 5),
-                PctPsychCheckupDone:    0.0,
-                NumHealthRecords:       ToDouble(row.num_health_records, 0),
-                TotalIncidents:         ToDouble(row.total_incidents, 0),
-                NumSevereIncidents:     ToDouble(row.num_severe_incidents, 0),
-                TotalPlans:             ToDouble(row.total_plans, 0),
-                PctPlansAchieved:       ToDouble(row.pct_plans_achieved, 0)
-            );
-        }
-        catch (Exception ex)
-        {
-            return Problem(detail: $"Feature mapping error: {ex.Message}", statusCode: 500);
-        }
+        var payload = new ReintegrationFeaturesPayload(
+            ResidentId:             residentId,
+            SafehouseId:            (string)(row.safehouse_code ?? "Unknown"),
+            AgeAtEntry:             (int)ToDouble(row.age_at_entry, 15),
+            DaysInProgram:          (int)ToDouble(row.days_in_program, 0),
+            ReferralSource:         "Unknown",
+            TotalSessions:          ToDouble(row.total_sessions, 0),
+            PctProgressNoted:       ToDouble(row.pct_progress_noted, 0),
+            PctConcernsFlagged:     ToDouble(row.pct_concerns_flagged, 0),
+            LatestAttendanceRate:   0.0,
+            AvgProgressPercent:     ToDouble(row.avg_progress_percent, 0),
+            AvgGeneralHealthScore:  ToDouble(row.avg_general_health_score, 5),
+            PctPsychCheckupDone:    0.0,
+            NumHealthRecords:       ToDouble(row.num_health_records, 0),
+            TotalIncidents:         ToDouble(row.total_incidents, 0),
+            NumSevereIncidents:     ToDouble(row.num_severe_incidents, 0),
+            TotalPlans:             ToDouble(row.total_plans, 0),
+            PctPlansAchieved:       ToDouble(row.pct_plans_achieved, 0)
+        );
 
         var http = httpFactory.CreateClient("MlService");
         HttpResponseMessage response;

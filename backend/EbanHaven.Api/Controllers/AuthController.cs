@@ -1,7 +1,9 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Net.Http.Json;
 using EbanHaven.Api.Auth;
+using EbanHaven.Api.Configuration;
 using EbanHaven.Api.DataAccess;
 using EbanHaven.Api.DataAccess.Entities;
 using Microsoft.AspNetCore.Identity;
@@ -9,12 +11,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 
 namespace EbanHaven.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(HavenDbContext db, IConfiguration config) : ControllerBase
+public sealed class AuthController(
+    HavenDbContext db,
+    IConfiguration config,
+    IHttpClientFactory httpClientFactory,
+    IOptions<GoogleAuthOptions> googleAuthOptions) : ControllerBase
 {
     private static readonly string[] AllowedRoles = ["admin", "social_worker", "staff", "donor", "resident"];
 
@@ -96,6 +103,87 @@ public sealed class AuthController(HavenDbContext db, IConfiguration config) : C
         return Ok(new { token, role = "donor" });
     }
 
+    [HttpPost("google")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Google([FromBody] GoogleAuthRequest body)
+    {
+        var clientId = googleAuthOptions.Value.ClientId?.Trim();
+        if (string.IsNullOrWhiteSpace(clientId))
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = "Google authentication is not configured." });
+
+        if (string.IsNullOrWhiteSpace(body.Credential))
+            return BadRequest(new { error = "Google credential is required." });
+
+        var client = httpClientFactory.CreateClient("GoogleOAuth");
+        using var response = await client.GetAsync($"/tokeninfo?id_token={Uri.EscapeDataString(body.Credential.Trim())}");
+        if (!response.IsSuccessStatusCode)
+            return StatusCode(StatusCodes.Status401Unauthorized, new { error = "Google authentication could not be verified." });
+
+        var tokenInfo = await response.Content.ReadFromJsonAsync<GoogleTokenInfo>();
+        if (tokenInfo is null)
+            return StatusCode(StatusCodes.Status401Unauthorized, new { error = "Google authentication returned an invalid payload." });
+
+        if (!string.Equals(tokenInfo.Audience, clientId, StringComparison.Ordinal))
+            return StatusCode(StatusCodes.Status401Unauthorized, new { error = "Google authentication was issued for a different client." });
+        if (!string.Equals(tokenInfo.EmailVerified, "true", StringComparison.OrdinalIgnoreCase))
+            return StatusCode(StatusCodes.Status401Unauthorized, new { error = "Your Google email address must be verified." });
+        if (string.IsNullOrWhiteSpace(tokenInfo.Email))
+            return StatusCode(StatusCodes.Status401Unauthorized, new { error = "Google authentication did not include an email address." });
+
+        var mode = string.Equals(body.Mode, "register", StringComparison.OrdinalIgnoreCase) ? "register" : "login";
+        var email = tokenInfo.Email.Trim().ToLowerInvariant();
+
+        var profile = await db.Profiles.FirstOrDefaultAsync(p => p.Email != null && p.Email.ToLower() == email);
+        if (profile is null && mode == "login")
+            return NotFound(new { error = "No donor account exists for this Google email yet. Use Google sign up first." });
+
+        var displayName = string.IsNullOrWhiteSpace(tokenInfo.Name) ? email : tokenInfo.Name.Trim();
+
+        if (profile is null)
+        {
+            profile = new Profile
+            {
+                Email = email,
+                FullName = displayName,
+                Role = "donor",
+                PasswordHash = null,
+                IsActive = true,
+            };
+            db.Profiles.Add(profile);
+        }
+        else
+        {
+            if (!AllowedRoles.Contains(profile.Role))
+                return StatusCode(StatusCodes.Status403Forbidden, new { error = "This account cannot access the portal." });
+            if (!profile.IsActive)
+                return StatusCode(StatusCodes.Status403Forbidden, new { error = "This account is inactive." });
+            if (string.IsNullOrWhiteSpace(profile.FullName))
+                profile.FullName = displayName;
+        }
+
+        var supporter = await db.Supporters.FirstOrDefaultAsync(s => s.Email != null && s.Email.ToLower() == email);
+        if (supporter is null)
+        {
+            db.Supporters.Add(new DataAccess.Entities.Supporter
+            {
+                SupporterType = "MonetaryDonor",
+                DisplayName = displayName,
+                Email = email,
+                Country = "Ghana",
+                Status = "Active",
+            });
+        }
+        else if (string.IsNullOrWhiteSpace(supporter.DisplayName))
+        {
+            supporter.DisplayName = displayName;
+        }
+
+        await db.SaveChangesAsync();
+
+        var token = IssueToken(email, profile.FullName ?? displayName, profile.Role);
+        return Ok(new { token, role = profile.Role });
+    }
+
     [HttpPost("logout")]
     [AllowAnonymous]
     public IActionResult Logout()
@@ -146,4 +234,15 @@ public sealed class AuthController(HavenDbContext db, IConfiguration config) : C
             signingCredentials: creds);
         return new JwtSecurityTokenHandler().WriteToken(jwt);
     }
+}
+
+public sealed record GoogleAuthRequest(string Credential, string? Mode);
+
+internal sealed class GoogleTokenInfo
+{
+    public string? Aud { get; init; }
+    public string? Email { get; init; }
+    public string? EmailVerified { get; init; }
+    public string? Name { get; init; }
+    public string? Audience => Aud;
 }
