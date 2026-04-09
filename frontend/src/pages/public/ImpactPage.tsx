@@ -161,8 +161,6 @@ export function ImpactPage() {
     return caseCategoriesFallback
   }, [whoRows])
 
-  const usingWhoFallback = whoRows.length < 2
-
   const growthSeries = useMemo(() => {
     if (!enrollmentGrowth || enrollmentGrowth.length === 0) return []
     return enrollmentGrowth.map((p) => ({
