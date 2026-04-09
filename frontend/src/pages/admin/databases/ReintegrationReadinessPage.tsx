@@ -393,18 +393,6 @@ export function ReintegrationReadinessPage() {
               </table>
             </div>
           </div>
-
-          <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
-            <div>
-              <h3 className="text-base font-semibold text-foreground">Resident case workspace</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Need the full case file instead of the action-plan workflow? Open the resident record directly.
-              </p>
-            </div>
-            <Link to="/admin/residents" className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted">
-              Open residents database
-            </Link>
-          </div>
         </>
       )}
     </div>
