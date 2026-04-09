@@ -1,0 +1,302 @@
+-- Verify + import Residents from CSV into Azure Postgres.
+--
+-- Run from repo root:
+--   cd "/Users/ethan/Desktop/Documents IS Junior Core (WINTER)/INTEX/Eban-Haven"
+--   psql "host=<server>.postgres.database.azure.com port=5432 dbname=<db> user=<user> sslmode=require" -f "backend/EbanHaven.Api/Scripts/verify-and-import-residents.psql"
+--
+-- Notes:
+-- - This script uses psql meta-commands (e.g., \copy). It must be run with `psql`, not PgAdmin's query window.
+-- - \copy reads the CSV from YOUR machine and streams it to Azure (works on Azure Database for PostgreSQL).
+
+\set ON_ERROR_STOP on
+\pset pager off
+
+-- ==========================================
+-- 1) Verify current DB column types (Azure)
+-- ==========================================
+
+\echo
+\echo '== public.residents column types (current DB) =='
+SELECT
+  ordinal_position,
+  column_name,
+  data_type,
+  udt_name,
+  is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'residents'
+ORDER BY ordinal_position;
+
+\echo
+\echo '== Constraints / keys for public.residents =='
+SELECT
+  tc.constraint_name,
+  tc.constraint_type,
+  kcu.column_name
+FROM information_schema.table_constraints tc
+LEFT JOIN information_schema.key_column_usage kcu
+  ON tc.constraint_name = kcu.constraint_name
+ AND tc.table_schema = kcu.table_schema
+WHERE tc.table_schema = 'public'
+  AND tc.table_name = 'residents'
+ORDER BY tc.constraint_type, tc.constraint_name, kcu.ordinal_position;
+
+-- ==========================================
+-- 2) Import residents.csv (staging -> upsert)
+-- ==========================================
+
+\echo
+\echo '== Import residents.csv into staging table =='
+
+BEGIN;
+
+DROP TABLE IF EXISTS stage_residents;
+CREATE TEMP TABLE stage_residents
+(
+  resident_id               text,
+  case_control_no           text,
+  internal_code             text,
+  safehouse_id              text,
+  case_status               text,
+  sex                       text,
+  date_of_birth             text,
+  birth_status              text,
+  place_of_birth            text,
+  religion                  text,
+  case_category             text,
+  sub_cat_orphaned          text,
+  sub_cat_trafficked        text,
+  sub_cat_child_labor       text,
+  sub_cat_physical_abuse    text,
+  sub_cat_sexual_abuse      text,
+  sub_cat_osaec             text,
+  sub_cat_cicl              text,
+  sub_cat_at_risk           text,
+  sub_cat_street_child      text,
+  sub_cat_child_with_hiv    text,
+  is_pwd                    text,
+  pwd_type                  text,
+  has_special_needs         text,
+  special_needs_diagnosis   text,
+  family_is_4ps             text,
+  family_solo_parent        text,
+  family_indigenous         text,
+  family_parent_pwd         text,
+  family_informal_settler   text,
+  date_of_admission         text,
+  age_upon_admission        text,
+  present_age               text,
+  length_of_stay            text,
+  referral_source           text,
+  referring_agency_person   text,
+  date_colb_registered      text,
+  date_colb_obtained        text,
+  assigned_social_worker    text,
+  initial_case_assessment   text,
+  date_case_study_prepared  text,
+  reintegration_type        text,
+  reintegration_status      text,
+  initial_risk_level        text,
+  current_risk_level        text,
+  date_enrolled             text,
+  date_closed               text,
+  created_at                text,
+  notes_restricted          text
+);
+
+COMMIT;
+
+-- IMPORTANT: This path is relative to where you run `psql` from.
+-- Run from repo root so it resolves correctly.
+\copy stage_residents FROM 'backend/EbanHaven.Api/Data/lighthouse/residents.csv' WITH (FORMAT csv, HEADER true)
+
+\echo
+\echo '== Upserting into public.residents =='
+
+BEGIN;
+
+INSERT INTO public.residents
+(
+  resident_id,
+  case_control_no,
+  internal_code,
+  safehouse_id,
+  case_status,
+  sex,
+  date_of_birth,
+  birth_status,
+  place_of_birth,
+  religion,
+  case_category,
+  sub_cat_orphaned,
+  sub_cat_trafficked,
+  sub_cat_child_labor,
+  sub_cat_physical_abuse,
+  sub_cat_sexual_abuse,
+  sub_cat_osaec,
+  sub_cat_cicl,
+  sub_cat_at_risk,
+  sub_cat_street_child,
+  sub_cat_child_with_hiv,
+  is_pwd,
+  pwd_type,
+  has_special_needs,
+  special_needs_diagnosis,
+  family_is_4ps,
+  family_solo_parent,
+  family_indigenous,
+  family_parent_pwd,
+  family_informal_settler,
+  date_of_admission,
+  age_upon_admission,
+  present_age,
+  length_of_stay,
+  referral_source,
+  referring_agency_person,
+  date_colb_registered,
+  date_colb_obtained,
+  assigned_social_worker,
+  initial_case_assessment,
+  date_case_study_prepared,
+  reintegration_type,
+  reintegration_status,
+  initial_risk_level,
+  current_risk_level,
+  date_enrolled,
+  date_closed,
+  created_at,
+  notes_restricted
+)
+SELECT
+  nullif(resident_id, '')::int,
+  coalesce(case_control_no, ''),
+  coalesce(internal_code, ''),
+  nullif(safehouse_id, '')::int,
+  coalesce(case_status, ''),
+  coalesce(sex, ''),
+  nullif(date_of_birth, '')::date,
+  nullif(birth_status, ''),
+  nullif(place_of_birth, ''),
+  nullif(religion, ''),
+  coalesce(case_category, ''),
+  nullif(sub_cat_orphaned, '')::boolean,
+  nullif(sub_cat_trafficked, '')::boolean,
+  nullif(sub_cat_child_labor, '')::boolean,
+  nullif(sub_cat_physical_abuse, '')::boolean,
+  nullif(sub_cat_sexual_abuse, '')::boolean,
+  nullif(sub_cat_osaec, '')::boolean,
+  nullif(sub_cat_cicl, '')::boolean,
+  nullif(sub_cat_at_risk, '')::boolean,
+  nullif(sub_cat_street_child, '')::boolean,
+  nullif(sub_cat_child_with_hiv, '')::boolean,
+  nullif(is_pwd, '')::boolean,
+  nullif(pwd_type, ''),
+  nullif(has_special_needs, '')::boolean,
+  nullif(special_needs_diagnosis, ''),
+  nullif(family_is_4ps, '')::boolean,
+  nullif(family_solo_parent, '')::boolean,
+  nullif(family_indigenous, '')::boolean,
+  nullif(family_parent_pwd, '')::boolean,
+  nullif(family_informal_settler, '')::boolean,
+  nullif(date_of_admission, '')::date,
+  nullif(age_upon_admission, ''),
+  nullif(present_age, ''),
+  nullif(length_of_stay, ''),
+  nullif(referral_source, ''),
+  nullif(referring_agency_person, ''),
+  nullif(date_colb_registered, '')::date,
+  nullif(date_colb_obtained, '')::date,
+  nullif(assigned_social_worker, ''),
+  nullif(initial_case_assessment, ''),
+  nullif(date_case_study_prepared, '')::date,
+  nullif(reintegration_type, ''),
+  nullif(reintegration_status, ''),
+  nullif(initial_risk_level, ''),
+  nullif(current_risk_level, ''),
+  nullif(date_enrolled, '')::date,
+  nullif(date_closed, '')::date,
+  nullif(created_at, '')::timestamp,
+  nullif(notes_restricted, '')
+FROM stage_residents
+WHERE nullif(resident_id, '') IS NOT NULL
+ON CONFLICT (resident_id) DO UPDATE SET
+  case_control_no = EXCLUDED.case_control_no,
+  internal_code = EXCLUDED.internal_code,
+  safehouse_id = EXCLUDED.safehouse_id,
+  case_status = EXCLUDED.case_status,
+  sex = EXCLUDED.sex,
+  date_of_birth = EXCLUDED.date_of_birth,
+  birth_status = EXCLUDED.birth_status,
+  place_of_birth = EXCLUDED.place_of_birth,
+  religion = EXCLUDED.religion,
+  case_category = EXCLUDED.case_category,
+  sub_cat_orphaned = EXCLUDED.sub_cat_orphaned,
+  sub_cat_trafficked = EXCLUDED.sub_cat_trafficked,
+  sub_cat_child_labor = EXCLUDED.sub_cat_child_labor,
+  sub_cat_physical_abuse = EXCLUDED.sub_cat_physical_abuse,
+  sub_cat_sexual_abuse = EXCLUDED.sub_cat_sexual_abuse,
+  sub_cat_osaec = EXCLUDED.sub_cat_osaec,
+  sub_cat_cicl = EXCLUDED.sub_cat_cicl,
+  sub_cat_at_risk = EXCLUDED.sub_cat_at_risk,
+  sub_cat_street_child = EXCLUDED.sub_cat_street_child,
+  sub_cat_child_with_hiv = EXCLUDED.sub_cat_child_with_hiv,
+  is_pwd = EXCLUDED.is_pwd,
+  pwd_type = EXCLUDED.pwd_type,
+  has_special_needs = EXCLUDED.has_special_needs,
+  special_needs_diagnosis = EXCLUDED.special_needs_diagnosis,
+  family_is_4ps = EXCLUDED.family_is_4ps,
+  family_solo_parent = EXCLUDED.family_solo_parent,
+  family_indigenous = EXCLUDED.family_indigenous,
+  family_parent_pwd = EXCLUDED.family_parent_pwd,
+  family_informal_settler = EXCLUDED.family_informal_settler,
+  date_of_admission = EXCLUDED.date_of_admission,
+  age_upon_admission = EXCLUDED.age_upon_admission,
+  present_age = EXCLUDED.present_age,
+  length_of_stay = EXCLUDED.length_of_stay,
+  referral_source = EXCLUDED.referral_source,
+  referring_agency_person = EXCLUDED.referring_agency_person,
+  date_colb_registered = EXCLUDED.date_colb_registered,
+  date_colb_obtained = EXCLUDED.date_colb_obtained,
+  assigned_social_worker = EXCLUDED.assigned_social_worker,
+  initial_case_assessment = EXCLUDED.initial_case_assessment,
+  date_case_study_prepared = EXCLUDED.date_case_study_prepared,
+  reintegration_type = EXCLUDED.reintegration_type,
+  reintegration_status = EXCLUDED.reintegration_status,
+  initial_risk_level = EXCLUDED.initial_risk_level,
+  current_risk_level = EXCLUDED.current_risk_level,
+  date_enrolled = EXCLUDED.date_enrolled,
+  date_closed = EXCLUDED.date_closed,
+  created_at = EXCLUDED.created_at,
+  notes_restricted = EXCLUDED.notes_restricted;
+
+COMMIT;
+
+-- ==========================================
+-- 3) Reseed identity/sequence (if applicable)
+-- ==========================================
+
+\echo
+\echo '== Reseed residents.resident_id sequence (if one exists) =='
+DO $$
+DECLARE
+  seq_name text;
+BEGIN
+  SELECT pg_get_serial_sequence('public.residents', 'resident_id') INTO seq_name;
+  IF seq_name IS NULL THEN
+    RAISE NOTICE 'No serial/identity sequence found for public.residents.resident_id (skipping).';
+    RETURN;
+  END IF;
+
+  EXECUTE format(
+    'SELECT setval(%L, (SELECT COALESCE(MAX(resident_id), 0) + 1 FROM public.residents), false)',
+    seq_name
+  );
+
+  RAISE NOTICE 'Reseeded sequence: %', seq_name;
+END $$;
+
+\echo
+\echo '== Done. Rowcount in public.residents =='
+SELECT count(*) AS residents_count FROM public.residents;
+

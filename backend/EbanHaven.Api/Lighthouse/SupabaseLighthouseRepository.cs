@@ -277,7 +277,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 r.CaseCategory,
                 r.Sex,
                 NullIfEmpty(r.AssignedSocialWorker),
-                NullIfEmpty(r.DateOfAdmission),
+                r.DateOfAdmission?.ToString("yyyy-MM-dd"),
                 NullIfEmpty(r.ReintegrationStatus),
                 NullIfEmpty(r.ReintegrationType),
                 NullIfEmpty(r.PresentAge),
