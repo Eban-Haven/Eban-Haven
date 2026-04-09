@@ -71,13 +71,6 @@ const caseCategoriesFallback = [
   { name: 'Sexual Abuse', value: 14 },
 ]
 
-const outcomeFallback = [
-  { category: 'Family Reintegration', pct: 72 },
-  { category: 'Independent Living', pct: 14 },
-  { category: 'Foster / Adoption', pct: 9 },
-  { category: 'Ongoing Care', pct: 5 },
-]
-
 const tooltipStyle = {
   background: 'hsl(var(--card))',
   border: '1px solid hsl(var(--border))',
@@ -166,10 +159,6 @@ export function ImpactPage() {
 
   const whoRows = useMemo(
     () => (latestSnapshot ? parseMetricBars(latestSnapshot.metrics, 'who_') : []),
-    [latestSnapshot],
-  )
-  const outcomeRows = useMemo(
-    () => (latestSnapshot ? parseMetricBars(latestSnapshot.metrics, 'outcome_') : []),
     [latestSnapshot],
   )
 
