@@ -79,6 +79,19 @@ function getGoogleTranslateCombo() {
   return document.querySelector<HTMLSelectElement>('.goog-te-combo')
 }
 
+async function waitForGoogleTranslateCombo(attempts = 20, delayMs = 150) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const combo = getGoogleTranslateCombo()
+    if (combo) {
+      return combo
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, delayMs))
+  }
+
+  return null
+}
+
 function ensureGoogleTranslateHost() {
   let host = document.getElementById(ELEMENT_ID)
   if (host) {
@@ -92,13 +105,14 @@ function ensureGoogleTranslateHost() {
   return host
 }
 
-function triggerGoogleTranslate(language: SupportedLanguageCode) {
-  const combo = getGoogleTranslateCombo()
+function triggerGoogleTranslate(language: SupportedLanguageCode, combo = getGoogleTranslateCombo()) {
   if (!combo) {
     return false
   }
 
   combo.value = language
+  combo.selectedIndex = Array.from(combo.options).findIndex((option) => option.value === language)
+  combo.dispatchEvent(new Event('input', { bubbles: true }))
   combo.dispatchEvent(new Event('change', { bubbles: true }))
   return true
 }
@@ -165,20 +179,24 @@ async function ensureGoogleTranslateLoaded() {
   await window.__havenGoogleTranslatePromise
 }
 
-function applySelectedLanguage(language: SupportedLanguageCode) {
+async function applySelectedLanguage(language: SupportedLanguageCode) {
   if (language === 'en') {
     clearGoogleTranslateCookie()
     return
   }
 
   setGoogleTranslateCookie(language)
-  const translated = triggerGoogleTranslate(language)
+  await ensureGoogleTranslateLoaded()
+  const combo = await waitForGoogleTranslateCombo()
+  const translated = triggerGoogleTranslate(language, combo)
 
   if (!translated) {
-    window.setTimeout(() => {
-      triggerGoogleTranslate(language)
-    }, 250)
+    return
   }
+
+  window.setTimeout(() => {
+    triggerGoogleTranslate(language, combo)
+  }, 400)
 }
 
 type GoogleTranslateProps = {
@@ -193,7 +211,7 @@ export function GoogleTranslate({ variant = 'footer' }: GoogleTranslateProps) {
   useEffect(() => {
     void ensureGoogleTranslateLoaded().then(() => {
       if (getStoredLanguage() !== 'en') {
-        applySelectedLanguage(getStoredLanguage())
+        void applySelectedLanguage(getStoredLanguage())
       }
     })
   }, [])
@@ -204,7 +222,7 @@ export function GoogleTranslate({ variant = 'footer' }: GoogleTranslateProps) {
     }
 
     const timer = window.setTimeout(() => {
-      applySelectedLanguage(language)
+      void applySelectedLanguage(language)
     }, 150)
 
     return () => window.clearTimeout(timer)
@@ -221,9 +239,8 @@ export function GoogleTranslate({ variant = 'footer' }: GoogleTranslateProps) {
       return
     }
 
-    void ensureGoogleTranslateLoaded().then(() => {
-      applySelectedLanguage(nextLanguage)
-    })
+    setGoogleTranslateCookie(nextLanguage)
+    window.location.reload()
   }
 
   const wrapperClassName =
