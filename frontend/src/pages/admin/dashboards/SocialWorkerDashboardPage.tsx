@@ -88,27 +88,36 @@ function KpiCard({
   sub,
   accentClass,
   icon: Icon,
+  onClick,
+  actionLabel,
 }: {
   label: string
   value: string
   sub: string
   accentClass: string
   icon: React.ElementType
+  onClick: () => void
+  actionLabel: string
 }) {
   return (
-    <div className={`${card} relative overflow-hidden`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${card} relative w-full overflow-hidden text-left transition-colors hover:border-primary/30 hover:bg-muted/20`}
+    >
       <div className={`absolute left-0 top-0 h-full w-1 ${accentClass}`} />
       <div className="flex items-start justify-between gap-2 pl-3">
         <div className="min-w-0">
           <p className={statCardInner}>{label}</p>
           <p className={statCardValue}>{value}</p>
           <p className={statCardSub}>{sub}</p>
+          <p className="mt-3 text-xs font-medium text-primary">{actionLabel}</p>
         </div>
         <div className="shrink-0 rounded-lg bg-muted/60 p-2">
           <Icon className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -120,6 +129,7 @@ export function SocialWorkerDashboardPage() {
   const [plans, setPlans] = useState<InterventionPlan[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [highlightSection, setHighlightSection] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -211,6 +221,23 @@ export function SocialWorkerDashboardPage() {
     .sort((a, b) => (toDateValue(a.date) ?? 0) - (toDateValue(b.date) ?? 0))
     .slice(0, 6)
 
+  const activeCaseload = [...openCases]
+    .sort((a, b) => {
+      const riskA = (a.currentRiskLevel ?? '').toLowerCase()
+      const riskB = (b.currentRiskLevel ?? '').toLowerCase()
+      const rank = (risk: string) => (risk.includes('critical') ? 3 : risk.includes('high') ? 2 : risk.includes('moderate') ? 1 : 0)
+      return rank(riskB) - rank(riskA)
+    })
+    .slice(0, 6)
+
+  function focusSection(sectionId: string) {
+    setHighlightSection(sectionId)
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.setTimeout(() => {
+      setHighlightSection((current) => (current === sectionId ? null : current))
+    }, 1800)
+  }
+
   if (loading) return <p className="text-muted-foreground">Loading social worker dashboard…</p>
 
   if (error || !dashboard) {
@@ -233,6 +260,8 @@ export function SocialWorkerDashboardPage() {
           sub="Residents currently active in program records"
           accentClass="bg-primary"
           icon={HeartHandshake}
+          actionLabel="View active caseload"
+          onClick={() => focusSection('active-caseload')}
         />
         <KpiCard
           label="High-risk residents"
@@ -240,6 +269,8 @@ export function SocialWorkerDashboardPage() {
           sub="Current risk marked high or critical"
           accentClass="bg-destructive"
           icon={TriangleAlert}
+          actionLabel="Review high-risk residents"
+          onClick={() => focusSection('high-risk-residents')}
         />
         <KpiCard
           label="Reintegration"
@@ -247,6 +278,8 @@ export function SocialWorkerDashboardPage() {
           sub={`Success rate ${dashboard.reintegration.successRatePercent.toFixed(0)}%`}
           accentClass="bg-sky-500"
           icon={Waypoints}
+          actionLabel="Open reintegration watch"
+          onClick={() => focusSection('reintegration-watch')}
         />
         <KpiCard
           label="Upcoming conferences"
@@ -254,6 +287,8 @@ export function SocialWorkerDashboardPage() {
           sub="Conference-linked plans already scheduled"
           accentClass="bg-amber-500"
           icon={CalendarDays}
+          actionLabel="Jump to upcoming plans"
+          onClick={() => focusSection('upcoming-plans')}
         />
         <KpiCard
           label="Home visits (90 d)"
@@ -261,11 +296,73 @@ export function SocialWorkerDashboardPage() {
           sub="Recent field and family contact volume"
           accentClass="bg-emerald-500"
           icon={Home}
+          actionLabel="See recent visit activity"
+          onClick={() => focusSection('recent-documentation')}
         />
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)]">
-        <div className={`${card} space-y-5`}>
+        <div id="active-caseload" className={`${card} space-y-5 ${highlightSection === 'active-caseload' ? 'ring-2 ring-primary/30' : ''}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Active caseload</h3>
+            </div>
+            <Link to="/admin/residents" className="text-sm font-medium text-primary hover:underline">
+              Open residents
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {activeCaseload.length === 0 ? (
+              <div className="rounded-2xl border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+                No active cases are currently available.
+              </div>
+            ) : (
+              activeCaseload.map((resident) => (
+                <div key={resident.id} className="rounded-2xl border border-border bg-muted/20 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link to={residentPath(resident.id)} className="text-sm font-semibold text-primary hover:underline">
+                        {residentLabel(resident)}
+                      </Link>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {resident.safehouseName ?? 'No safehouse listed'} · {resident.caseCategory}
+                      </p>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Assigned {resident.assignedSocialWorker ?? '—'} · Risk {resident.currentRiskLevel ?? '—'}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
+                      {resident.caseStatus}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      to={residentPath(resident.id)}
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                    >
+                      Open profile
+                    </Link>
+                    <Link
+                      to="/admin/process-recordings"
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                    >
+                      Log session
+                    </Link>
+                    <Link
+                      to="/admin/home-visitations"
+                      className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40"
+                    >
+                      Log visit
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div id="follow-up-queue" className={`${card} space-y-5 ${highlightSection === 'follow-up-queue' ? 'ring-2 ring-primary/30' : ''}`}>
           <div className="flex items-center gap-2">
             <TriangleAlert className="h-4 w-4 text-primary" />
             <h3 className="text-lg font-semibold text-foreground">Immediate follow-up queue</h3>
@@ -325,7 +422,7 @@ export function SocialWorkerDashboardPage() {
         </div>
 
         <div className="space-y-6">
-          <div className={`${card} space-y-5`}>
+          <div id="high-risk-residents" className={`${card} space-y-5 ${highlightSection === 'high-risk-residents' ? 'ring-2 ring-primary/30' : ''}`}>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <TriangleAlert className="h-4 w-4 text-primary" />
@@ -385,7 +482,7 @@ export function SocialWorkerDashboardPage() {
             </div>
           </div>
 
-          <div className={`${card} space-y-5`}>
+          <div id="reintegration-watch" className={`${card} space-y-5 ${highlightSection === 'reintegration-watch' ? 'ring-2 ring-primary/30' : ''}`}>
             <div className="flex items-center gap-2">
               <Waypoints className="h-4 w-4 text-primary" />
               <h3 className="text-lg font-semibold text-foreground">Reintegration watch</h3>
@@ -464,7 +561,7 @@ export function SocialWorkerDashboardPage() {
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className={`${card} space-y-5`}>
+        <div id="upcoming-plans" className={`${card} space-y-5 ${highlightSection === 'upcoming-plans' ? 'ring-2 ring-primary/30' : ''}`}>
           <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-primary" />
             <h3 className="text-lg font-semibold text-foreground">Upcoming conferences & plan milestones</h3>
@@ -518,7 +615,7 @@ export function SocialWorkerDashboardPage() {
           </div>
         </div>
 
-        <div className={`${card} space-y-5`}>
+        <div id="recent-documentation" className={`${card} space-y-5 ${highlightSection === 'recent-documentation' ? 'ring-2 ring-primary/30' : ''}`}>
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
             <h3 className="text-lg font-semibold text-foreground">Recent documentation activity</h3>
