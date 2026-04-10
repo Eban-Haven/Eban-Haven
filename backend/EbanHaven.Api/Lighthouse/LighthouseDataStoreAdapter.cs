@@ -5,8 +5,8 @@ public sealed class LighthouseDataStoreAdapter(LighthouseDataStore inner) : ILig
     public AdminDashboardDto GetAdminDashboard() => inner.GetAdminDashboard();
     public IReadOnlyList<SafehouseOptionDto> ListSafehousesOptions() => inner.ListSafehousesOptions();
     public IReadOnlyList<SupporterDto> ListSupporters() => inner.ListSupporters();
-    public SupporterDto CreateSupporter(string supporterType, string displayName, string? email, string? region, string status) =>
-        inner.CreateSupporter(supporterType, displayName, email, region, status);
+    public SupporterDto CreateSupporter(string supporterType, string displayName, string? email, string? region, string? country, string status) =>
+        inner.CreateSupporter(supporterType, displayName, email, region, country, status);
     public SupporterDto? UpdateSupporter(int id, string? status, string? supporterType) => inner.UpdateSupporter(id, status, supporterType);
     public IReadOnlyList<DonationDto> ListDonations(int? supporterId) => inner.ListDonations(supporterId);
     public DonationDto CreateDonation(int supporterId, string donationType, DateTime donationDate, decimal? amount, string? currencyCode,

@@ -23,6 +23,7 @@ public sealed class PublicRegistrationController(ILighthouseRepository repo) : C
             body.DisplayName.Trim(),
             string.IsNullOrWhiteSpace(body.Email) ? null : body.Email.Trim().ToLowerInvariant(),
             string.IsNullOrWhiteSpace(body.Region) ? null : body.Region.Trim(),
+            null,
             status);
 
         return Created($"/api/admin/supporters/{created.Id}", created);

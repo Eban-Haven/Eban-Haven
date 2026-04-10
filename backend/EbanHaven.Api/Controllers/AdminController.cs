@@ -37,6 +37,7 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
             body.DisplayName.Trim(),
             body.Email?.Trim(),
             body.Region?.Trim(),
+            body.Country?.Trim(),
             status);
         return Created($"/api/admin/supporters/{created.Id}", created);
     }

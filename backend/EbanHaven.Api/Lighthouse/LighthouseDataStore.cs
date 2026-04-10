@@ -341,6 +341,7 @@ public sealed class LighthouseDataStore
         string displayName,
         string? email,
         string? region,
+        string? country,
         string status)
     {
         lock (_lock)
@@ -356,7 +357,7 @@ public sealed class LighthouseDataStore
                 ["last_name"] = string.Empty,
                 ["relationship_type"] = "Local",
                 ["region"] = region ?? string.Empty,
-                ["country"] = "Philippines",
+                ["country"] = string.IsNullOrWhiteSpace(country) ? "Ghana" : country.Trim(),
                 ["email"] = email ?? string.Empty,
                 ["phone"] = string.Empty,
                 ["status"] = status,

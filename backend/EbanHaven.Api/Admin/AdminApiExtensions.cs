@@ -28,6 +28,7 @@ public static class AdminApiExtensions
                 body.DisplayName.Trim(),
                 body.Email?.Trim(),
                 body.Region?.Trim(),
+                body.Country?.Trim(),
                 status);
             return Results.Created($"/api/admin/supporters/{created.Id}", created);
         });
@@ -402,6 +403,7 @@ public sealed record CreateSupporterRequest(
     string DisplayName,
     string? Email,
     string? Region,
+    string? Country,
     string? Status);
 
 public sealed record PatchSupporterRequest(string? Status, string? SupporterType);

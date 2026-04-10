@@ -6,7 +6,7 @@ public interface ILighthouseRepository
 
     IReadOnlyList<SafehouseOptionDto> ListSafehousesOptions();
     IReadOnlyList<SupporterDto> ListSupporters();
-    SupporterDto CreateSupporter(string supporterType, string displayName, string? email, string? region, string status);
+    SupporterDto CreateSupporter(string supporterType, string displayName, string? email, string? region, string? country, string status);
     SupporterDto? UpdateSupporter(int id, string? status, string? supporterType);
 
     IReadOnlyList<DonationDto> ListDonations(int? supporterId);

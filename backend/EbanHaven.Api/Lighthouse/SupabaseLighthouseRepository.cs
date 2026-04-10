@@ -143,7 +143,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             .ToList();
     }
 
-    public SupporterDto CreateSupporter(string supporterType, string displayName, string? email, string? region, string status)
+    public SupporterDto CreateSupporter(string supporterType, string displayName, string? email, string? region, string? country, string status)
     {
         var row = new Supporter
         {
@@ -152,7 +152,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             Email = email,
             Region = region,
             Status = status,
-            Country = "Philippines",
+            Country = string.IsNullOrWhiteSpace(country) ? "Ghana" : country.Trim(),
         };
         db.Supporters.Add(row);
         db.SaveChanges();

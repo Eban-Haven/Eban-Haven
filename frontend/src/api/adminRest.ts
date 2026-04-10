@@ -22,6 +22,7 @@ export async function createSupporter(body: T.CreateSupporterBody): Promise<T.Su
     displayName: body.displayName,
     email: body.email,
     region: body.region,
+    country: body.country,
     status: body.status,
   }
   return parseJson<T.Supporter>(
