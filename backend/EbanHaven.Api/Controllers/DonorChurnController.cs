@@ -361,9 +361,8 @@ public sealed class DonorChurnController : ControllerBase
         int limit = 100,
         CancellationToken ct = default)
     {
-        var conn = db.Database.GetDbConnection();
-        if (conn.State == ConnectionState.Closed)
-            await conn.OpenAsync(ct);
+        await using var conn = new NpgsqlConnection(_connStr);
+        await conn.OpenAsync(ct);
         var rows = (await conn.QueryAsync<dynamic>(UpgradeFeatureSql)).ToList();
 
         if (rows.Count == 0)
@@ -381,7 +380,7 @@ public sealed class DonorChurnController : ControllerBase
             RelationshipType:       (string)(r.relationship_type   ?? "Unknown")
         )).ToList();
 
-        var http = httpFactory.CreateClient("MlService");
+        var http = _httpFactory.CreateClient("MlService");
         HttpResponseMessage response;
         try
         {
