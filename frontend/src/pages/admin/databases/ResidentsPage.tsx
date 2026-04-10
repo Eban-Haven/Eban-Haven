@@ -55,9 +55,7 @@ const caseCategoryOptions = [
   'Child Labor',
   'At Risk',
 ] as const
-const sexOptions = ['F', 'M'] as const
 const reintegrationStatuses = ['In Progress', 'Completed', 'On Hold', 'Not Started'] as const
-const reintegrationTypes = ['Family Reunification', 'Independent Living', 'Foster Care', 'Shelter Extension'] as const
 const riskOptions = ['Low', 'Medium', 'High', 'Critical'] as const
 
 const PICK_FOR_RECORD = new Set(['education', 'health', 'incident', 'plan'])
@@ -69,35 +67,15 @@ const pickForLabels: Record<string, string> = {
   plan: 'an intervention plan',
 }
 
-type ResidentFormState = {
+/** Fields that match the columns on this list page (safe PATCH to Postgres; no boolean "" payloads). */
+type ResidentListPageFormState = {
   safehouse_id: string
   case_status: string
   case_category: string
-  sex: string
-  date_of_birth: string
-  place_of_birth: string
-  religion: string
-  sub_cat_trafficked: string
-  sub_cat_physical_abuse: string
-  sub_cat_at_risk: string
-  is_pwd: string
-  pwd_type: string
-  has_special_needs: string
-  special_needs_diagnosis: string
-  family_is_4ps: string
-  family_solo_parent: string
-  family_indigenous: string
-  family_informal_settler: string
   date_of_admission: string
-  age_upon_admission: string
-  referral_source: string
-  referring_agency_person: string
-  assigned_social_worker: string
   reintegration_status: string
-  reintegration_type: string
-  initial_risk_level: string
   current_risk_level: string
-  notes_restricted: string
+  assigned_social_worker: string
 }
 
 function emptyFilters() {
@@ -114,151 +92,82 @@ function emptyFilters() {
   }
 }
 
-function blankResidentForm(defaultSafehouseId?: number): ResidentFormState {
+function blankListPageForm(defaultSafehouseId?: number): ResidentListPageFormState {
   return {
     safehouse_id: defaultSafehouseId ? String(defaultSafehouseId) : '',
     case_status: 'Active',
     case_category: 'Surrendered',
-    sex: 'F',
-    date_of_birth: '',
-    place_of_birth: '',
-    religion: '',
-    sub_cat_trafficked: '',
-    sub_cat_physical_abuse: '',
-    sub_cat_at_risk: '',
-    is_pwd: '',
-    pwd_type: '',
-    has_special_needs: '',
-    special_needs_diagnosis: '',
-    family_is_4ps: '',
-    family_solo_parent: '',
-    family_indigenous: '',
-    family_informal_settler: '',
     date_of_admission: new Date().toISOString().slice(0, 10),
-    age_upon_admission: '',
-    referral_source: '',
-    referring_agency_person: '',
-    assigned_social_worker: '',
     reintegration_status: '',
-    reintegration_type: '',
-    initial_risk_level: '',
     current_risk_level: '',
-    notes_restricted: '',
+    assigned_social_worker: '',
   }
 }
 
-function formFromResidentDetail(detail: ResidentDetail, defaultSafehouseId?: number): ResidentFormState {
-  const fields = detail.fields
-  const fallback = blankResidentForm(defaultSafehouseId)
+function listPageFormFromResidentDetail(detail: ResidentDetail, defaultSafehouseId?: number): ResidentListPageFormState {
+  const f = detail.fields
+  const b = blankListPageForm(defaultSafehouseId)
+  const rawSh = (f.safehouse_id ?? b.safehouse_id).toString().trim()
+  const adm = (f.date_of_admission ?? '').trim().slice(0, 10)
   return {
-    ...fallback,
-    safehouse_id: fields.safehouse_id ?? fallback.safehouse_id,
-    case_status: fields.case_status ?? fallback.case_status,
-    case_category: fields.case_category ?? fallback.case_category,
-    sex: fields.sex ?? fallback.sex,
-    date_of_birth: fields.date_of_birth ?? '',
-    place_of_birth: fields.place_of_birth ?? '',
-    religion: fields.religion ?? '',
-    sub_cat_trafficked: fields.sub_cat_trafficked ?? '',
-    sub_cat_physical_abuse: fields.sub_cat_physical_abuse ?? '',
-    sub_cat_at_risk: fields.sub_cat_at_risk ?? '',
-    is_pwd: fields.is_pwd ?? '',
-    pwd_type: fields.pwd_type ?? '',
-    has_special_needs: fields.has_special_needs ?? '',
-    special_needs_diagnosis: fields.special_needs_diagnosis ?? '',
-    family_is_4ps: fields.family_is_4ps ?? '',
-    family_solo_parent: fields.family_solo_parent ?? '',
-    family_indigenous: fields.family_indigenous ?? '',
-    family_informal_settler: fields.family_informal_settler ?? '',
-    date_of_admission: fields.date_of_admission ?? fallback.date_of_admission,
-    age_upon_admission: fields.age_upon_admission ?? '',
-    referral_source: fields.referral_source ?? '',
-    referring_agency_person: fields.referring_agency_person ?? '',
-    assigned_social_worker: fields.assigned_social_worker ?? '',
-    reintegration_status: fields.reintegration_status ?? '',
-    reintegration_type: fields.reintegration_type ?? '',
-    initial_risk_level: fields.initial_risk_level ?? '',
-    current_risk_level: fields.current_risk_level ?? '',
-    notes_restricted: fields.notes_restricted ?? '',
+    safehouse_id: rawSh,
+    case_status: (f.case_status ?? b.case_status).trim(),
+    case_category: (f.case_category ?? b.case_category).trim(),
+    date_of_admission: adm || b.date_of_admission,
+    reintegration_status: (f.reintegration_status ?? '').trim(),
+    current_risk_level: (f.current_risk_level ?? '').trim(),
+    assigned_social_worker: (f.assigned_social_worker ?? '').trim(),
   }
 }
 
-function patchFromResidentForm(form: ResidentFormState) {
+/** Only list-page columns; use null for optional clears (Postgres booleans must not receive ""). */
+function patchBodyFromListPageForm(form: ResidentListPageFormState): Record<string, string | null> {
+  const sh = form.safehouse_id.trim()
+  if (!/^\d+$/.test(sh)) {
+    throw new Error('Choose a valid safehouse.')
+  }
+  const adm = form.date_of_admission.trim()
+  const cat = form.case_category.trim() || 'Surrendered'
+  const status = form.case_status.trim()
+  if (!status) {
+    throw new Error('Case status is required.')
+  }
   return {
-    safehouse_id: form.safehouse_id,
-    case_status: form.case_status,
-    case_category: form.case_category,
-    sex: form.sex,
-    date_of_birth: form.date_of_birth,
-    place_of_birth: form.place_of_birth,
-    religion: form.religion,
-    sub_cat_trafficked: form.sub_cat_trafficked,
-    sub_cat_physical_abuse: form.sub_cat_physical_abuse,
-    sub_cat_at_risk: form.sub_cat_at_risk,
-    is_pwd: form.is_pwd,
-    pwd_type: form.pwd_type,
-    has_special_needs: form.has_special_needs,
-    special_needs_diagnosis: form.special_needs_diagnosis,
-    family_is_4ps: form.family_is_4ps,
-    family_solo_parent: form.family_solo_parent,
-    family_indigenous: form.family_indigenous,
-    family_informal_settler: form.family_informal_settler,
-    date_of_admission: form.date_of_admission,
-    age_upon_admission: form.age_upon_admission,
-    referral_source: form.referral_source,
-    referring_agency_person: form.referring_agency_person,
-    assigned_social_worker: form.assigned_social_worker,
-    reintegration_status: form.reintegration_status,
-    reintegration_type: form.reintegration_type,
-    initial_risk_level: form.initial_risk_level,
-    current_risk_level: form.current_risk_level,
-    notes_restricted: form.notes_restricted,
+    safehouse_id: sh,
+    case_status: status,
+    case_category: cat,
+    date_of_admission: adm === '' ? null : adm,
+    reintegration_status: form.reintegration_status.trim() === '' ? null : form.reintegration_status.trim(),
+    current_risk_level: form.current_risk_level.trim() === '' ? null : form.current_risk_level.trim(),
+    assigned_social_worker: form.assigned_social_worker.trim() === '' ? null : form.assigned_social_worker.trim(),
   }
 }
 
-function YesNoSelect({
-  labelText,
-  value,
-  onChange,
-}: {
-  labelText: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className={label}>
-      {labelText}
-      <select className={input} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">—</option>
-        <option value="true">Yes</option>
-        <option value="false">No</option>
-      </select>
-    </label>
-  )
-}
-
-function ResidentProfileForm({
+function ResidentsTableEditForm({
   form,
   onChange,
   safehouses,
   submitLabel,
   saving,
   onCancel,
+  internalCodeReadOnly,
 }: {
-  form: ResidentFormState
-  onChange: (field: keyof ResidentFormState, value: string) => void
+  form: ResidentListPageFormState
+  onChange: (field: keyof ResidentListPageFormState, value: string) => void
   safehouses: Array<{ id: number; code: string; name: string }>
   submitLabel: string
   saving: boolean
   onCancel: () => void
+  /** When set (edit mode), internal code is display-only — same as the table column. */
+  internalCodeReadOnly: string | null
 }) {
   return (
-    <div className={`${card} scroll-mt-28 space-y-6`}>
-      <div className="flex items-center justify-between">
+    <div className={`${card} scroll-mt-28 space-y-5`}>
+      <div className="flex items-center justify-between gap-3">
         <div>
           <p className={sectionFormTitle}>{submitLabel}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Capture demographics, case profile, referral details, and reintegration tracking in one place.
+            Only the fields shown on this table are edited here. Open the resident profile for full case details.
           </p>
         </div>
         <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={onCancel}>
@@ -266,202 +175,94 @@ function ResidentProfileForm({
         </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="space-y-4 rounded-xl border border-border bg-background/70 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Case Profile</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={label}>
-              Safehouse
-              <select className={input} value={form.safehouse_id} onChange={(e) => onChange('safehouse_id', e.target.value)}>
-                {safehouses.map((safehouse) => (
-                  <option key={safehouse.id} value={safehouse.id}>
-                    {safehouse.name} ({safehouse.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              Case Status
-              <select className={input} value={form.case_status} onChange={(e) => onChange('case_status', e.target.value)}>
-                {caseStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              Case Category
-              <select className={input} value={form.case_category} onChange={(e) => onChange('case_category', e.target.value)}>
-                {caseCategoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              Sex
-              <select className={input} value={form.sex} onChange={(e) => onChange('sex', e.target.value)}>
-                {sexOptions.map((sex) => (
-                  <option key={sex} value={sex}>
-                    {sex}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <YesNoSelect labelText="Trafficked" value={form.sub_cat_trafficked} onChange={(value) => onChange('sub_cat_trafficked', value)} />
-            <YesNoSelect
-              labelText="Physical Abuse"
-              value={form.sub_cat_physical_abuse}
-              onChange={(value) => onChange('sub_cat_physical_abuse', value)}
-            />
-            <YesNoSelect labelText="Neglected / At Risk" value={form.sub_cat_at_risk} onChange={(value) => onChange('sub_cat_at_risk', value)} />
-            <label className={label}>
-              Assigned Social Worker
-              <input className={input} value={form.assigned_social_worker} onChange={(e) => onChange('assigned_social_worker', e.target.value)} />
-            </label>
-          </div>
-        </section>
-
-        <section className="space-y-4 rounded-xl border border-border bg-background/70 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Demographics</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={label}>
-              Date of Birth
-              <input type="date" className={input} value={form.date_of_birth} onChange={(e) => onChange('date_of_birth', e.target.value)} />
-            </label>
-            <label className={label}>
-              Age Upon Admission
-              <input className={input} value={form.age_upon_admission} onChange={(e) => onChange('age_upon_admission', e.target.value)} />
-            </label>
-            <label className={label}>
-              Place of Birth
-              <input className={input} value={form.place_of_birth} onChange={(e) => onChange('place_of_birth', e.target.value)} />
-            </label>
-            <label className={label}>
-              Religion
-              <input className={input} value={form.religion} onChange={(e) => onChange('religion', e.target.value)} />
-            </label>
-          </div>
-        </section>
-
-        <section className="space-y-4 rounded-xl border border-border bg-background/70 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Disability and Support Needs</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <YesNoSelect labelText="Person with Disability" value={form.is_pwd} onChange={(value) => onChange('is_pwd', value)} />
-            <label className={label}>
-              Disability Type
-              <input className={input} value={form.pwd_type} onChange={(e) => onChange('pwd_type', e.target.value)} />
-            </label>
-            <YesNoSelect
-              labelText="Has Special Needs"
-              value={form.has_special_needs}
-              onChange={(value) => onChange('has_special_needs', value)}
-            />
-            <label className={`${label} sm:col-span-2`}>
-              Special Needs Diagnosis
-              <input
-                className={input}
-                value={form.special_needs_diagnosis}
-                onChange={(e) => onChange('special_needs_diagnosis', e.target.value)}
-              />
-            </label>
-          </div>
-        </section>
-
-        <section className="space-y-4 rounded-xl border border-border bg-background/70 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Family Socio-Demographic Profile</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <YesNoSelect labelText="4Ps Beneficiary" value={form.family_is_4ps} onChange={(value) => onChange('family_is_4ps', value)} />
-            <YesNoSelect labelText="Solo Parent" value={form.family_solo_parent} onChange={(value) => onChange('family_solo_parent', value)} />
-            <YesNoSelect labelText="Indigenous Group" value={form.family_indigenous} onChange={(value) => onChange('family_indigenous', value)} />
-            <YesNoSelect
-              labelText="Informal Settler"
-              value={form.family_informal_settler}
-              onChange={(value) => onChange('family_informal_settler', value)}
-            />
-          </div>
-        </section>
-
-        <section className="space-y-4 rounded-xl border border-border bg-background/70 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Admission and Referral</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={label}>
-              Date of Admission
-              <input type="date" className={input} value={form.date_of_admission} onChange={(e) => onChange('date_of_admission', e.target.value)} />
-            </label>
-            <label className={label}>
-              Referral Source
-              <input className={input} value={form.referral_source} onChange={(e) => onChange('referral_source', e.target.value)} />
-            </label>
-            <label className={`${label} sm:col-span-2`}>
-              Referring Agency / Person
-              <input
-                className={input}
-                value={form.referring_agency_person}
-                onChange={(e) => onChange('referring_agency_person', e.target.value)}
-              />
-            </label>
-          </div>
-        </section>
-
-        <section className="space-y-4 rounded-xl border border-border bg-background/70 p-4">
-          <h3 className="text-sm font-semibold text-foreground">Reintegration Tracking</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className={label}>
-              Reintegration Status
-              <select className={input} value={form.reintegration_status} onChange={(e) => onChange('reintegration_status', e.target.value)}>
-                <option value="">—</option>
-                {reintegrationStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              Reintegration Type
-              <select className={input} value={form.reintegration_type} onChange={(e) => onChange('reintegration_type', e.target.value)}>
-                <option value="">—</option>
-                {reintegrationTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              Initial Risk Level
-              <select className={input} value={form.initial_risk_level} onChange={(e) => onChange('initial_risk_level', e.target.value)}>
-                <option value="">—</option>
-                {riskOptions.map((risk) => (
-                  <option key={risk} value={risk}>
-                    {risk}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              Current Risk Level
-              <select className={input} value={form.current_risk_level} onChange={(e) => onChange('current_risk_level', e.target.value)}>
-                <option value="">—</option>
-                {riskOptions.map((risk) => (
-                  <option key={risk} value={risk}>
-                    {risk}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={`${label} sm:col-span-2`}>
-              Reintegration Notes
-              <textarea className={input} rows={3} value={form.notes_restricted} onChange={(e) => onChange('notes_restricted', e.target.value)} />
-            </label>
-          </div>
-        </section>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {internalCodeReadOnly != null ? (
+          <label className={label}>
+            Internal Code
+            <input className={input} readOnly value={internalCodeReadOnly} />
+          </label>
+        ) : null}
+        <label className={label}>
+          Safehouse
+          <select
+            className={input}
+            value={form.safehouse_id}
+            onChange={(e) => onChange('safehouse_id', e.target.value)}
+            disabled={safehouses.length === 0}
+          >
+            {safehouses.length === 0 ? (
+              <option value="">No safehouses — add one first</option>
+            ) : (
+              safehouses.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.code})
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+        <label className={label}>
+          Case Status
+          <select className={input} value={form.case_status} onChange={(e) => onChange('case_status', e.target.value)}>
+            {caseStatuses.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={label}>
+          Case Category
+          <select className={input} value={form.case_category} onChange={(e) => onChange('case_category', e.target.value)}>
+            {caseCategoryOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={label}>
+          Date of Admission
+          <input type="date" className={input} value={form.date_of_admission} onChange={(e) => onChange('date_of_admission', e.target.value)} />
+        </label>
+        <label className={label}>
+          Reintegration Status
+          <select
+            className={input}
+            value={form.reintegration_status}
+            onChange={(e) => onChange('reintegration_status', e.target.value)}
+          >
+            <option value="">—</option>
+            {reintegrationStatuses.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={label}>
+          Current Risk Level
+          <select className={input} value={form.current_risk_level} onChange={(e) => onChange('current_risk_level', e.target.value)}>
+            <option value="">—</option>
+            {riskOptions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={`${label} sm:col-span-2 lg:col-span-1`}>
+          Assigned Social Worker
+          <input
+            className={input}
+            value={form.assigned_social_worker}
+            onChange={(e) => onChange('assigned_social_worker', e.target.value)}
+            placeholder="e.g. SW-01"
+          />
+        </label>
       </div>
 
-      <button type="submit" form="resident-profile-form" disabled={saving} className={btnPrimary}>
+      <button type="submit" form="resident-profile-form" disabled={saving || safehouses.length === 0} className={btnPrimary}>
         {saving ? 'Saving…' : submitLabel}
       </button>
     </div>
@@ -487,7 +288,9 @@ export function ResidentsPage() {
   const [deleteModal, setDeleteModal] = useState<{ ids: number[]; labels: string[] } | null>(null)
   const [saving, setSaving] = useState(false)
   const [loadingResidentForm, setLoadingResidentForm] = useState(false)
-  const [residentForm, setResidentForm] = useState<ResidentFormState>(blankResidentForm())
+  const [residentForm, setResidentForm] = useState<ResidentListPageFormState>(blankListPageForm())
+  /** Internal code from API when editing (table row may be filtered out). */
+  const [editingInternalCode, setEditingInternalCode] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -495,7 +298,7 @@ export function ResidentsPage() {
       const [r, sh] = await Promise.all([getResidents({}), getSafehouses()])
       setRows(r)
       setSafehouses(sh)
-      setResidentForm((current) => (current.safehouse_id ? current : blankResidentForm(sh[0]?.id)))
+      setResidentForm((current) => (current.safehouse_id ? current : blankListPageForm(sh[0]?.id)))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
@@ -516,7 +319,8 @@ export function ResidentsPage() {
     if (loading || searchParams.get('new') !== '1') return
     setFormMode('add')
     setEditingResidentId(null)
-    setResidentForm(blankResidentForm(safehouses[0]?.id))
+    setEditingInternalCode(null)
+    setResidentForm(blankListPageForm(safehouses[0]?.id))
     const next = new URLSearchParams(searchParams)
     next.delete('new')
     setSearchParams(next, { replace: true })
@@ -604,7 +408,7 @@ export function ResidentsPage() {
     setSortDir(next.dir)
   }
 
-  function setResidentFormField(field: keyof ResidentFormState, value: string) {
+  function setResidentFormField(field: keyof ResidentListPageFormState, value: string) {
     setResidentForm((current) => ({ ...current, [field]: value }))
   }
 
@@ -655,7 +459,8 @@ export function ResidentsPage() {
   function openAdd() {
     setFormMode('add')
     setEditingResidentId(null)
-    setResidentForm(blankResidentForm(safehouses[0]?.id))
+    setEditingInternalCode(null)
+    setResidentForm(blankListPageForm(safehouses[0]?.id))
     requestAnimationFrame(() => document.getElementById('resident-profile-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
 
@@ -666,7 +471,8 @@ export function ResidentsPage() {
     setError(null)
     try {
       const detail = await getResident(residentId)
-      setResidentForm(formFromResidentDetail(detail, safehouses[0]?.id))
+      setEditingInternalCode(detail.fields.internal_code?.trim() || null)
+      setResidentForm(listPageFormFromResidentDetail(detail, safehouses[0]?.id))
       requestAnimationFrame(() => document.getElementById('resident-profile-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load resident profile.')
@@ -681,17 +487,19 @@ export function ResidentsPage() {
     setSaving(true)
     setError(null)
     try {
+      const patch = patchBodyFromListPageForm(residentForm)
       if (formMode === 'add') {
         const created = await createResident({
-          caseStatus: residentForm.case_status,
-          caseCategory: residentForm.case_category || undefined,
+          caseStatus: patch.case_status!,
+          caseCategory: patch.case_category ?? undefined,
         })
-        await patchResident(created.id, patchFromResidentForm(residentForm))
+        await patchResident(created.id, patch)
       } else if (formMode === 'edit' && editingResidentId) {
-        await patchResident(editingResidentId, patchFromResidentForm(residentForm))
+        await patchResident(editingResidentId, patch)
       }
       setFormMode(null)
       setEditingResidentId(null)
+      setEditingInternalCode(null)
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
@@ -701,6 +509,10 @@ export function ResidentsPage() {
   }
 
   const colCount = 10
+  const internalCodeForForm =
+    formMode === 'edit' && editingResidentId != null
+      ? editingInternalCode ?? rows.find((r) => r.id === editingResidentId)?.internalCode ?? null
+      : null
 
   return (
     <div className="space-y-6">
@@ -804,15 +616,17 @@ export function ResidentsPage() {
           {loadingResidentForm ? (
             <div className={card}>Loading resident profile…</div>
           ) : (
-            <ResidentProfileForm
+            <ResidentsTableEditForm
               form={residentForm}
               onChange={setResidentFormField}
               safehouses={safehouses}
               submitLabel={formMode === 'add' ? 'Save Resident' : 'Save Changes'}
               saving={saving}
+              internalCodeReadOnly={internalCodeForForm}
               onCancel={() => {
                 setFormMode(null)
                 setEditingResidentId(null)
+                setEditingInternalCode(null)
               }}
             />
           )}

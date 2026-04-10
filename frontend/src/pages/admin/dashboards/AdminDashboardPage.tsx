@@ -3,28 +3,17 @@ import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowRight,
-  BarChart3,
   CalendarDays,
-  CheckCircle,
   ChevronDown,
   ClipboardList,
-  GitBranch,
   Heart,
   Home,
   Mail,
-  Star,
   TrendingUp,
   Users,
   Video,
 } from 'lucide-react'
-import {
-  getDashboard,
-  getAtRiskDonors,
-  getResidents,
-  type DashboardSummary,
-  type AtRiskDonorInfo,
-  type ResidentSummary,
-} from '../../../api/admin'
+import { getDashboard, getResidents, type DashboardSummary, type ResidentSummary } from '../../../api/admin'
 import {
   alertError,
   card,
@@ -35,10 +24,6 @@ import {
   statCardValue,
 } from '../shared/adminStyles'
 import { formatUsd } from '../../../utils/currency'
-
-function listRowShell(extra = '') {
-  return `rounded-lg border border-border bg-muted/15 px-3 py-2 text-sm ${extra}`.trim()
-}
 
 function KpiCard({
   label,
@@ -98,7 +83,9 @@ function SafehouseBar({
   capacity: number
 }) {
   const pct = capacity > 0 ? Math.round((occupancy / capacity) * 100) : 0
-  const barClass = pct >= 90 ? 'bg-destructive' : pct >= 70 ? 'bg-accent' : 'bg-primary'
+  /** Stepped fill: high occupancy uses amber (capacity pressure), not theme destructive red. */
+  const barClass =
+    pct >= 90 ? 'bg-amber-600 dark:bg-amber-500' : pct >= 70 ? 'bg-primary' : 'bg-primary/65'
   return (
     <li className="space-y-1">
       <div className="flex items-center justify-between text-sm">
@@ -188,7 +175,6 @@ function daysUntil(dateStr: string | null): number | null {
 export function AdminDashboardPage() {
   const [data, setData] = useState<DashboardSummary | null>(null)
   const [residents, setResidents] = useState<ResidentSummary[]>([])
-  const [atRiskDonors, setAtRiskDonors] = useState<AtRiskDonorInfo[]>([])
   const [residentsLoading, setResidentsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -218,11 +204,6 @@ export function AdminDashboardPage() {
       .catch(() => {
         if (!cancelled) setResidentsLoading(false)
       })
-    getAtRiskDonors(0.55, 10)
-      .then((r) => {
-        if (!cancelled) setAtRiskDonors(r)
-      })
-      .catch(() => {})
     return () => {
       cancelled = true
     }
@@ -233,23 +214,12 @@ export function AdminDashboardPage() {
     return <div className={alertError}>{error ?? 'No data'}</div>
   }
 
-  const atRiskResidents = residents
-    .filter(
-      (r) =>
-        r.caseStatus === 'Active' &&
-        (r.currentRiskLevel?.toLowerCase().includes('high') ||
-          r.currentRiskLevel?.toLowerCase().includes('critical')),
-    )
-    .slice(0, 6)
-
-  const reintegrationReady = residents
-    .filter(
-      (r) =>
-        r.caseStatus === 'Active' &&
-        r.reintegrationStatus != null &&
-        !r.reintegrationStatus.toLowerCase().includes('none'),
-    )
-    .slice(0, 6)
+  const highRiskGirlsCount = residents.filter(
+    (r) =>
+      r.caseStatus === 'Active' &&
+      (r.currentRiskLevel?.toLowerCase().includes('high') ||
+        r.currentRiskLevel?.toLowerCase().includes('critical')),
+  ).length
 
   const conferencesSorted = [...data.upcomingCaseConferences].sort((a, b) => {
     if (!a.caseConferenceDate) return 1
@@ -279,13 +249,21 @@ export function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           label="Active residents"
           value={String(data.activeResidentsTotal)}
           sub={`across ${data.safehouses.length} safehouse${data.safehouses.length === 1 ? '' : 's'}`}
           accentClass="bg-primary"
           icon={Users}
+          to="/admin/residents"
+        />
+        <KpiCard
+          label="Girls at high risk"
+          value={residentsLoading ? '—' : String(highRiskGirlsCount)}
+          sub="Active · high or critical"
+          accentClass="bg-amber-600 dark:bg-amber-500"
+          icon={AlertTriangle}
           to="/admin/residents"
         />
         <KpiCard
@@ -321,53 +299,7 @@ export function AdminDashboardPage() {
         />
       </div>
 
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">More shortcuts</p>
-        <div className="mt-2 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <KpiCard
-            label="Residents on file"
-            value={residentsLoading ? '—' : String(residents.length)}
-            sub="All statuses in directory"
-            accentClass="bg-primary"
-            icon={Users}
-            to="/admin/residents"
-          />
-          <KpiCard
-            label="Upcoming conferences"
-            value={String(conferencesSorted.length)}
-            sub="Scheduled case conferences"
-            accentClass="bg-accent"
-            icon={CalendarDays}
-            to="/admin/case-conferences"
-          />
-          <KpiCard
-            label="Reintegration in progress"
-            value={String(data.reintegration.inProgressCount)}
-            sub={`${data.reintegration.completedCount} completed to date`}
-            accentClass="bg-foreground/55"
-            icon={Star}
-            to="/admin/reintigration-readiness"
-          />
-          <KpiCard
-            label="At-risk donors"
-            value={String(atRiskDonors.length)}
-            sub="Flagged for outreach"
-            accentClass="bg-primary/45"
-            icon={Mail}
-            to="/admin/email-hub"
-          />
-          <KpiCard
-            label="Program analytics"
-            value="Reports"
-            sub="Donations, safehouses, outcomes"
-            accentClass="bg-accent/70"
-            icon={BarChart3}
-            to="/admin/reports"
-          />
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
             <Home className="h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -403,7 +335,7 @@ export function AdminDashboardPage() {
                     key={c.planId}
                     className={`border-l-2 pl-3 py-2 text-sm ${
                       isUrgent
-                        ? 'border-l-destructive/60 bg-destructive/5'
+                        ? 'border-l-amber-600/70 bg-amber-500/10 dark:border-l-amber-500/60 dark:bg-amber-500/10'
                         : isSoon
                           ? 'border-l-accent bg-accent/10'
                           : 'border-l-border bg-muted/15'
@@ -417,7 +349,7 @@ export function AdminDashboardPage() {
                         <span
                           className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                             isUrgent
-                              ? 'bg-destructive/10 text-destructive'
+                              ? 'bg-amber-500/20 text-amber-950 dark:bg-amber-500/25 dark:text-amber-100'
                               : isSoon
                                 ? 'bg-accent/20 text-foreground'
                                 : 'bg-muted text-muted-foreground'
@@ -436,136 +368,6 @@ export function AdminDashboardPage() {
             </ul>
           )}
         </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className={card}>
-          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" aria-hidden />
-            Girls at high risk
-            {atRiskResidents.length > 0 && (
-              <span className="ml-auto rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
-                {atRiskResidents.length}
-              </span>
-            )}
-          </h3>
-          {residentsLoading ? (
-            <p className="mt-4 text-sm text-muted-foreground">Loading resident data…</p>
-          ) : atRiskResidents.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">No high-risk residents currently flagged.</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {atRiskResidents.map((r) => (
-                <li
-                  key={r.id}
-                  className={`${listRowShell('border-l-2 border-l-destructive/50')}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-foreground">{r.internalCode}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.safehouseName ?? '—'} · {r.assignedSocialWorker ?? 'Unassigned'}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
-                      {r.currentRiskLevel}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link to="/admin/residents" className="mt-4 flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-            View all residents <ArrowRight className="h-3 w-3" aria-hidden />
-          </Link>
-        </div>
-
-        <div className={card}>
-          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <CheckCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-            Reintegration pipeline
-            {reintegrationReady.length > 0 && (
-              <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
-                {reintegrationReady.length}
-              </span>
-            )}
-          </h3>
-          {residentsLoading ? (
-            <p className="mt-4 text-sm text-muted-foreground">Loading resident data…</p>
-          ) : reintegrationReady.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">No residents currently in reintegration pipeline.</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {reintegrationReady.map((r) => (
-                <li key={r.id} className={listRowShell()}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-foreground">{r.internalCode}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {r.safehouseName ?? '—'}
-                        {r.lengthOfStay ? ` · ${r.lengthOfStay}` : ''}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-primary/12 px-2 py-0.5 text-xs font-semibold text-primary">
-                      {r.reintegrationStatus}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <span>
-              <span className="font-semibold text-foreground">{data.reintegration.completedCount}</span> completed
-            </span>
-            <span>
-              <span className="font-semibold text-foreground">{data.reintegration.inProgressCount}</span> in progress
-            </span>
-            <span className="font-semibold text-foreground">{data.reintegration.successRatePercent}% success</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className={card}>
-          <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <GitBranch className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-            Donors at churn risk
-            {atRiskDonors.length > 0 && (
-              <span className="ml-auto rounded-full bg-accent/20 px-2 py-0.5 text-xs font-semibold text-foreground">
-                {atRiskDonors.length}
-              </span>
-            )}
-          </h3>
-          {atRiskDonors.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">No at-risk donors detected or ML service unavailable.</p>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {atRiskDonors.slice(0, 5).map((d) => (
-                <li key={d.supporter_id} className={listRowShell()}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-foreground">Donor #{d.supporter_id}</p>
-                      <p className="text-xs text-muted-foreground">{d.risk_tier}</p>
-                    </div>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        d.risk_tier === 'High Risk'
-                          ? 'bg-destructive/10 text-destructive'
-                          : 'bg-accent/15 text-foreground'
-                      }`}
-                    >
-                      {Math.round(d.churn_probability * 100)}% churn
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link to="/admin/email-hub" className="mt-4 flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-            Open Donor Outreach → reach at-risk donors <ArrowRight className="h-3 w-3" aria-hidden />
-          </Link>
-        </div>
 
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
@@ -575,7 +377,7 @@ export function AdminDashboardPage() {
           {data.recentDonations.length === 0 ? (
             <p className="mt-4 text-sm text-muted-foreground">No recent donations recorded.</p>
           ) : (
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto">
               {data.recentDonations.slice(0, 6).map((d) => (
                 <li
                   key={d.donationId}
