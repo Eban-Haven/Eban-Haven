@@ -45,18 +45,18 @@
   "best_threshold": 0.7012,
   "trained_on": "2026-04-06",
   "benchmark_medians": {
-    "days_in_program":          180.0,
-    "total_sessions":           15.0,
-    "pct_progress_noted":       0.75,
-    "pct_concerns_flagged":     0.20,
-    "latest_attendance_rate":   0.85,
-    "avg_progress_percent":     72.0,
-    "avg_general_health_score": 7.5,
-    "pct_psych_checkup_done":   0.80,
-    "num_health_records":       5.0,
-    "total_incidents":          1.0,
-    "num_severe_incidents":     0.0,
-    "total_plans":              3.0,
-    "pct_plans_achieved":       0.70
-  }
+    "age_at_entry": 15.0,
+    "days_in_program": 914.0,
+    "total_sessions": 46.0,
+    "pct_progress_noted": 0.9434,
+    "pct_concerns_flagged": 0.2432,
+    "avg_progress_percent": 81.9875,
+    "avg_general_health_score": 3.115,
+    "num_health_records": 9.0,
+    "total_incidents": 2.0,
+    "num_severe_incidents": 0.0,
+    "total_plans": 3.0,
+    "pct_plans_achieved": 0.0
+  },
+  "benchmark_note": "Medians computed from 19 successfully reintegrated residents. Excludes latest_attendance_rate and pct_psych_checkup_done (not tracked in current DB schema)."
 }
