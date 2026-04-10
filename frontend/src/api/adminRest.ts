@@ -687,6 +687,10 @@ export async function patchIncidentReport(
   )
 }
 
+export async function deleteIncidentReport(id: number): Promise<void> {
+  await apiFetch(`${base}/incident-reports/${id}`, { method: 'DELETE' })
+}
+
 export async function getMarketingAnalyticsSummary(): Promise<T.MarketingAnalyticsSummary> {
   return parseJson<T.MarketingAnalyticsSummary>(await apiFetch('/api/marketing/summary'))
 }

@@ -1,48 +1,39 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  getResident,
-  patchResident,
-  getSafehouses,
-  getProcessRecordings,
+  createIncidentReport,
+  deleteHomeVisitation,
+  deleteIncidentReport,
+  deleteProcessRecording,
   getHomeVisitations,
   getInterventionPlans,
+  getProcessRecordings,
+  getResident,
+  getSafehouses,
   listEducationRecords,
   listHealthRecords,
   listIncidentReports,
-  createIncidentReport,
-  deleteProcessRecording,
-  deleteHomeVisitation,
-  type ResidentDetail,
-  type ProcessRecording,
-  type HomeVisitation,
-  type InterventionPlan,
+  patchIncidentReport,
+  patchResident,
   type EducationRecord,
   type HealthRecord,
+  type HomeVisitation,
+  type InterventionPlan,
   type JsonTableRow,
+  type ProcessRecording,
+  type ResidentDetail,
   type SafehouseOption,
 } from '../../../../api/admin'
 import { alertError, btnPrimary, card, input, label, pageDesc, pageTitle } from '../adminStyles'
-import { ReintegrationBadge, RiskBadge, StatusBadge } from '../adminDataTable/AdminBadges'
-import { BooleanBadge, CategoryBadge } from '../adminDataTable/AdminBadges'
+import { BooleanBadge, CategoryBadge, ReintegrationBadge, RiskBadge, StatusBadge } from '../adminDataTable/AdminBadges'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
+import { AdminDeleteModal } from '../adminDataTable/AdminDeleteModal'
 import { CASE_STATUSES, RISK_LEVELS, SEX_OPTIONS } from './caseConstants'
-import { CaseDrawer, EmptyState, QuickActionButton, SectionHeader, StatTile, ToggleField } from './caseUi'
-import { ReintegrationReadiness } from '../../../../components/ml/ReintegrationReadiness'
-import {
-  CounselingSection,
-  EducationSection,
-  HealthSection,
-  HomeVisitDrawer,
-  ProcessRecordingDrawer,
-  VisitsSection,
-} from './CareProgressContent'
-import { GoalsTabContent } from './GoalsTabContent'
+import { EducationSection, HealthSection, HomeVisitDrawer, ProcessRecordingDrawer } from './CareProgressContent'
 import { PlansTabContent } from './PlansTabContent'
+import { SessionWorkflowDrawer } from './SessionWorkflowDrawer'
 import {
-  buildProfileNextSteps,
   buildTimelineItems,
-  buildWorkspaceAlerts,
   filterTimeline,
   planIsOverdue,
   type MainWorkspaceTab,
@@ -50,6 +41,7 @@ import {
   type TimelineKind,
   type WorkspaceQuickAction,
 } from './caseWorkspaceModel'
+import { CaseDrawer, EmptyState, ToggleField } from './caseUi'
 
 function gf(fields: Record<string, string>, ...keys: string[]): string {
   for (const k of keys) {
@@ -62,22 +54,138 @@ function gf(fields: Record<string, string>, ...keys: string[]): string {
 
 const TAB_LABELS: { k: MainWorkspaceTab; label: string }[] = [
   { k: 'overview', label: 'Overview' },
-  { k: 'timeline', label: 'Case timeline' },
-  { k: 'goals', label: 'Goals' },
+  { k: 'activity', label: 'Activity' },
   { k: 'plans', label: 'Plans & goals' },
-  { k: 'safety', label: 'Safety & incidents' },
-  { k: 'info', label: 'Resident info' },
-  { k: 'insights', label: 'Insights' },
+  { k: 'safety', label: 'Safety' },
+  { k: 'profile', label: 'Profile' },
 ]
 
 const ACTIVITY_TYPES = [
-  { id: 'counseling' as const, label: 'Counseling session' },
-  { id: 'visit' as const, label: 'Home visit' },
-  { id: 'education' as const, label: 'Education record' },
-  { id: 'health' as const, label: 'Health record' },
-  { id: 'incident' as const, label: 'Incident report' },
-  { id: 'plan' as const, label: 'Intervention plan' },
+  { id: 'counseling' as const, label: 'Add session' },
+  { id: 'visit' as const, label: 'Add home visit' },
+  { id: 'incident' as const, label: 'Add incident' },
+  { id: 'health' as const, label: 'Add health record' },
+  { id: 'education' as const, label: 'Add education record' },
+  { id: 'plan' as const, label: 'Add plan' },
 ]
+
+type GoalKey = 'health' | 'education' | 'safety'
+
+type CurrentStateCard = {
+  key: GoalKey
+  label: string
+  currentLabel: string
+  targetLabel?: string
+  chip: string
+  chipTone: 'success' | 'warning' | 'danger' | 'default'
+  trend: 'up' | 'down' | 'flat'
+  subtext: string
+}
+
+type GoalCardData = {
+  key: GoalKey
+  label: string
+  target: number
+  current: number | null
+  currentLabel: string
+  targetLabel: string
+  detail: string
+}
+
+type AttentionItem = {
+  id: string
+  label: string
+  count?: number
+  tone: 'danger' | 'warning' | 'default'
+  actionLabel: string
+  action: WorkspaceQuickAction
+}
+
+type TaskItem = {
+  id: string
+  source: string
+  date: string
+  summary: string
+  action: WorkspaceQuickAction
+}
+
+function byNewestDate<T>(rows: T[], pickDate: (row: T) => string | null | undefined): T[] {
+  return [...rows].sort((a, b) => {
+    const ta = pickDate(a) ? new Date(pickDate(a)!).getTime() : 0
+    const tb = pickDate(b) ? new Date(pickDate(b)!).getTime() : 0
+    return tb - ta
+  })
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function percentage(value: number | null, target: number) {
+  if (value == null || target <= 0) return 0
+  return clamp((value / target) * 100, 0, 100)
+}
+
+function scoreLabel(value: number | null, digits = 1) {
+  return value == null ? '—' : value.toFixed(digits)
+}
+
+function attendanceLabel(value: number | null) {
+  return value == null ? '—' : `${Math.round(value * 100)}%`
+}
+
+function trendFromNumbers(current: number | null | undefined, previous: number | null | undefined): 'up' | 'down' | 'flat' {
+  if (current == null || previous == null) return 'flat'
+  if (current > previous) return 'up'
+  if (current < previous) return 'down'
+  return 'flat'
+}
+
+function severityPenalty(value: string): number {
+  const normalized = value.trim().toLowerCase()
+  if (normalized === 'high') return 0.95
+  if (normalized === 'medium') return 0.55
+  if (normalized === 'low') return 0.25
+  return 0.4
+}
+
+function deriveSafetyScore(visitations: HomeVisitation[], incidents: JsonTableRow[]): number | null {
+  if (visitations.length === 0 && incidents.length === 0) return null
+  let score = 5
+
+  for (const incident of byNewestDate(incidents, (row) => row.fields.incident_date).slice(0, 5)) {
+    const unresolved = (incident.fields.resolved ?? '').toLowerCase() !== 'true'
+    if (!unresolved) continue
+    score -= severityPenalty(incident.fields.severity ?? '')
+  }
+
+  for (const visit of byNewestDate(visitations, (row) => row.visitDate).slice(0, 3)) {
+    if (visit.safetyConcernsNoted) score -= 0.55
+    if (visit.followUpNeeded) score -= 0.25
+    const outcome = (visit.visitOutcome ?? '').trim().toLowerCase()
+    if (outcome === 'unfavorable') score -= 0.35
+    if (outcome === 'needs improvement') score -= 0.15
+  }
+
+  return clamp(Number(score.toFixed(2)), 1, 5)
+}
+
+function findLatestPlan(plans: InterventionPlan[], categories: string[]): InterventionPlan | null {
+  const wanted = new Set(categories.map((value) => value.toLowerCase()))
+  return (
+    byNewestDate(
+      plans.filter((plan) => wanted.has(plan.planCategory.trim().toLowerCase())),
+      (plan) => plan.updatedAt || plan.createdAt || plan.targetDate,
+    )[0] ?? null
+  )
+}
+
+function toneClass(tone: 'danger' | 'warning' | 'default' | 'success') {
+  if (tone === 'danger') return 'bg-destructive/10 text-destructive'
+  if (tone === 'warning') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
+  if (tone === 'success') return 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-100'
+  return 'bg-muted text-muted-foreground'
+}
 
 export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const [mainTab, setMainTab] = useState<MainWorkspaceTab>('overview')
@@ -91,42 +199,24 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const [inc, setInc] = useState<JsonTableRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
   const [profileOpen, setProfileOpen] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
-  const [incidentInfoOpen, setIncidentInfoOpen] = useState(false)
-  const [incidentFormSaving, setIncidentFormSaving] = useState(false)
-  const [incidentFormError, setIncidentFormError] = useState<string | null>(null)
-  const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [incidentType, setIncidentType] = useState('Medical')
-  const [incidentSeverity, setIncidentSeverity] = useState('Medium')
-  const [incidentDescription, setIncidentDescription] = useState('')
-  const [incidentResponse, setIncidentResponse] = useState('')
-  const [incidentReportedBy, setIncidentReportedBy] = useState('')
-  const [incidentResolved, setIncidentResolved] = useState(false)
-  const [incidentFollowUp, setIncidentFollowUp] = useState(false)
-
   const [addMenuOpen, setAddMenuOpen] = useState(false)
-  const [createSig, setCreateSig] = useState({ counseling: 0, visit: 0, education: 0, health: 0, plan: 0 })
-
-  const [focusPlanId, setFocusPlanId] = useState<number | null>(null)
-
-  /** Timeline → full editor (hideChrome sections) */
-  const [tlEduId, setTlEduId] = useState<number | null>(null)
-  const [tlHealthId, setTlHealthId] = useState<number | null>(null)
-
-  const [procDrawer, setProcDrawer] = useState<
-    null | { mode: 'view' | 'edit' | 'create'; row?: ProcessRecording | null }
-  >(null)
-  const [visitDrawer, setVisitDrawer] = useState<
-    null | { mode: 'view' | 'edit' | 'create'; row?: HomeVisitation | null }
-  >(null)
-  const [deleteProcessId, setDeleteProcessId] = useState<number | null>(null)
-  const [deleteVisitId, setDeleteVisitId] = useState<number | null>(null)
-  const [drawerErr, setDrawerErr] = useState<string | null>(null)
-  const [drawerSaving, setDrawerSaving] = useState(false)
+  const [sessionWorkflowOpen, setSessionWorkflowOpen] = useState(false)
+  const [expandedState, setExpandedState] = useState<GoalKey | null>('health')
+  const [expandedGoal, setExpandedGoal] = useState<GoalKey | null>(null)
+  const [profileSections, setProfileSections] = useState<Record<string, boolean>>({
+    identity: true,
+    admission: false,
+    classification: false,
+    family: false,
+    worker: false,
+    raw: false,
+  })
 
   const [timelineKinds, setTimelineKinds] = useState<Set<TimelineKind>>(
-    () => new Set<TimelineKind>(['process', 'visit', 'education', 'health', 'plan']),
+    () => new Set<TimelineKind>(['process', 'visit', 'incident', 'education', 'health', 'plan']),
   )
   const [timelineFrom, setTimelineFrom] = useState('')
   const [timelineTo, setTimelineTo] = useState('')
@@ -134,14 +224,27 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const [timelineSearch, setTimelineSearch] = useState('')
   const [tlConcerns, setTlConcerns] = useState(false)
   const [tlFollow, setTlFollow] = useState(false)
-  const [tlProgress, setTlProgress] = useState(false)
+
+  const [createSig, setCreateSig] = useState({ education: 0, health: 0, plan: 0 })
+  const [focusPlanId, setFocusPlanId] = useState<number | null>(null)
+  const [tlEduId, setTlEduId] = useState<number | null>(null)
+  const [tlHealthId, setTlHealthId] = useState<number | null>(null)
+
+  const [procDrawer, setProcDrawer] = useState<null | { mode: 'view' | 'edit'; row: ProcessRecording }>(null)
+  const [visitDrawer, setVisitDrawer] = useState<null | { mode: 'view' | 'edit' | 'create'; row?: HomeVisitation | null }>(null)
+  const [incidentDrawer, setIncidentDrawer] = useState<null | { mode: 'view' | 'edit' | 'create'; row?: JsonTableRow | null }>(null)
+  const [deleteProcessId, setDeleteProcessId] = useState<number | null>(null)
+  const [deleteVisitId, setDeleteVisitId] = useState<number | null>(null)
+  const [deleteIncidentId, setDeleteIncidentId] = useState<number | null>(null)
+  const [drawerErr, setDrawerErr] = useState<string | null>(null)
+  const [drawerSaving, setDrawerSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!Number.isFinite(residentId) || residentId <= 0) return
     setLoading(true)
     setError(null)
     try {
-      const [d, sh, p, v, pl, e, h, i] = await Promise.all([
+      const [d, sh, p, v, pl, e, h, incidents] = await Promise.all([
         getResident(residentId),
         getSafehouses(),
         getProcessRecordings(residentId),
@@ -158,24 +261,26 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       setPlans(pl)
       setEdu(e)
       setHl(h)
-      setInc(i.map(r => ({
-        id: r.id,
-        fields: {
-          resident_id: String(r.residentId),
-          safehouse_id: r.safehouseId != null ? String(r.safehouseId) : '',
-          incident_date: r.incidentDate,
-          incident_type: r.incidentType,
-          severity: r.severity,
-          description: r.description ?? '',
-          response_taken: r.responseTaken ?? '',
-          resolved: String(r.resolved),
-          resolution_date: r.resolutionDate ?? '',
-          reported_by: r.reportedBy ?? '',
-          follow_up_required: String(r.followUpRequired),
-        },
-      })))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setInc(
+        incidents.map((row) => ({
+          id: row.id,
+          fields: {
+            resident_id: String(row.residentId),
+            safehouse_id: row.safehouseId != null ? String(row.safehouseId) : '',
+            incident_date: row.incidentDate,
+            incident_type: row.incidentType,
+            severity: row.severity,
+            description: row.description ?? '',
+            response_taken: row.responseTaken ?? '',
+            resolved: String(row.resolved),
+            resolution_date: row.resolutionDate ?? '',
+            reported_by: row.reportedBy ?? '',
+            follow_up_required: String(row.followUpRequired),
+          },
+        })),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load resident')
       setDetail(null)
     } finally {
       setLoading(false)
@@ -189,49 +294,116 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const fields = detail?.fields ?? {}
   const internalCode = gf(fields, 'internal_code', 'internalCode') || `Resident #${residentId}`
   const safehouseId = Number(gf(fields, 'safehouse_id', 'safehouseId')) || 0
-  const safehouseName =
-    safehouses.find((s) => s.id === safehouseId)?.name ?? (safehouseId ? `Safehouse #${safehouseId}` : '—')
+  const safehouseName = safehouses.find((item) => item.id === safehouseId)?.name ?? (safehouseId ? `Safehouse #${safehouseId}` : '—')
+  const assignedWorker = gf(fields, 'assigned_social_worker', 'assignedSocialWorker')
+  const admissionDate = gf(fields, 'date_of_admission', 'dateOfAdmission')
 
-  const stats = useMemo(() => {
-    const now = Date.now()
-    const d30 = now - 30 * 86400000
-    const sessions30 = proc.filter((r) => new Date(r.sessionDate).getTime() >= d30).length
-    const visits30 = vis.filter((v) => new Date(v.visitDate).getTime() >= d30).length
-    const activePlans = plans.filter(
-      (p) => !p.status.toLowerCase().includes('closed') && !p.status.toLowerCase().includes('achieved'),
-    ).length
-    const overduePlans = plans.filter(planIsOverdue).length
-    const latestEdu = [...edu].sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime())[0]
-    const latestHl = [...hl].sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime())[0]
-    const concernSessions = proc.filter((r) => r.concernsFlagged).length
-    return {
-      sessions30,
-      visits30,
-      activePlans,
-      overduePlans,
-      latestProgress: latestEdu?.progressPercent ?? null,
-      latestHealth: latestHl?.healthScore ?? null,
-      incidents: inc.length,
-      concernSessions,
-    }
-  }, [proc, vis, plans, edu, hl, inc])
+  const latestHealth = useMemo(() => byNewestDate(hl, (row) => row.recordDate)[0] ?? null, [hl])
+  const previousHealth = useMemo(() => byNewestDate(hl, (row) => row.recordDate)[1] ?? null, [hl])
+  const latestEducation = useMemo(() => byNewestDate(edu, (row) => row.recordDate)[0] ?? null, [edu])
+  const previousEducation = useMemo(() => byNewestDate(edu, (row) => row.recordDate)[1] ?? null, [edu])
+  const latestHealthPlan = useMemo(() => findLatestPlan(plans, ['health', 'physical health']), [plans])
+  const latestEducationPlan = useMemo(() => findLatestPlan(plans, ['education']), [plans])
+  const latestSafetyPlan = useMemo(() => findLatestPlan(plans, ['safety']), [plans])
 
-  const alerts = useMemo(
-    () =>
-      buildWorkspaceAlerts({
-        riskLevel: gf(fields, 'current_risk_level', 'currentRiskLevel'),
-        plans,
-        vis,
-        proc,
-        edu,
-        hl,
-        assignedWorker: gf(fields, 'assigned_social_worker', 'assignedSocialWorker'),
-        admission: gf(fields, 'date_of_admission', 'dateOfAdmission'),
-      }),
-    [fields, plans, vis, proc, edu, hl],
+  const safetyScore = useMemo(() => deriveSafetyScore(vis, inc), [vis, inc])
+  const priorSafetyScore = useMemo(() => deriveSafetyScore(vis.slice(1), inc.slice(1)), [vis, inc])
+
+  const currentStateCards = useMemo<Record<GoalKey, CurrentStateCard>>(
+    () => ({
+      health: {
+        key: 'health',
+        label: 'Health',
+        currentLabel: scoreLabel(latestHealth?.healthScore ?? null),
+        targetLabel: scoreLabel(latestHealthPlan?.targetValue ?? 4.2),
+        chip:
+          latestHealth?.healthScore != null && latestHealthPlan?.targetValue != null
+            ? latestHealth.healthScore >= latestHealthPlan.targetValue
+              ? 'On track'
+              : 'Needs support'
+            : 'Monitoring',
+        chipTone:
+          latestHealth?.healthScore != null && latestHealthPlan?.targetValue != null
+            ? latestHealth.healthScore >= latestHealthPlan.targetValue
+              ? 'success'
+              : 'warning'
+            : 'default',
+        trend: trendFromNumbers(latestHealth?.healthScore ?? null, previousHealth?.healthScore ?? null),
+        subtext: latestHealth ? `Latest score on ${formatAdminDate(latestHealth.recordDate)}` : 'No health record yet',
+      },
+      education: {
+        key: 'education',
+        label: 'Education',
+        currentLabel: attendanceLabel(latestEducation?.attendanceRate ?? null),
+        targetLabel: attendanceLabel(latestEducationPlan?.targetValue ?? 0.85),
+        chip:
+          latestEducation?.attendanceRate != null && latestEducationPlan?.targetValue != null
+            ? latestEducation.attendanceRate >= latestEducationPlan.targetValue
+              ? 'On track'
+              : 'Watch'
+            : 'Monitoring',
+        chipTone:
+          latestEducation?.attendanceRate != null && latestEducationPlan?.targetValue != null
+            ? latestEducation.attendanceRate >= latestEducationPlan.targetValue
+              ? 'success'
+              : 'warning'
+            : 'default',
+        trend: trendFromNumbers(latestEducation?.attendanceRate ?? null, previousEducation?.attendanceRate ?? null),
+        subtext: latestEducation ? `Latest attendance on ${formatAdminDate(latestEducation.recordDate)}` : 'No education record yet',
+      },
+      safety: {
+        key: 'safety',
+        label: 'Safety',
+        currentLabel: scoreLabel(safetyScore),
+        targetLabel: scoreLabel(latestSafetyPlan?.targetValue ?? 4.2),
+        chip: inc.some((row) => (row.fields.resolved ?? '').toLowerCase() !== 'true') ? 'Open concern' : 'Stable',
+        chipTone: inc.some((row) => (row.fields.resolved ?? '').toLowerCase() !== 'true') ? 'danger' : 'success',
+        trend: trendFromNumbers(safetyScore, priorSafetyScore),
+        subtext: safetyScore != null ? 'Derived from incidents and visit flags' : 'No recent safety activity',
+      },
+    }),
+    [inc, latestEducation, latestEducationPlan, latestHealth, latestHealthPlan, latestSafetyPlan, previousEducation, previousHealth, priorSafetyScore, safetyScore],
   )
 
-  const timelineAll = useMemo(() => buildTimelineItems(proc, vis, edu, hl, plans), [proc, vis, edu, hl, plans])
+  const goalCards = useMemo<Record<GoalKey, GoalCardData>>(
+    () => ({
+      health: {
+        key: 'health',
+        label: 'Health goal',
+        target: latestHealthPlan?.targetValue ?? 4.2,
+        current: latestHealth?.healthScore ?? null,
+        currentLabel: scoreLabel(latestHealth?.healthScore ?? null),
+        targetLabel: scoreLabel(latestHealthPlan?.targetValue ?? 4.2),
+        detail: latestHealthPlan?.planDescription || 'Wellbeing goal from the latest intervention plan.',
+      },
+      education: {
+        key: 'education',
+        label: 'Education goal',
+        target: latestEducationPlan?.targetValue ?? 0.85,
+        current: latestEducation?.attendanceRate ?? null,
+        currentLabel: attendanceLabel(latestEducation?.attendanceRate ?? null),
+        targetLabel: attendanceLabel(latestEducationPlan?.targetValue ?? 0.85),
+        detail: latestEducationPlan?.planDescription || 'Attendance goal from the latest intervention plan.',
+      },
+      safety: {
+        key: 'safety',
+        label: 'Safety goal',
+        target: latestSafetyPlan?.targetValue ?? 4.2,
+        current: safetyScore,
+        currentLabel: scoreLabel(safetyScore),
+        targetLabel: scoreLabel(latestSafetyPlan?.targetValue ?? 4.2),
+        detail: latestSafetyPlan?.planDescription || 'Safety goal informed by incidents and safety-related visits.',
+      },
+    }),
+    [latestEducation, latestEducationPlan, latestHealth, latestHealthPlan, latestSafetyPlan, safetyScore],
+  )
+
+  const unresolvedIncidents = useMemo(
+    () => inc.filter((row) => (row.fields.resolved ?? '').toLowerCase() !== 'true'),
+    [inc],
+  )
+
+  const timelineAll = useMemo(() => buildTimelineItems(proc, vis, edu, hl, plans, inc), [proc, vis, edu, hl, plans, inc])
   const timelineFiltered = useMemo(
     () =>
       filterTimeline(timelineAll, {
@@ -241,40 +413,210 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
         workerQ: timelineWorker,
         concernsOnly: tlConcerns,
         followUpOnly: tlFollow,
-        progressOnly: tlProgress,
+        progressOnly: false,
         search: timelineSearch,
       }),
-    [timelineAll, timelineKinds, timelineFrom, timelineTo, timelineWorker, tlConcerns, tlFollow, tlProgress, timelineSearch],
+    [timelineAll, timelineKinds, timelineFrom, timelineTo, timelineWorker, tlConcerns, tlFollow, timelineSearch],
   )
 
-  const profileNextSteps = useMemo(
-    () => buildProfileNextSteps({ plans, vis, proc, edu, hl }),
-    [plans, vis, proc, edu, hl],
-  )
+  const attentionItems = useMemo<AttentionItem[]>(() => {
+    const items: AttentionItem[] = []
+    const overduePlans = plans.filter(planIsOverdue)
+    const followVisits = vis.filter((row) => row.followUpNeeded)
+    const flaggedSessions = proc.filter((row) => row.concernsFlagged)
+
+    if (overduePlans.length) {
+      items.push({
+        id: 'overdue-plans',
+        label: 'Overdue plans',
+        count: overduePlans.length,
+        tone: 'warning',
+        actionLabel: 'Review',
+        action: { kind: 'tab', tab: 'plans' },
+      })
+    }
+    if (followVisits.length) {
+      items.push({
+        id: 'visit-follow-ups',
+        label: 'Visit follow-ups',
+        count: followVisits.length,
+        tone: 'warning',
+        actionLabel: 'Update',
+        action: { kind: 'timeline', followUpOnly: true },
+      })
+    }
+    if (flaggedSessions.length) {
+      items.push({
+        id: 'flagged-sessions',
+        label: 'Flagged sessions',
+        count: flaggedSessions.length,
+        tone: 'danger',
+        actionLabel: 'Review',
+        action: { kind: 'timeline', concernsOnly: true },
+      })
+    }
+    if (unresolvedIncidents.length) {
+      items.push({
+        id: 'unresolved-incidents',
+        label: 'Unresolved incidents',
+        count: unresolvedIncidents.length,
+        tone: 'danger',
+        actionLabel: 'Resolve',
+        action: { kind: 'tab', tab: 'safety' },
+      })
+    }
+    if (latestEducation?.attendanceRate != null && previousEducation?.attendanceRate != null && latestEducation.attendanceRate < previousEducation.attendanceRate) {
+      items.push({
+        id: 'attendance-dip',
+        label: 'Attendance dip',
+        tone: 'warning',
+        actionLabel: 'Open',
+        action: { kind: 'add_activity', activity: 'education' },
+      })
+    }
+    return items.slice(0, 5)
+  }, [latestEducation, previousEducation, plans, proc, unresolvedIncidents.length, vis])
+
+  const openTasks = useMemo<TaskItem[]>(() => {
+    const tasks: TaskItem[] = []
+    proc
+      .filter((row) => row.followUpActions?.trim())
+      .slice(0, 4)
+      .forEach((row) => {
+        tasks.push({
+          id: `proc-${row.id}`,
+          source: 'Session',
+          date: row.sessionDate,
+          summary: row.followUpActions!.trim(),
+          action: { kind: 'timeline', concernsOnly: false, followUpOnly: true },
+        })
+      })
+    vis
+      .filter((row) => row.followUpNeeded)
+      .slice(0, 4)
+      .forEach((row) => {
+        tasks.push({
+          id: `visit-${row.id}`,
+          source: 'Home visit',
+          date: row.visitDate,
+          summary: row.followUpNotes?.trim() || 'Follow-up needed',
+          action: { kind: 'open_visit', visitId: row.id },
+        })
+      })
+    unresolvedIncidents
+      .filter((row) => (row.fields.follow_up_required ?? '').toLowerCase() === 'true')
+      .slice(0, 4)
+      .forEach((row) => {
+        tasks.push({
+          id: `incident-${row.id}`,
+          source: 'Incident',
+          date: row.fields.incident_date ?? '',
+          summary: row.fields.description?.trim() || row.fields.incident_type || 'Incident follow-up required',
+          action: { kind: 'tab', tab: 'safety' },
+        })
+      })
+    plans
+      .filter(planIsOverdue)
+      .slice(0, 4)
+      .forEach((row) => {
+        tasks.push({
+          id: `plan-${row.id}`,
+          source: 'Plan',
+          date: row.targetDate ?? row.updatedAt ?? row.createdAt,
+          summary: row.planDescription,
+          action: { kind: 'open_plan', planId: row.id },
+        })
+      })
+    return byNewestDate(tasks, (row) => row.date).slice(0, 8)
+  }, [plans, proc, unresolvedIncidents, vis])
 
   const emotionalCounts = useMemo(() => {
-    const m = new Map<string, number>()
-    for (const r of proc) {
-      const e = r.emotionalStateObserved?.trim()
-      if (e) m.set(e, (m.get(e) ?? 0) + 1)
+    const map = new Map<string, number>()
+    for (const row of proc) {
+      const state = row.emotionalStateObserved?.trim()
+      if (state) map.set(state, (map.get(state) ?? 0) + 1)
     }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)
+    return [...map.entries()].sort((a, b) => b[1] - a[1])
   }, [proc])
 
-  function bumpCreate(kind: (typeof ACTIVITY_TYPES)[number]['id']) {
+  const keySignals = useMemo(() => {
+    const signals: string[] = []
+    if (latestEducation?.attendanceRate != null && previousEducation?.attendanceRate != null && latestEducation.attendanceRate < previousEducation.attendanceRate) {
+      signals.push('Attendance dropped on the latest record.')
+    }
+    if (latestHealth?.healthScore != null && previousHealth?.healthScore != null && latestHealth.healthScore < previousHealth.healthScore) {
+      signals.push('Health score is trending down.')
+    }
+    if (emotionalCounts[0] && emotionalCounts[0][1] >= 2) {
+      signals.push(`Repeated emotional state: ${emotionalCounts[0][0]}.`)
+    }
+    if (vis.filter((row) => row.safetyConcernsNoted || row.followUpNeeded).length >= 2) {
+      signals.push('Recent visits show safety or follow-up flags.')
+    }
+    const incidentsIn60Days = inc.filter((row) => {
+      const t = new Date(row.fields.incident_date ?? '').getTime()
+      return Number.isFinite(t) && t >= Date.now() - 60 * 86400000
+    }).length
+    if (incidentsIn60Days === 0) signals.push('No incidents logged in the last 60 days.')
+    const recentProgress = proc.filter((row) => row.progressNoted).slice(0, 3).length
+    if (recentProgress > 0) signals.push(`Progress noted in ${recentProgress} recent session${recentProgress === 1 ? '' : 's'}.`)
+    return signals.slice(0, 6)
+  }, [emotionalCounts, inc, latestEducation, latestHealth, previousEducation, previousHealth, proc, vis])
+
+  const recentConcerns = useMemo(
+    () =>
+      proc
+        .filter((row) => row.concernsFlagged)
+        .slice(0, 3)
+        .map((row) => `${formatAdminDate(row.sessionDate)} · ${row.sessionNarrative.slice(0, 90)}${row.sessionNarrative.length > 90 ? '…' : ''}`),
+    [proc],
+  )
+
+  const activeGoalContext = useMemo(
+    () =>
+      plans
+        .filter((row) => !row.status.toLowerCase().includes('closed') && !row.status.toLowerCase().includes('achieved'))
+        .slice(0, 4)
+        .map((row) => `${row.planCategory} · ${row.planDescription}`),
+    [plans],
+  )
+
+  const recentActivityContext = useMemo(
+    () => timelineAll.slice(0, 4).map((row) => `${formatAdminDate(row.dateIso)} · ${row.title} · ${row.summary}`),
+    [timelineAll],
+  )
+
+  function closeAddMenu() {
     setAddMenuOpen(false)
-    setMainTab(kind === 'plan' ? 'plans' : kind === 'incident' ? 'safety' : 'timeline')
-    setCreateSig((s) => ({
-      ...s,
-      counseling: kind === 'counseling' ? s.counseling + 1 : s.counseling,
-      visit: kind === 'visit' ? s.visit + 1 : s.visit,
-      education: kind === 'education' ? s.education + 1 : s.education,
-      health: kind === 'health' ? s.health + 1 : s.health,
-      plan: kind === 'plan' ? s.plan + 1 : s.plan,
-    }))
+  }
+
+  function bumpCreate(kind: (typeof ACTIVITY_TYPES)[number]['id']) {
+    closeAddMenu()
+    if (kind === 'counseling') {
+      setSessionWorkflowOpen(true)
+      return
+    }
+    if (kind === 'visit') {
+      setVisitDrawer({ mode: 'create', row: null })
+      return
+    }
     if (kind === 'incident') {
-      setIncidentFormError(null)
-      setIncidentInfoOpen(true)
+      setIncidentDrawer({ mode: 'create', row: null })
+      return
+    }
+    if (kind === 'plan') {
+      setMainTab('plans')
+      setCreateSig((state) => ({ ...state, plan: state.plan + 1 }))
+      return
+    }
+    if (kind === 'education') {
+      setMainTab('activity')
+      setCreateSig((state) => ({ ...state, education: state.education + 1 }))
+      return
+    }
+    if (kind === 'health') {
+      setMainTab('activity')
+      setCreateSig((state) => ({ ...state, health: state.health + 1 }))
     }
   }
 
@@ -284,20 +626,15 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
         setMainTab(action.tab)
         break
       case 'timeline':
-        setMainTab('timeline')
-        if (action.followUpOnly) {
-          setTlFollow(true)
-          setTlConcerns(false)
-        } else if (action.concernsOnly) {
-          setTlConcerns(true)
-          setTlFollow(false)
-        }
+        setMainTab('activity')
+        setTlFollow(Boolean(action.followUpOnly))
+        setTlConcerns(Boolean(action.concernsOnly))
         break
       case 'open_visit': {
-        const row = vis.find((v) => v.id === action.visitId)
+        const row = vis.find((item) => item.id === action.visitId)
         if (row) {
           setVisitDrawer({ mode: 'view', row })
-          setMainTab('timeline')
+          setMainTab('activity')
         }
         break
       }
@@ -311,25 +648,58 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
     }
   }
 
-  function onTimelineSelect(it: TimelineItem) {
-    switch (it.ref.kind) {
+  function onTimelineSelect(item: TimelineItem) {
+    switch (item.ref.kind) {
       case 'process':
-        setProcDrawer({ mode: 'view', row: it.ref.row })
+        setProcDrawer({ mode: 'view', row: item.ref.row })
         break
       case 'visit':
-        setVisitDrawer({ mode: 'view', row: it.ref.row })
+        setVisitDrawer({ mode: 'view', row: item.ref.row })
         break
       case 'education':
-        setTlEduId(it.ref.row.id)
+        setTlEduId(item.ref.row.id)
         break
       case 'health':
-        setTlHealthId(it.ref.row.id)
+        setTlHealthId(item.ref.row.id)
         break
       case 'plan':
-        setFocusPlanId(it.ref.row.id)
+        setFocusPlanId(item.ref.row.id)
+        setMainTab('plans')
+        break
+      case 'incident':
+        setIncidentDrawer({ mode: 'view', row: item.ref.row })
+        break
+    }
+  }
+
+  function openTimelineEdit(item: TimelineItem) {
+    switch (item.ref.kind) {
+      case 'process':
+        setProcDrawer({ mode: 'edit', row: item.ref.row })
+        break
+      case 'visit':
+        setVisitDrawer({ mode: 'edit', row: item.ref.row })
+        break
+      case 'incident':
+        setIncidentDrawer({ mode: 'edit', row: item.ref.row })
+        break
+      case 'education':
+        setTlEduId(item.ref.row.id)
+        break
+      case 'health':
+        setTlHealthId(item.ref.row.id)
+        break
+      case 'plan':
+        setFocusPlanId(item.ref.row.id)
         setMainTab('plans')
         break
     }
+  }
+
+  function requestDeleteFromTimeline(item: TimelineItem) {
+    if (item.ref.kind === 'process') setDeleteProcessId(item.ref.row.id)
+    if (item.ref.kind === 'visit') setDeleteVisitId(item.ref.row.id)
+    if (item.ref.kind === 'incident') setDeleteIncidentId(item.ref.row.id)
   }
 
   if (!Number.isFinite(residentId) || residentId <= 0) {
@@ -337,67 +707,72 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   }
 
   if (loading) return <p className="text-muted-foreground">Loading case…</p>
-  if (error && !detail) return (
-    <div className="space-y-3">
-      <p className="text-destructive">{error}</p>
-      <Link to="/admin/residents" className="text-sm text-primary hover:underline">← Back to residents</Link>
-    </div>
-  )
-  if (!detail) return (
-    <div className="space-y-3">
-      <p className="text-destructive">Resident not found.</p>
-      <Link to="/admin/residents" className="text-sm text-primary hover:underline">← Back to residents</Link>
-    </div>
-  )
+  if (error && !detail) {
+    return (
+      <div className="space-y-3">
+        <p className="text-destructive">{error}</p>
+        <Link to="/admin/residents" className="text-sm text-primary hover:underline">
+          ← Back to residents
+        </Link>
+      </div>
+    )
+  }
+  if (!detail) {
+    return (
+      <div className="space-y-3">
+        <p className="text-destructive">Resident not found.</p>
+        <Link to="/admin/residents" className="text-sm text-primary hover:underline">
+          ← Back to residents
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
-      <div>
+      <div className="space-y-4">
         <Link to="/admin/residents" className="text-sm text-primary hover:underline">
           ← Residents
         </Link>
-        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className={pageTitle}>{internalCode}</h2>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
+
+        <div className={`${card} flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between`}>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className={pageTitle}>{internalCode}</h2>
               {gf(fields, 'case_status', 'caseStatus') ? <StatusBadge status={gf(fields, 'case_status', 'caseStatus')} /> : null}
-              {gf(fields, 'current_risk_level', 'currentRiskLevel') ? (
-                <RiskBadge level={gf(fields, 'current_risk_level', 'currentRiskLevel')} />
-              ) : null}
-              {gf(fields, 'reintegration_type', 'reintegrationType') ? (
-                <CategoryBadge>{gf(fields, 'reintegration_type', 'reintegrationType')}</CategoryBadge>
-              ) : null}
-              {gf(fields, 'reintegration_status', 'reintegrationStatus') ? (
-                <ReintegrationBadge value={gf(fields, 'reintegration_status', 'reintegrationStatus')} />
-              ) : null}
+              {gf(fields, 'current_risk_level', 'currentRiskLevel') ? <RiskBadge level={gf(fields, 'current_risk_level', 'currentRiskLevel')} /> : null}
+              {gf(fields, 'reintegration_type', 'reintegrationType') ? <CategoryBadge>{gf(fields, 'reintegration_type', 'reintegrationType')}</CategoryBadge> : null}
+              {gf(fields, 'reintegration_status', 'reintegrationStatus') ? <ReintegrationBadge value={gf(fields, 'reintegration_status', 'reintegrationStatus')} /> : null}
             </div>
-            <p className={`${pageDesc} mt-3 max-w-3xl`}>
-              <span className="font-medium text-foreground">{safehouseName}</span>
+            <p className={`${pageDesc} mt-2`}>
+              {safehouseName}
               {' · '}
-              {gf(fields, 'assigned_social_worker', 'assignedSocialWorker') || 'No worker assigned'}
-              {gf(fields, 'date_of_admission', 'dateOfAdmission')
-                ? ` · Admitted ${formatAdminDate(gf(fields, 'date_of_admission', 'dateOfAdmission'))}`
-                : ''}
+              {assignedWorker || 'No worker assigned'}
+              {admissionDate ? ` · Admitted ${formatAdminDate(admissionDate)}` : ''}
             </p>
           </div>
-          <div className="relative flex flex-col items-stretch gap-2 sm:items-end">
-            <button type="button" className={btnPrimary} onClick={() => setAddMenuOpen((o) => !o)}>
-              Add activity
+
+          <div className="relative flex flex-wrap gap-2 lg:justify-end">
+            <button type="button" className={btnPrimary} onClick={() => setAddMenuOpen((open) => !open)}>
+              Add
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
+              onClick={() => setSessionWorkflowOpen(true)}
+            >
+              Start session
             </button>
             {addMenuOpen ? (
-              <div
-                className={`${card} absolute right-0 top-full z-40 mt-2 min-w-[14rem] space-y-1 py-2 shadow-lg`}
-                role="menu"
-              >
-                {ACTIVITY_TYPES.map((a) => (
+              <div className={`${card} absolute right-0 top-full z-40 mt-2 min-w-[15rem] space-y-1 py-2 shadow-lg`}>
+                {ACTIVITY_TYPES.map((activity) => (
                   <button
-                    key={a.id}
+                    key={activity.id}
                     type="button"
-                    role="menuitem"
                     className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
-                    onClick={() => bumpCreate(a.id)}
+                    onClick={() => bumpCreate(activity.id)}
                   >
-                    {a.label}
+                    {activity.label}
                   </button>
                 ))}
               </div>
@@ -406,243 +781,295 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
         </div>
       </div>
 
-      {error && <div className={alertError}>{error}</div>}
+      {error ? <div className={alertError}>{error}</div> : null}
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-        {TAB_LABELS.map((t) => (
+        {TAB_LABELS.map((tab) => (
           <button
-            key={t.k}
+            key={tab.k}
             type="button"
-            onClick={() => setMainTab(t.k)}
+            onClick={() => setMainTab(tab.k)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              mainTab === t.k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+              mainTab === tab.k ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {mainTab === 'overview' && (
+      {mainTab === 'overview' ? (
         <div className="space-y-8">
-          {alerts.length > 0 ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">Needs attention</h3>
-              {alerts.map((a) => (
-                <div
-                  key={a.id}
-                  className={`rounded-lg border px-4 py-3 text-sm ${
-                    a.level === 'risk'
-                      ? 'border-rose-400/60 bg-rose-500/10 text-black dark:text-black'
-                      : a.level === 'warn'
-                        ? 'border-amber-400/50 bg-amber-500/10 text-black dark:text-black'
-                        : 'border-border bg-muted/40'
+          <OverviewSection title="Needs attention">
+            {attentionItems.length === 0 ? (
+              <EmptyState title="Nothing urgent right now" hint="This resident has no high-priority alerts at the moment." />
+            ) : (
+              <div className="space-y-2">
+                {attentionItems.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`rounded-full px-2 py-1 text-xs font-medium ${toneClass(item.tone)}`}>{item.label}</span>
+                      {item.count != null ? <span className="text-sm font-semibold text-foreground">{item.count}</span> : null}
+                    </div>
+                    <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => runWorkspaceAction(item.action)}>
+                      {item.actionLabel}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </OverviewSection>
+
+          <OverviewSection title="Current state">
+            <div className="grid gap-4 lg:grid-cols-3">
+              {(Object.values(currentStateCards) as CurrentStateCard[]).map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setExpandedState((value) => (value === item.key ? null : item.key))}
+                  className={`rounded-2xl border p-4 text-left transition-colors ${
+                    expandedState === item.key ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/40'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 flex-1 leading-snug">{a.text}</p>
-                    {a.action ? (
-                      <button
-                        type="button"
-                        className="shrink-0 text-sm font-medium text-primary hover:underline"
-                        onClick={() => runWorkspaceAction(a.action!)}
-                      >
-                        Open
-                      </button>
-                    ) : null}
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${toneClass(item.chipTone)}`}>{item.chip}</span>
                   </div>
-                </div>
+                  <p className="mt-4 text-3xl font-semibold tabular-nums text-foreground">{item.currentLabel}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Target {item.targetLabel}</p>
+                  <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{item.subtext}</span>
+                    <TrendBadge trend={item.trend} />
+                  </div>
+                </button>
               ))}
             </div>
-          ) : null}
 
-          <div>
-            <h3 className="mb-3 text-sm font-semibold text-foreground">Quick snapshot</h3>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <StatTile label="Counseling sessions (30d)" value={stats.sessions30} />
-              <StatTile label="Home visits (30d)" value={stats.visits30} />
-              <StatTile label="Active plans" value={stats.activePlans} />
-              <StatTile label="Overdue plans" value={stats.overduePlans} />
-              <StatTile label="Session flags (concerns)" value={stats.concernSessions} />
-              <StatTile label="Latest education %" value={stats.latestProgress != null ? `${stats.latestProgress}%` : '—'} />
-              <StatTile label="Latest wellbeing score" value={stats.latestHealth != null ? String(stats.latestHealth) : '—'} />
+            {expandedState ? (
+              <InlineDetailCard title={`${currentStateCards[expandedState].label} details`}>
+                {expandedState === 'health' ? (
+                  <StateDetailList
+                    rows={byNewestDate(hl, (row) => row.recordDate).slice(0, 4).map((row) => ({
+                      id: row.id,
+                      title: formatAdminDate(row.recordDate),
+                      subtitle: row.notes || 'Health record',
+                      meta: row.healthScore != null ? `Score ${row.healthScore}` : 'No score',
+                      onOpen: () => {
+                        setMainTab('activity')
+                        setTlHealthId(row.id)
+                      },
+                    }))}
+                    emptyLabel="No health records yet."
+                    primaryAction={<InlineActionButton onClick={() => bumpCreate('health')}>Add health record</InlineActionButton>}
+                    secondaryAction={<InlineActionButton onClick={() => setMainTab('activity')}>View activity</InlineActionButton>}
+                  />
+                ) : null}
+                {expandedState === 'education' ? (
+                  <StateDetailList
+                    rows={byNewestDate(edu, (row) => row.recordDate).slice(0, 4).map((row) => ({
+                      id: row.id,
+                      title: formatAdminDate(row.recordDate),
+                      subtitle: row.notes || 'Education record',
+                      meta: row.attendanceRate != null ? `Attendance ${attendanceLabel(row.attendanceRate)}` : 'No attendance value',
+                      onOpen: () => {
+                        setMainTab('activity')
+                        setTlEduId(row.id)
+                      },
+                    }))}
+                    emptyLabel="No education records yet."
+                    primaryAction={<InlineActionButton onClick={() => bumpCreate('education')}>Add education record</InlineActionButton>}
+                    secondaryAction={<InlineActionButton onClick={() => setMainTab('activity')}>View activity</InlineActionButton>}
+                  />
+                ) : null}
+                {expandedState === 'safety' ? (
+                  <StateDetailList
+                    rows={[
+                      ...unresolvedIncidents.slice(0, 3).map((row) => ({
+                        id: row.id,
+                        title: row.fields.incident_type || 'Incident',
+                        subtitle: row.fields.description || 'Unresolved incident',
+                        meta: row.fields.incident_date ? formatAdminDate(row.fields.incident_date) : 'No date',
+                        onOpen: () => setIncidentDrawer({ mode: 'view', row }),
+                      })),
+                      ...vis
+                        .filter((row) => row.safetyConcernsNoted || row.followUpNeeded)
+                        .slice(0, 3)
+                        .map((row) => ({
+                          id: row.id + 100000,
+                          title: `Visit · ${formatAdminDate(row.visitDate)}`,
+                          subtitle: row.followUpNotes || row.observations || 'Safety-related visit',
+                          meta: row.safetyConcernsNoted ? 'Safety concern' : 'Follow-up needed',
+                          onOpen: () => setVisitDrawer({ mode: 'view', row }),
+                        })),
+                    ]}
+                    emptyLabel="No recent safety issues."
+                    primaryAction={<InlineActionButton onClick={() => bumpCreate('incident')}>Log incident</InlineActionButton>}
+                    secondaryAction={<InlineActionButton onClick={() => setMainTab('safety')}>Open safety tab</InlineActionButton>}
+                  />
+                ) : null}
+              </InlineDetailCard>
+            ) : null}
+          </OverviewSection>
+
+          <OverviewSection title="Goals">
+            <div className="grid gap-4 lg:grid-cols-3">
+              {(Object.values(goalCards) as GoalCardData[]).map((goal) => (
+                <button
+                  key={goal.key}
+                  type="button"
+                  onClick={() => setExpandedGoal((value) => (value === goal.key ? null : goal.key))}
+                  className={`rounded-2xl border p-4 text-left transition-colors ${
+                    expandedGoal === goal.key ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/40'
+                  }`}
+                >
+                  <ProgressRing label={goal.label} progress={percentage(goal.current, goal.target)}>
+                    <div className="text-xl font-semibold tabular-nums text-foreground">{goal.currentLabel}</div>
+                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Current</div>
+                  </ProgressRing>
+                  <p className="mt-4 text-sm text-muted-foreground">Target {goal.targetLabel}</p>
+                  <p className="mt-2 line-clamp-2 text-sm text-foreground">{goal.detail}</p>
+                </button>
+              ))}
             </div>
-          </div>
 
-          <div className={`${card} space-y-3`}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-base font-semibold text-foreground">Recent activity</h3>
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => setMainTab('timeline')}>
-                View full timeline
+            {expandedGoal ? (
+              <InlineDetailCard title={`${goalCards[expandedGoal].label} details`}>
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-3">
+                    <MetaPill label="Target" value={goalCards[expandedGoal].targetLabel} />
+                    <MetaPill label="Current" value={goalCards[expandedGoal].currentLabel} />
+                    <MetaPill label="Progress" value={`${Math.round(percentage(goalCards[expandedGoal].current, goalCards[expandedGoal].target))}%`} />
+                  </div>
+                  <p className="text-sm text-muted-foreground">{goalCards[expandedGoal].detail}</p>
+                  {expandedGoal === 'health' ? (
+                    <div className="flex flex-wrap gap-2">
+                      <InlineActionButton onClick={() => bumpCreate('health')}>Add health record</InlineActionButton>
+                      <InlineActionButton onClick={() => setMainTab('plans')}>Open plans</InlineActionButton>
+                    </div>
+                  ) : null}
+                  {expandedGoal === 'education' ? (
+                    <div className="flex flex-wrap gap-2">
+                      <InlineActionButton onClick={() => bumpCreate('education')}>Add education record</InlineActionButton>
+                      <InlineActionButton onClick={() => setMainTab('plans')}>Open plans</InlineActionButton>
+                    </div>
+                  ) : null}
+                  {expandedGoal === 'safety' ? (
+                    <div className="flex flex-wrap gap-2">
+                      <InlineActionButton onClick={() => bumpCreate('incident')}>Log incident</InlineActionButton>
+                      <InlineActionButton onClick={() => setMainTab('safety')}>Open safety</InlineActionButton>
+                    </div>
+                  ) : null}
+                </div>
+              </InlineDetailCard>
+            ) : null}
+          </OverviewSection>
+
+          <OverviewSection title="Open tasks / follow-ups">
+            {openTasks.length === 0 ? (
+              <EmptyState title="No open follow-ups" hint="New follow-up items from sessions, visits, incidents, and plans will show here." />
+            ) : (
+              <div className="space-y-2">
+                {openTasks.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{item.source}</span>
+                        <span className="text-xs text-muted-foreground">{formatAdminDate(item.date)}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-foreground">{item.summary}</p>
+                    </div>
+                    <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => runWorkspaceAction(item.action)}>
+                      View
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </OverviewSection>
+
+          <OverviewSection title="Key signals">
+            {keySignals.length === 0 ? (
+              <EmptyState title="No strong signals yet" hint="Signals will appear as more resident activity is recorded." />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {keySignals.map((signal) => (
+                  <span key={signal} className="rounded-full border border-border bg-card px-3 py-2 text-sm text-foreground">
+                    {signal}
+                  </span>
+                ))}
+              </div>
+            )}
+          </OverviewSection>
+
+          <OverviewSection title="Recent activity">
+            <div className="space-y-2">
+              {timelineAll.slice(0, 5).map((item) => (
+                <TimelineRow key={item.key} item={item} onOpen={onTimelineSelect} onEdit={openTimelineEdit} onDelete={requestDeleteFromTimeline} />
+              ))}
+            </div>
+            <div className="pt-2">
+              <button type="button" className="text-sm font-medium text-primary hover:underline" onClick={() => setMainTab('activity')}>
+                View all activity
               </button>
             </div>
-            <ul className="space-y-2">
-              {timelineAll.slice(0, 12).length === 0 ? (
-                <li className="text-sm text-muted-foreground">No activity yet.</li>
-              ) : (
-                timelineAll.slice(0, 12).map((it) => (
-                  <li key={it.key}>
-                    <button
-                      type="button"
-                      className="w-full rounded-lg border border-transparent px-2 py-2 text-left text-sm hover:border-border hover:bg-muted/40"
-                      onClick={() => onTimelineSelect(it)}
-                    >
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{it.title}</span>
-                      <span className="ml-2 tabular-nums text-muted-foreground">{formatAdminDate(it.dateIso)}</span>
-                      <p className="mt-0.5 text-foreground">{it.summary}</p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {it.flags.map((f) => (
-                          <span
-                            key={f.label}
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                              f.tone === 'danger'
-                                ? 'bg-destructive/15 text-destructive'
-                                : f.tone === 'warning'
-                                  ? 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
-                                  : f.tone === 'success'
-                                    ? 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-100'
-                                    : 'bg-muted text-muted-foreground'
-                            }`}
-                          >
-                            {f.label}
-                          </span>
-                        ))}
-                      </div>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-
-          {profileNextSteps.length > 0 ? (
-            <div className={`${card} space-y-3`}>
-              <h3 className="text-base font-semibold text-foreground">Suggested actions</h3>
-              <p className="text-xs text-muted-foreground">
-                Based on this resident&apos;s records — click an item to jump to the right place or start the right form.
-              </p>
-              <ul className="space-y-2">
-                {profileNextSteps.map((step) => (
-                  <li key={step.id}>
-                    <button
-                      type="button"
-                      className="w-full rounded-lg border border-border/80 bg-muted/10 px-3 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-muted/40"
-                      onClick={() => runWorkspaceAction(step.action)}
-                    >
-                      {step.text}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className={`${card} space-y-2`}>
-              <h3 className="text-sm font-semibold text-foreground">Education trend</h3>
-              <p className="text-xs text-muted-foreground">Last few records by date</p>
-              <ul className="text-sm">
-                {[...edu]
-                  .sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime())
-                  .slice(0, 5)
-                  .map((e) => (
-                    <li key={e.id} className="flex justify-between border-b border-border/60 py-1">
-                      <span>{formatAdminDate(e.recordDate)}</span>
-                      <span className="tabular-nums">{e.progressPercent ?? '—'}%</span>
-                    </li>
-                  ))}
-                {edu.length === 0 ? <li className="text-muted-foreground">No education records.</li> : null}
-              </ul>
-            </div>
-            <div className={`${card} space-y-2`}>
-              <h3 className="text-sm font-semibold text-foreground">Wellbeing trend</h3>
-              <p className="text-xs text-muted-foreground">Recent scores (1–5)</p>
-              <ul className="text-sm">
-                {[...hl]
-                  .sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime())
-                  .slice(0, 5)
-                  .map((h) => (
-                    <li key={h.id} className="flex justify-between border-b border-border/60 py-1">
-                      <span>{formatAdminDate(h.recordDate)}</span>
-                      <span className="tabular-nums">{h.healthScore ?? '—'}</span>
-                    </li>
-                  ))}
-                {hl.length === 0 ? <li className="text-muted-foreground">No health records.</li> : null}
-              </ul>
-            </div>
-          </div>
+          </OverviewSection>
         </div>
-      )}
+      ) : null}
 
-      {mainTab === 'timeline' && (
+      {mainTab === 'activity' ? (
         <div className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Unified chronological view of counseling sessions, visits, education, health, and plans. Select a row to open the full record.
-          </p>
-          <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-muted/20 p-4">
-            <label className={label}>
-              From
-              <input type="date" className={input} value={timelineFrom} onChange={(e) => setTimelineFrom(e.target.value)} />
-            </label>
-            <label className={label}>
-              To
-              <input type="date" className={input} value={timelineTo} onChange={(e) => setTimelineTo(e.target.value)} />
-            </label>
-            <label className={label}>
-              Worker contains
-              <input className={input} value={timelineWorker} onChange={(e) => setTimelineWorker(e.target.value)} placeholder="Name" />
-            </label>
-            <label className={label}>
-              Search
-              <input className={input} value={timelineSearch} onChange={(e) => setTimelineSearch(e.target.value)} />
-            </label>
-            <div className="flex flex-wrap gap-3 text-sm">
-              {(['process', 'visit', 'education', 'health', 'plan'] as TimelineKind[]).map((k) => (
-                <label key={k} className="flex cursor-pointer items-center gap-2">
+          <div className={`${card} space-y-4`}>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className={label}>
+                From
+                <input type="date" className={input} value={timelineFrom} onChange={(e) => setTimelineFrom(e.target.value)} />
+              </label>
+              <label className={label}>
+                To
+                <input type="date" className={input} value={timelineTo} onChange={(e) => setTimelineTo(e.target.value)} />
+              </label>
+              <label className={label}>
+                Worker
+                <input className={input} value={timelineWorker} onChange={(e) => setTimelineWorker(e.target.value)} placeholder="Search worker" />
+              </label>
+              <label className={label}>
+                Search
+                <input className={input} value={timelineSearch} onChange={(e) => setTimelineSearch(e.target.value)} placeholder="Keyword" />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              {(['process', 'visit', 'incident', 'education', 'health', 'plan'] as TimelineKind[]).map((kind) => (
+                <label key={kind} className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm text-foreground">
                   <input
                     type="checkbox"
-                    checked={timelineKinds.has(k)}
+                    checked={timelineKinds.has(kind)}
                     onChange={() => {
                       setTimelineKinds((prev) => {
-                        const n = new Set(prev)
-                        if (n.has(k)) n.delete(k)
-                        else n.add(k)
-                        return n
+                        const next = new Set(prev)
+                        if (next.has(kind)) next.delete(kind)
+                        else next.add(kind)
+                        return next
                       })
                     }}
                   />
-                  {k}
+                  {kind}
                 </label>
               ))}
             </div>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={tlConcerns} onChange={(e) => setTlConcerns(e.target.checked)} />
-              Concerns only (sessions)
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={tlFollow} onChange={(e) => setTlFollow(e.target.checked)} />
-              Follow-up only
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input type="checkbox" checked={tlProgress} onChange={(e) => setTlProgress(e.target.checked)} />
-              Progress noted (sessions)
-            </label>
+
+            <div className="flex flex-wrap gap-3">
+              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm text-foreground">
+                <input type="checkbox" checked={tlFollow} onChange={(e) => setTlFollow(e.target.checked)} />
+                Follow-up only
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm text-foreground">
+                <input type="checkbox" checked={tlConcerns} onChange={(e) => setTlConcerns(e.target.checked)} />
+                Flagged only
+              </label>
+            </div>
           </div>
 
-          <CounselingSection
-            residentId={residentId}
-            rows={proc}
-            onReload={load}
-            openCreateSignal={createSig.counseling}
-            hideChrome
-          />
-          <VisitsSection
-            residentId={residentId}
-            rows={vis}
-            onReload={load}
-            openCreateSignal={createSig.visit}
-            hideChrome
-          />
           <EducationSection
             residentId={residentId}
             rows={edu}
@@ -664,47 +1091,17 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
 
           <div className="space-y-2">
             {timelineFiltered.length === 0 ? (
-              <EmptyState title="No items match filters" />
+              <EmptyState title="No activity matches these filters" />
             ) : (
-              timelineFiltered.map((it) => (
-                <button
-                  key={it.key}
-                  type="button"
-                  onClick={() => onTimelineSelect(it)}
-                  className="w-full rounded-xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/40"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-primary">{it.title}</span>
-                    <span className="text-sm text-muted-foreground">{formatAdminDate(it.dateIso)}</span>
-                    {it.worker ? <span className="text-sm text-muted-foreground">· {it.worker}</span> : null}
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-foreground">{it.summary}</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {it.flags.map((f) => (
-                      <span
-                        key={f.label}
-                        className={`rounded-md px-2 py-0.5 text-xs font-medium ${
-                          f.tone === 'danger'
-                            ? 'bg-destructive/15 text-destructive'
-                            : f.tone === 'warning'
-                              ? 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
-                              : f.tone === 'success'
-                                ? 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-100'
-                                : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {f.label}
-                      </span>
-                    ))}
-                  </div>
-                </button>
+              timelineFiltered.map((item) => (
+                <TimelineRow key={item.key} item={item} onOpen={onTimelineSelect} onEdit={openTimelineEdit} onDelete={requestDeleteFromTimeline} />
               ))
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {mainTab === 'plans' && (
+      {mainTab === 'plans' ? (
         <PlansTabContent
           residentId={residentId}
           plans={plans}
@@ -714,262 +1111,205 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           focusPlanId={focusPlanId}
           onFocusPlanConsumed={() => setFocusPlanId(null)}
         />
-      )}
+      ) : null}
 
-      {mainTab === 'goals' && (
-        <GoalsTabContent
-          residentId={residentId}
-          plans={plans}
-          education={edu}
-          health={hl}
-          visitations={vis}
-          incidents={inc}
-          onReload={load}
-          openCreateSignals={{
-            education: createSig.education,
-            health: createSig.health,
-            plan: createSig.plan,
-          }}
-          onOpenIncident={() => {
-            setIncidentFormError(null)
-            setIncidentInfoOpen(true)
-          }}
-        />
-      )}
-
-      {mainTab === 'safety' && (
+      {mainTab === 'safety' ? (
         <div className="space-y-6">
-          <SectionHeader
-            title="Incident reports"
-            description="Logged incidents, responses, and follow-up for this resident."
-            actions={
-              <QuickActionButton
-                onClick={() => {
-                  setIncidentInfoOpen(true)
-                  setIncidentFormError(null)
-                }}
-              >
-                Log incident
-              </QuickActionButton>
-            }
-          />
-          {inc.length === 0 ? (
-            <EmptyState
-              title="No incident reports"
-              hint="Log safety incidents, conflicts, medical events, and responses here."
-              action={
-                <QuickActionButton
-                  onClick={() => {
-                    setIncidentInfoOpen(true)
-                    setIncidentFormError(null)
-                  }}
-                >
-                  Log first incident
-                </QuickActionButton>
-              }
-            />
-          ) : (
-            <div className="space-y-2">
-              {inc.map((row) => {
-                const f = row.fields
-                const severity = f.severity ?? ''
-                const severityColor =
-                  severity === 'High'
-                    ? 'text-red-600 bg-red-50 border-red-200'
-                    : severity === 'Medium'
-                      ? 'text-amber-600 bg-amber-50 border-amber-200'
-                      : 'text-green-700 bg-green-50 border-green-200'
-                const resolved = f.resolved === 'True' || f.resolved === 'true'
-                return (
-                  <div key={row.id} className="rounded-xl border border-border bg-card px-4 py-3 text-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-foreground">{f.incident_type}</span>
-                      <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${severityColor}`}>{severity}</span>
-                      {resolved ? (
-                        <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                          Resolved
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
-                          Open
-                        </span>
-                      )}
-                      <span className="ml-auto text-xs text-muted-foreground">{f.incident_date}</span>
-                    </div>
-                    {f.description ? <p className="mt-1.5 text-muted-foreground">{f.description}</p> : null}
-                    {f.response_taken ? (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        <span className="font-medium">Response:</span> {f.response_taken}
-                      </p>
-                    ) : null}
-                    <div className="mt-1.5 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      {f.reported_by ? <span>Reported by: {f.reported_by}</span> : null}
-                      {f.resolution_date ? <span>Resolved: {f.resolution_date}</span> : null}
-                      {f.follow_up_required === 'True' || f.follow_up_required === 'true' ? (
-                        <span className="font-medium text-amber-600">Follow-up required</span>
-                      ) : null}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <p className="text-sm text-muted-foreground">
-            Review safety signals from counseling sessions and home visits alongside formal incidents above.
-          </p>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className={`${card} space-y-3`}>
-              <h3 className="text-base font-semibold text-foreground">Counseling — concerns flagged</h3>
-              <ul className="space-y-2 text-sm">
-                {proc
-                  .filter((r) => r.concernsFlagged)
-                  .sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())
-                  .map((r) => (
-                    <li key={r.id}>
-                      <button
-                        type="button"
-                        className="w-full rounded-lg border border-border/80 px-3 py-2 text-left hover:bg-muted/50"
-                        onClick={() => {
-                          setProcDrawer({ mode: 'view', row: r })
-                          setMainTab('timeline')
-                        }}
-                      >
-                        <span className="font-medium">{formatAdminDate(r.sessionDate)}</span>
-                        <p className="line-clamp-2 text-muted-foreground">{r.sessionNarrative}</p>
-                      </button>
-                    </li>
-                  ))}
-                {proc.every((r) => !r.concernsFlagged) ? (
-                  <li className="text-muted-foreground">No sessions with concerns flagged.</li>
-                ) : null}
-              </ul>
-            </div>
-            <div className={`${card} space-y-3`}>
-              <h3 className="text-base font-semibold text-foreground">Visits — safety & follow-up</h3>
-              <ul className="space-y-2 text-sm">
-                {vis
-                  .filter((v) => v.safetyConcernsNoted || v.followUpNeeded)
-                  .sort((a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime())
-                  .map((v) => (
-                    <li key={v.id}>
-                      <button
-                        type="button"
-                        className="w-full rounded-lg border border-border/80 px-3 py-2 text-left hover:bg-muted/50"
-                        onClick={() => {
-                          setVisitDrawer({ mode: 'view', row: v })
-                          setMainTab('timeline')
-                        }}
-                      >
-                        <span className="font-medium">{formatAdminDate(v.visitDate)}</span>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          {v.safetyConcernsNoted ? <BooleanBadge value={true} trueLabel="Safety" trueVariant="danger" /> : null}
-                          {v.followUpNeeded ? <BooleanBadge value={true} trueLabel="Follow-up" trueVariant="warning" /> : null}
-                        </div>
-                      </button>
-                    </li>
-                  ))}
-                {vis.every((v) => !v.safetyConcernsNoted && !v.followUpNeeded) ? (
-                  <li className="text-muted-foreground">No visit safety or follow-up flags.</li>
-                ) : null}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {mainTab === 'info' && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h3 className="text-base font-semibold text-foreground">Resident information</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Administrative and case file fields. Use Edit for structured updates to core case data.
-              </p>
+              <h3 className="text-base font-semibold text-foreground">Safety summary</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Critical concerns, visits, and flagged sessions in one place.</p>
             </div>
-            <button type="button" className={btnPrimary} onClick={() => setProfileOpen(true)}>
-              Edit resident info
+            <button type="button" className={btnPrimary} onClick={() => bumpCreate('incident')}>
+              Log incident
             </button>
           </div>
-          <div className="grid gap-8">
-            <InfoSection title="Identity & case basics" fields={fields} keys={['internal_code', 'internalCode', 'case_control_no', 'caseControlNo', 'case_status', 'caseStatus', 'case_category', 'caseCategory', 'sex']} readField={gf} />
-            <InfoSection
-              title="Admission & placement"
-              fields={fields}
-              keys={['date_of_admission', 'dateOfAdmission', 'length_of_stay', 'lengthOfStay', 'safehouse_id', 'safehouseId']}
-              readField={gf}
-              extra={[
-                ['Safehouse (resolved)', safehouseName],
-              ]}
-            />
-            <InfoSection
-              title="Classification & risk"
-              fields={fields}
-              keys={['current_risk_level', 'currentRiskLevel', 'reintegration_status', 'reintegrationStatus', 'reintegration_type', 'reintegrationType', 'present_age', 'presentAge']}
-              readField={gf}
-            />
-            <InfoSection title="Worker assignment" fields={fields} keys={['assigned_social_worker', 'assignedSocialWorker']} readField={gf} />
-            <div className={`${card} space-y-2`}>
-              <h4 className="text-sm font-semibold text-foreground">All raw fields</h4>
-              <p className="text-xs text-muted-foreground">Additional columns from the resident record (for migration / custom data).</p>
-              <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
-                {Object.keys(fields)
-                  .sort()
-                  .map((k) => (
-                    <div key={k} className="border-b border-border/40 pb-1">
-                      <dt className="text-xs uppercase text-muted-foreground">{k}</dt>
-                      <dd className="text-foreground">{fields[k] || '—'}</dd>
-                    </div>
-                  ))}
-              </dl>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {mainTab === 'insights' && (
+          <div className="grid gap-4 md:grid-cols-3">
+            <SummaryTile label="Unresolved incidents" value={unresolvedIncidents.length} />
+            <SummaryTile label="Safety-related visits" value={vis.filter((row) => row.safetyConcernsNoted || row.followUpNeeded).length} />
+            <SummaryTile label="Flagged sessions" value={proc.filter((row) => row.concernsFlagged).length} />
+          </div>
+
+          <SafetyBlock title="Incidents">
+            {inc.length === 0 ? (
+              <EmptyState title="No incidents logged" hint="Use Log incident to add the first one." />
+            ) : (
+              inc.map((row) => (
+                <SafetyRow
+                  key={row.id}
+                  title={row.fields.incident_type || 'Incident'}
+                  subtitle={row.fields.description || 'No description'}
+                  meta={[
+                    row.fields.incident_date ? formatAdminDate(row.fields.incident_date) : '',
+                    row.fields.severity || '',
+                    (row.fields.resolved ?? '').toLowerCase() === 'true' ? 'Resolved' : 'Open',
+                  ]}
+                  onView={() => setIncidentDrawer({ mode: 'view', row })}
+                  onEdit={() => setIncidentDrawer({ mode: 'edit', row })}
+                  onDelete={() => setDeleteIncidentId(row.id)}
+                />
+              ))
+            )}
+          </SafetyBlock>
+
+          <SafetyBlock title="Visits with safety concerns or follow-up">
+            {vis.filter((row) => row.safetyConcernsNoted || row.followUpNeeded).length === 0 ? (
+              <EmptyState title="No safety-related visits" />
+            ) : (
+              vis
+                .filter((row) => row.safetyConcernsNoted || row.followUpNeeded)
+                .map((row) => (
+                  <SafetyRow
+                    key={row.id}
+                    title={`Home visit · ${formatAdminDate(row.visitDate)}`}
+                    subtitle={row.followUpNotes || row.observations || row.purpose || 'No notes'}
+                    meta={[
+                      row.socialWorker,
+                      row.safetyConcernsNoted ? 'Safety concern' : '',
+                      row.followUpNeeded ? 'Follow-up needed' : '',
+                    ]}
+                    onView={() => setVisitDrawer({ mode: 'view', row })}
+                    onEdit={() => setVisitDrawer({ mode: 'edit', row })}
+                    onDelete={() => setDeleteVisitId(row.id)}
+                  />
+                ))
+            )}
+          </SafetyBlock>
+
+          <SafetyBlock title="Sessions with concerns flagged">
+            {proc.filter((row) => row.concernsFlagged).length === 0 ? (
+              <EmptyState title="No flagged sessions" />
+            ) : (
+              proc
+                .filter((row) => row.concernsFlagged)
+                .map((row) => (
+                  <SafetyRow
+                    key={row.id}
+                    title={`Session · ${formatAdminDate(row.sessionDate)}`}
+                    subtitle={row.sessionNarrative}
+                    meta={[row.socialWorker, row.sessionType, row.followUpActions ? 'Follow-up noted' : '']}
+                    onView={() => setProcDrawer({ mode: 'view', row })}
+                    onEdit={() => setProcDrawer({ mode: 'edit', row })}
+                    onDelete={() => setDeleteProcessId(row.id)}
+                  />
+                ))
+            )}
+          </SafetyBlock>
+        </div>
+      ) : null}
+
+      {mainTab === 'profile' ? (
         <div className="space-y-6">
-          <p className="text-sm text-muted-foreground">Derived signals from this resident&apos;s records to support supervision and case review.</p>
-          <ReintegrationReadiness residentId={residentId} />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className={`${card} space-y-2`}>
-              <h3 className="text-sm font-semibold">Concerns in last windows</h3>
-              <p className="text-2xl font-bold text-foreground">
-                {proc.filter((r) => r.concernsFlagged && new Date(r.sessionDate).getTime() > Date.now() - 30 * 86400000).length}
-                <span className="ml-2 text-sm font-normal text-muted-foreground">/ 30d</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                60d: {proc.filter((r) => r.concernsFlagged && new Date(r.sessionDate).getTime() > Date.now() - 60 * 86400000).length} · 90d:{' '}
-                {proc.filter((r) => r.concernsFlagged && new Date(r.sessionDate).getTime() > Date.now() - 90 * 86400000).length}
-              </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Profile</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Administrative details and background information.</p>
             </div>
-            <div className={`${card} space-y-2`}>
-              <h3 className="text-sm font-semibold">Plans overdue or stalled</h3>
-              <p className="text-2xl font-bold text-foreground">{plans.filter(planIsOverdue).length}</p>
-              <p className="text-sm text-muted-foreground">Open plans: {stats.activePlans}</p>
-            </div>
-            <div className={`${card} space-y-2`}>
-              <h3 className="text-sm font-semibold">Repeated emotional states (sessions)</h3>
-              <ul className="text-sm">
-                {emotionalCounts.length === 0 ? <li className="text-muted-foreground">No emotional state labels captured.</li> : null}
-                {emotionalCounts.map(([state, n]) => (
-                  <li key={state} className="flex justify-between border-b border-border/50 py-1">
-                    <span>{state}</span>
-                    <span className="tabular-nums">{n}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className={`${card} space-y-2`}>
-              <h3 className="text-sm font-semibold">Visit follow-ups outstanding</h3>
-              <p className="text-2xl font-bold text-foreground">{vis.filter((v) => v.followUpNeeded).length}</p>
-              <p className="text-sm text-muted-foreground">Visits with safety concerns noted: {vis.filter((v) => v.safetyConcernsNoted).length}</p>
-            </div>
+            <button type="button" className={btnPrimary} onClick={() => setProfileOpen(true)}>
+              Edit profile
+            </button>
           </div>
-        </div>
-      )}
 
-      {profileOpen && (
+          <ProfileSection
+            title="Identity & case basics"
+            open={profileSections.identity}
+            onToggle={() => setProfileSections((value) => ({ ...value, identity: !value.identity }))}
+          >
+            <ProfileGrid rows={[
+              ['Internal code', gf(fields, 'internal_code', 'internalCode')],
+              ['Case control no', gf(fields, 'case_control_no', 'caseControlNo')],
+              ['Case status', gf(fields, 'case_status', 'caseStatus')],
+              ['Case category', gf(fields, 'case_category', 'caseCategory')],
+              ['Sex', gf(fields, 'sex')],
+            ]} />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Admission & placement"
+            open={profileSections.admission}
+            onToggle={() => setProfileSections((value) => ({ ...value, admission: !value.admission }))}
+          >
+            <ProfileGrid rows={[
+              ['Admission date', admissionDate ? formatAdminDate(admissionDate) : ''],
+              ['Length of stay', gf(fields, 'length_of_stay', 'lengthOfStay')],
+              ['Safehouse', safehouseName],
+              ['Safehouse ID', gf(fields, 'safehouse_id', 'safehouseId')],
+            ]} />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Classification & risk"
+            open={profileSections.classification}
+            onToggle={() => setProfileSections((value) => ({ ...value, classification: !value.classification }))}
+          >
+            <ProfileGrid rows={[
+              ['Risk level', gf(fields, 'current_risk_level', 'currentRiskLevel')],
+              ['Reintegration status', gf(fields, 'reintegration_status', 'reintegrationStatus')],
+              ['Reintegration type', gf(fields, 'reintegration_type', 'reintegrationType')],
+              ['Present age', gf(fields, 'present_age', 'presentAge')],
+            ]} />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Family / vulnerability indicators"
+            open={profileSections.family}
+            onToggle={() => setProfileSections((value) => ({ ...value, family: !value.family }))}
+          >
+            <ProfileGrid rows={[
+              ['Family background', gf(fields, 'family_background', 'familyBackground')],
+              ['Vulnerability indicators', gf(fields, 'vulnerability_indicators', 'vulnerabilityIndicators')],
+              ['Referral source', gf(fields, 'referral_source', 'referralSource')],
+              ['Notes', gf(fields, 'notes')],
+            ]} />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Worker assignment"
+            open={profileSections.worker}
+            onToggle={() => setProfileSections((value) => ({ ...value, worker: !value.worker }))}
+          >
+            <ProfileGrid rows={[
+              ['Assigned social worker', assignedWorker],
+              ['Safehouse', safehouseName],
+            ]} />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Additional fields / raw fields"
+            open={profileSections.raw}
+            onToggle={() => setProfileSections((value) => ({ ...value, raw: !value.raw }))}
+          >
+            <dl className="grid gap-2 sm:grid-cols-2">
+              {Object.keys(fields)
+                .sort()
+                .map((key) => (
+                  <div key={key} className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">{key}</dt>
+                    <dd className="mt-1 text-sm text-foreground">{fields[key] || '—'}</dd>
+                  </div>
+                ))}
+            </dl>
+          </ProfileSection>
+        </div>
+      ) : null}
+
+      {sessionWorkflowOpen ? (
+        <SessionWorkflowDrawer
+          residentId={residentId}
+          assignedWorker={assignedWorker}
+          recentConcerns={recentConcerns}
+          activeGoals={activeGoalContext}
+          recentActivity={recentActivityContext}
+          onClose={() => setSessionWorkflowOpen(false)}
+          onSaved={async () => {
+            setSessionWorkflowOpen(false)
+            await load()
+          }}
+        />
+      ) : null}
+
+      {profileOpen ? (
         <ProfileEditDrawer
           residentId={residentId}
           fields={fields}
@@ -983,121 +1323,45 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           setSaving={setProfileSaving}
           onError={setError}
         />
-      )}
+      ) : null}
 
-      {incidentInfoOpen && (
-        <CaseDrawer title="Log incident" onClose={() => setIncidentInfoOpen(false)}>
-          <form
-            className="space-y-4"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              setIncidentFormSaving(true)
-              setIncidentFormError(null)
-              try {
-                await createIncidentReport(residentId, {
-                  safehouse_id: safehouseId > 0 ? String(safehouseId) : '',
-                  incident_date: incidentDate,
-                  incident_type: incidentType,
-                  severity: incidentSeverity,
-                  description: incidentDescription,
-                  response_taken: incidentResponse,
-                  reported_by: incidentReportedBy,
-                  resolved: incidentResolved ? 'true' : 'false',
-                  follow_up_required: incidentFollowUp ? 'true' : 'false',
-                })
-                setIncidentInfoOpen(false)
-                setIncidentDate(new Date().toISOString().slice(0, 10))
-                setIncidentType('Medical')
-                setIncidentSeverity('Medium')
-                setIncidentDescription('')
-                setIncidentResponse('')
-                setIncidentReportedBy('')
-                setIncidentResolved(false)
-                setIncidentFollowUp(false)
-                await load()
-              } catch (err) {
-                setIncidentFormError(err instanceof Error ? err.message : 'Failed to save')
-              } finally {
-                setIncidentFormSaving(false)
-              }
-            }}
-          >
-            {incidentFormError ? (
-              <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                {incidentFormError}
-              </p>
-            ) : null}
-            <label className={label}>
-              <span className="text-xs text-muted-foreground">Date *</span>
-              <input type="date" className={input} value={incidentDate} onChange={(e) => setIncidentDate(e.target.value)} required />
-            </label>
-            <label className={label}>
-              <span className="text-xs text-muted-foreground">Incident type *</span>
-              <select className={input} value={incidentType} onChange={(e) => setIncidentType(e.target.value)}>
-                {[
-                  'Medical',
-                  'Security',
-                  'Behavioral',
-                  'SelfHarm',
-                  'RunawayAttempt',
-                  'ConflictWithPeer',
-                  'PropertyDamage',
-                  'Other',
-                ].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={label}>
-              <span className="text-xs text-muted-foreground">Severity *</span>
-              <select className={input} value={incidentSeverity} onChange={(e) => setIncidentSeverity(e.target.value)}>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </label>
-            <label className={label}>
-              <span className="text-xs text-muted-foreground">Description</span>
-              <textarea className={input} rows={3} value={incidentDescription} onChange={(e) => setIncidentDescription(e.target.value)} />
-            </label>
-            <label className={label}>
-              <span className="text-xs text-muted-foreground">Response taken</span>
-              <textarea className={input} rows={2} value={incidentResponse} onChange={(e) => setIncidentResponse(e.target.value)} />
-            </label>
-            <label className={label}>
-              <span className="text-xs text-muted-foreground">Reported by</span>
-              <input
-                className={input}
-                value={incidentReportedBy}
-                onChange={(e) => setIncidentReportedBy(e.target.value)}
-                placeholder="e.g. SW-01"
-              />
-            </label>
-            <ToggleField labelText="Resolved" value={incidentResolved} onChange={setIncidentResolved} />
-            <ToggleField labelText="Follow-up required" value={incidentFollowUp} onChange={setIncidentFollowUp} />
-            <button type="submit" disabled={incidentFormSaving} className={btnPrimary}>
-              {incidentFormSaving ? 'Saving…' : 'Save incident'}
-            </button>
-          </form>
-        </CaseDrawer>
-      )}
+      {incidentDrawer ? (
+        <IncidentDrawer
+          mode={incidentDrawer.mode}
+          residentId={residentId}
+          safehouseId={safehouseId}
+          initial={incidentDrawer.row ?? null}
+          error={drawerErr}
+          onError={setDrawerErr}
+          onClose={() => {
+            setIncidentDrawer(null)
+            setDrawerErr(null)
+          }}
+          onSaved={async () => {
+            setIncidentDrawer(null)
+            setDrawerErr(null)
+            await load()
+          }}
+          onEdit={() => {
+            if (incidentDrawer.row) setIncidentDrawer({ mode: 'edit', row: incidentDrawer.row })
+          }}
+          onDeleteRequest={(id) => setDeleteIncidentId(id)}
+        />
+      ) : null}
 
-      {procDrawer && (
+      {procDrawer ? (
         <ProcessRecordingDrawer
-          key={procDrawer.mode === 'create' ? 'new' : String(procDrawer.row?.id ?? 'x')}
+          key={String(procDrawer.row.id)}
           mode={procDrawer.mode}
           residentId={residentId}
-          initial={procDrawer.row ?? null}
+          initial={procDrawer.row}
           error={drawerErr}
           onError={setDrawerErr}
           onClose={() => {
             setProcDrawer(null)
             setDrawerErr(null)
-            void load()
           }}
-          onEdit={() => setProcDrawer((d) => (d && d.row ? { mode: 'edit', row: d.row } : d))}
+          onEdit={() => setProcDrawer((value) => (value ? { ...value, mode: 'edit' } : value))}
           onSaved={async () => {
             setProcDrawer(null)
             setDrawerErr(null)
@@ -1105,11 +1369,11 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           }}
           onDeleteRequest={(id) => setDeleteProcessId(id)}
         />
-      )}
+      ) : null}
 
-      {visitDrawer && (
+      {visitDrawer ? (
         <HomeVisitDrawer
-          key={visitDrawer.mode === 'create' ? 'newv' : String(visitDrawer.row?.id ?? 'y')}
+          key={visitDrawer.mode === 'create' ? 'new-visit' : String(visitDrawer.row?.id ?? 'visit')}
           mode={visitDrawer.mode}
           residentId={residentId}
           initial={visitDrawer.row ?? null}
@@ -1118,9 +1382,8 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           onClose={() => {
             setVisitDrawer(null)
             setDrawerErr(null)
-            void load()
           }}
-          onEdit={() => setVisitDrawer((d) => (d && d.row ? { mode: 'edit', row: d.row } : d))}
+          onEdit={() => setVisitDrawer((value) => (value && value.row ? { mode: 'edit', row: value.row } : value))}
           onSaved={async () => {
             setVisitDrawer(null)
             setDrawerErr(null)
@@ -1128,119 +1391,471 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           }}
           onDeleteRequest={(id) => setDeleteVisitId(id)}
         />
-      )}
+      ) : null}
 
-      {deleteProcessId != null && (
-        <ConfirmDeleteModal
-          title="Delete process recording?"
-          loading={drawerSaving}
-          onCancel={() => setDeleteProcessId(null)}
-          onConfirm={async () => {
-            setDrawerSaving(true)
-            try {
-              await deleteProcessRecording(deleteProcessId)
-              setDeleteProcessId(null)
-              setProcDrawer(null)
-              await load()
-            } catch (e) {
-              setDrawerErr(e instanceof Error ? e.message : 'Delete failed')
-            } finally {
-              setDrawerSaving(false)
-            }
-          }}
-        />
-      )}
+      <AdminDeleteModal
+        open={deleteProcessId != null}
+        title="Delete record?"
+        body="This action cannot be undone."
+        loading={drawerSaving}
+        onCancel={() => setDeleteProcessId(null)}
+        onConfirm={async () => {
+          if (deleteProcessId == null) return
+          setDrawerSaving(true)
+          try {
+            await deleteProcessRecording(deleteProcessId)
+            setDeleteProcessId(null)
+            setProcDrawer(null)
+            await load()
+          } catch (err) {
+            setDrawerErr(err instanceof Error ? err.message : 'Delete failed')
+          } finally {
+            setDrawerSaving(false)
+          }
+        }}
+      />
 
-      {deleteVisitId != null && (
-        <ConfirmDeleteModal
-          title="Delete home visit?"
-          loading={drawerSaving}
-          onCancel={() => setDeleteVisitId(null)}
-          onConfirm={async () => {
-            setDrawerSaving(true)
-            try {
-              await deleteHomeVisitation(deleteVisitId)
-              setDeleteVisitId(null)
-              setVisitDrawer(null)
-              await load()
-            } catch (e) {
-              setDrawerErr(e instanceof Error ? e.message : 'Delete failed')
-            } finally {
-              setDrawerSaving(false)
-            }
-          }}
-        />
-      )}
+      <AdminDeleteModal
+        open={deleteVisitId != null}
+        title="Delete record?"
+        body="This action cannot be undone."
+        loading={drawerSaving}
+        onCancel={() => setDeleteVisitId(null)}
+        onConfirm={async () => {
+          if (deleteVisitId == null) return
+          setDrawerSaving(true)
+          try {
+            await deleteHomeVisitation(deleteVisitId)
+            setDeleteVisitId(null)
+            setVisitDrawer(null)
+            await load()
+          } catch (err) {
+            setDrawerErr(err instanceof Error ? err.message : 'Delete failed')
+          } finally {
+            setDrawerSaving(false)
+          }
+        }}
+      />
+
+      <AdminDeleteModal
+        open={deleteIncidentId != null}
+        title="Delete record?"
+        body="This action cannot be undone."
+        loading={drawerSaving}
+        onCancel={() => setDeleteIncidentId(null)}
+        onConfirm={async () => {
+          if (deleteIncidentId == null) return
+          setDrawerSaving(true)
+          try {
+            await deleteIncidentReport(deleteIncidentId)
+            setDeleteIncidentId(null)
+            setIncidentDrawer(null)
+            await load()
+          } catch (err) {
+            setDrawerErr(err instanceof Error ? err.message : 'Delete failed')
+          } finally {
+            setDrawerSaving(false)
+          }
+        }}
+      />
     </div>
   )
 }
 
-function InfoSection({
-  title,
-  fields,
-  keys,
-  readField,
-  extra,
-}: {
-  title: string
-  fields: Record<string, string>
-  keys: string[]
-  readField: typeof gf
-  extra?: [string, string][]
-}) {
-  const seen = new Set<string>()
-  const rows: [string, string][] = []
-  for (let i = 0; i < keys.length; i += 2) {
-    const labelKey = keys[i]
-    const valKey = keys[i + 1] ?? keys[i]
-    const v = readField(fields, labelKey, valKey)
-    const label = labelKey.replace(/_/g, ' ')
-    if (seen.has(label)) continue
-    seen.add(label)
-    rows.push([label, v])
-  }
-  if (extra) rows.push(...extra)
+function OverviewSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className={`${card} space-y-3`}>
-      <h4 className="text-sm font-semibold text-foreground">{title}</h4>
-      <dl className="grid gap-2 sm:grid-cols-2">
-        {rows.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{k}</dt>
-            <dd className="text-sm text-foreground">{v || '—'}</dd>
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      {children}
+    </section>
+  )
+}
+
+function InlineDetailCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-5 py-5">
+      <h4 className="text-base font-semibold text-foreground">{title}</h4>
+      <div className="mt-4">{children}</div>
+    </div>
+  )
+}
+
+function SummaryTile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-4">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function ProgressRing({ label, progress, children }: { label: string; progress: number; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className="grid h-24 w-24 place-items-center rounded-full"
+        style={{ background: `conic-gradient(var(--primary) ${progress}%, rgba(148, 163, 184, 0.15) ${progress}% 100%)` }}
+      >
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-card text-center">{children}</div>
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{Math.round(progress)}% of target</p>
+      </div>
+    </div>
+  )
+}
+
+function MetaPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-full border border-border bg-muted/20 px-3 py-1.5 text-sm text-foreground">
+      <span className="text-muted-foreground">{label}</span>
+      {' · '}
+      <span className="font-medium">{value}</span>
+    </div>
+  )
+}
+
+function InlineActionButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return (
+    <button type="button" className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50" onClick={onClick}>
+      {children}
+    </button>
+  )
+}
+
+function TrendBadge({ trend }: { trend: 'up' | 'down' | 'flat' }) {
+  if (trend === 'up') return <span className="text-emerald-700 dark:text-emerald-300">Up</span>
+  if (trend === 'down') return <span className="text-destructive">Down</span>
+  return <span>Flat</span>
+}
+
+function StateDetailList({
+  rows,
+  emptyLabel,
+  primaryAction,
+  secondaryAction,
+}: {
+  rows: { id: number; title: string; subtitle: string; meta: string; onOpen: () => void }[]
+  emptyLabel: string
+  primaryAction: ReactNode
+  secondaryAction?: ReactNode
+}) {
+  return (
+    <div className="space-y-4">
+      {rows.length === 0 ? (
+        <EmptyState title={emptyLabel} />
+      ) : (
+        <div className="space-y-2">
+          {rows.map((row) => (
+            <button key={row.id} type="button" onClick={row.onOpen} className="w-full rounded-xl border border-border bg-muted/10 px-4 py-3 text-left hover:bg-muted/40">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium text-foreground">{row.title}</span>
+                <span className="text-xs text-muted-foreground">{row.meta}</span>
+              </div>
+              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{row.subtitle}</p>
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {primaryAction}
+        {secondaryAction}
+      </div>
+    </div>
+  )
+}
+
+function TimelineRow({
+  item,
+  onOpen,
+  onEdit,
+  onDelete,
+}: {
+  item: TimelineItem
+  onOpen: (item: TimelineItem) => void
+  onEdit: (item: TimelineItem) => void
+  onDelete: (item: TimelineItem) => void
+}) {
+  const canDelete = item.ref.kind === 'process' || item.ref.kind === 'visit' || item.ref.kind === 'incident'
+  const editLabel = item.ref.kind === 'education' || item.ref.kind === 'health' || item.ref.kind === 'plan' ? 'Open' : 'Edit'
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-primary">{item.title}</span>
+            <span className="text-sm text-muted-foreground">{formatAdminDate(item.dateIso)}</span>
+            {item.worker ? <span className="text-sm text-muted-foreground">· {item.worker}</span> : null}
           </div>
-        ))}
-      </dl>
-    </div>
-  )
-}
-
-function ConfirmDeleteModal({
-  title,
-  loading,
-  onCancel,
-  onConfirm,
-}: {
-  title: string
-  loading: boolean
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-foreground/40 p-4">
-      <div className={`${card} max-w-sm space-y-4`}>
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground">This cannot be undone.</p>
-        <div className="flex gap-2">
-          <button type="button" className={btnPrimary} disabled={loading} onClick={() => void onConfirm()}>
-            {loading ? 'Deleting…' : 'Delete'}
-          </button>
-          <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={onCancel}>
-            Cancel
-          </button>
+          <p className="mt-2 text-sm text-foreground">{item.summary}</p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {item.flags.map((flag) => (
+              <span key={flag.label} className={`rounded-full px-2 py-1 text-xs font-medium ${toneClass(flag.tone)}`}>
+                {flag.label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <InlineActionButton onClick={() => onOpen(item)}>View</InlineActionButton>
+          <InlineActionButton onClick={() => onEdit(item)}>{editLabel}</InlineActionButton>
+          {canDelete ? <InlineActionButton onClick={() => onDelete(item)}>Delete</InlineActionButton> : null}
         </div>
       </div>
     </div>
+  )
+}
+
+function SafetyBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <div className="space-y-2">{children}</div>
+    </section>
+  )
+}
+
+function SafetyRow({
+  title,
+  subtitle,
+  meta,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  title: string
+  subtitle: string
+  meta: string[]
+  onView: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card px-4 py-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground">{title}</p>
+          <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{subtitle}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {meta.filter(Boolean).map((item) => (
+              <span key={item} className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <InlineActionButton onClick={onView}>View</InlineActionButton>
+          <InlineActionButton onClick={onEdit}>Edit</InlineActionButton>
+          <InlineActionButton onClick={onDelete}>Delete</InlineActionButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProfileSection({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card">
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between px-5 py-4 text-left">
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <span className="text-sm text-muted-foreground">{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open ? <div className="border-t border-border px-5 py-4">{children}</div> : null}
+    </div>
+  )
+}
+
+function ProfileGrid({ rows }: { rows: [string, string][] }) {
+  const filtered = rows.filter(([, value]) => value)
+  if (filtered.length === 0) {
+    return <p className="text-sm text-muted-foreground">No fields in this section yet.</p>
+  }
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2">
+      {filtered.map(([key, value]) => (
+        <div key={key} className="rounded-lg border border-border/60 bg-muted/10 px-3 py-2">
+          <dt className="text-xs uppercase tracking-wide text-muted-foreground">{key}</dt>
+          <dd className="mt-1 text-sm text-foreground">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function IncidentDrawer({
+  mode,
+  residentId,
+  safehouseId,
+  initial,
+  error,
+  onError,
+  onClose,
+  onSaved,
+  onEdit,
+  onDeleteRequest,
+}: {
+  mode: 'view' | 'edit' | 'create'
+  residentId: number
+  safehouseId: number
+  initial: JsonTableRow | null
+  error: string | null
+  onError: (value: string | null) => void
+  onClose: () => void
+  onSaved: () => Promise<void>
+  onEdit: () => void
+  onDeleteRequest: (id: number) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [incidentDate, setIncidentDate] = useState(initial?.fields.incident_date ?? new Date().toISOString().slice(0, 10))
+  const [incidentType, setIncidentType] = useState(initial?.fields.incident_type ?? 'Medical')
+  const [severity, setSeverity] = useState(initial?.fields.severity ?? 'Medium')
+  const [description, setDescription] = useState(initial?.fields.description ?? '')
+  const [responseTaken, setResponseTaken] = useState(initial?.fields.response_taken ?? '')
+  const [reportedBy, setReportedBy] = useState(initial?.fields.reported_by ?? '')
+  const [resolved, setResolved] = useState((initial?.fields.resolved ?? '').toLowerCase() === 'true')
+  const [followUpRequired, setFollowUpRequired] = useState((initial?.fields.follow_up_required ?? '').toLowerCase() === 'true')
+  const [resolutionDate, setResolutionDate] = useState(initial?.fields.resolution_date ?? '')
+  const readOnly = mode === 'view'
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    setSaving(true)
+    try {
+      const payload = {
+        safehouse_id: safehouseId > 0 ? String(safehouseId) : '',
+        incident_date: incidentDate,
+        incident_type: incidentType,
+        severity,
+        description,
+        response_taken: responseTaken,
+        reported_by: reportedBy,
+        resolved: resolved ? 'true' : 'false',
+        follow_up_required: followUpRequired ? 'true' : 'false',
+        resolution_date: resolved ? resolutionDate || incidentDate : '',
+      }
+      if (mode === 'create') {
+        await createIncidentReport(residentId, payload)
+      } else if (initial && mode === 'edit') {
+        await patchIncidentReport(initial.id, payload)
+      }
+      await onSaved()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to save incident')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <CaseDrawer
+      title={mode === 'create' ? 'Add incident' : 'Incident'}
+      onClose={onClose}
+      footer={
+        readOnly && initial ? (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={btnPrimary} onClick={onEdit}>
+              Edit
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-destructive/50 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+              onClick={() => onDeleteRequest(initial.id)}
+            >
+              Delete
+            </button>
+          </div>
+        ) : null
+      }
+    >
+      {error ? <div className={alertError}>{error}</div> : null}
+      {readOnly && initial ? (
+        <div className="space-y-3 text-sm">
+          <p className="font-medium text-foreground">{initial.fields.incident_type || 'Incident'}</p>
+          <p className="text-muted-foreground">{initial.fields.incident_date ? formatAdminDate(initial.fields.incident_date) : 'No date'}</p>
+          <div className="flex flex-wrap gap-2">
+            {initial.fields.severity ? <CategoryBadge>{initial.fields.severity}</CategoryBadge> : null}
+            <BooleanBadge value={(initial.fields.resolved ?? '').toLowerCase() === 'true'} trueLabel="Resolved" falseLabel="Open" trueVariant="success" />
+            {(initial.fields.follow_up_required ?? '').toLowerCase() === 'true' ? <BooleanBadge value={true} trueLabel="Follow-up required" trueVariant="warning" /> : null}
+          </div>
+          {initial.fields.description ? <p className="whitespace-pre-wrap text-foreground">{initial.fields.description}</p> : null}
+          {initial.fields.response_taken ? (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Response</p>
+              <p className="mt-1 whitespace-pre-wrap text-foreground">{initial.fields.response_taken}</p>
+            </div>
+          ) : null}
+          {initial.fields.reported_by ? <p className="text-muted-foreground">Reported by {initial.fields.reported_by}</p> : null}
+        </div>
+      ) : (
+        <form className="space-y-3" onSubmit={submit}>
+          <label className={label}>
+            Incident date
+            <input type="date" className={input} value={incidentDate} onChange={(e) => setIncidentDate(e.target.value)} required />
+          </label>
+          <label className={label}>
+            Incident type
+            <select className={input} value={incidentType} onChange={(e) => setIncidentType(e.target.value)}>
+              {['Medical', 'Security', 'Behavioral', 'SelfHarm', 'RunawayAttempt', 'ConflictWithPeer', 'PropertyDamage', 'Other'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Severity
+            <select className={input} value={severity} onChange={(e) => setSeverity(e.target.value)}>
+              {['Low', 'Medium', 'High'].map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={label}>
+            Description
+            <textarea className={input} rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <label className={label}>
+            Response taken
+            <textarea className={input} rows={3} value={responseTaken} onChange={(e) => setResponseTaken(e.target.value)} />
+          </label>
+          <label className={label}>
+            Reported by
+            <input className={input} value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
+          </label>
+          <ToggleField labelText="Resolved" value={resolved} onChange={setResolved} />
+          {resolved ? (
+            <label className={label}>
+              Resolution date
+              <input type="date" className={input} value={resolutionDate} onChange={(e) => setResolutionDate(e.target.value)} />
+            </label>
+          ) : null}
+          <ToggleField labelText="Follow-up required" value={followUpRequired} onChange={setFollowUpRequired} />
+          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+            <button type="submit" className={btnPrimary} disabled={saving}>
+              {saving ? 'Saving…' : mode === 'create' ? 'Save incident' : 'Save changes'}
+            </button>
+            <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={onClose}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </CaseDrawer>
   )
 }
 
@@ -1260,20 +1875,18 @@ function ProfileEditDrawer({
   onClose: () => void
   onSaved: () => Promise<void>
   saving: boolean
-  setSaving: (v: boolean) => void
-  onError: (e: string | null) => void
+  setSaving: (value: boolean) => void
+  onError: (value: string | null) => void
 }) {
   const [caseStatus, setCaseStatus] = useState(gf(fields, 'case_status', 'caseStatus'))
-  const [risk, setRisk] = useState(gf(fields, 'current_risk_level', 'currentRiskLevel'))
-  const [sex, setSex] = useState(gf(fields, 'sex'))
-  const [category, setCategory] = useState(gf(fields, 'case_category', 'caseCategory'))
-  const [reintStat, setReintStat] = useState(gf(fields, 'reintegration_status', 'reintegrationStatus'))
-  const [reintType, setReintType] = useState(gf(fields, 'reintegration_type', 'reintegrationType'))
-  const [admission, setAdmission] = useState(gf(fields, 'date_of_admission', 'dateOfAdmission').slice(0, 10))
-  const [worker, setWorker] = useState(gf(fields, 'assigned_social_worker', 'assignedSocialWorker'))
-  const [safeId, setSafeId] = useState(gf(fields, 'safehouse_id', 'safehouseId'))
+  const [riskLevel, setRiskLevel] = useState(gf(fields, 'current_risk_level', 'currentRiskLevel'))
+  const [reintegrationStatus, setReintegrationStatus] = useState(gf(fields, 'reintegration_status', 'reintegrationStatus'))
+  const [reintegrationType, setReintegrationType] = useState(gf(fields, 'reintegration_type', 'reintegrationType'))
+  const [assignedWorker, setAssignedWorker] = useState(gf(fields, 'assigned_social_worker', 'assignedSocialWorker'))
   const [presentAge, setPresentAge] = useState(gf(fields, 'present_age', 'presentAge'))
-  const [los, setLos] = useState(gf(fields, 'length_of_stay', 'lengthOfStay'))
+  const [sex, setSex] = useState(gf(fields, 'sex'))
+  const [safehouseId, setSafehouseId] = useState(gf(fields, 'safehouse_id', 'safehouseId'))
+  const [admissionDate, setAdmissionDate] = useState(gf(fields, 'date_of_admission', 'dateOfAdmission'))
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -1282,16 +1895,14 @@ function ProfileEditDrawer({
     try {
       await patchResident(residentId, {
         case_status: caseStatus,
-        current_risk_level: risk || null,
-        sex: sex || null,
-        case_category: category || null,
-        reintegration_status: reintStat || null,
-        reintegration_type: reintType || null,
-        date_of_admission: admission || null,
-        assigned_social_worker: worker || null,
-        safehouse_id: safeId || null,
+        current_risk_level: riskLevel,
+        reintegration_status: reintegrationStatus,
+        reintegration_type: reintegrationType,
+        assigned_social_worker: assignedWorker,
         present_age: presentAge || null,
-        length_of_stay: los || null,
+        sex,
+        safehouse_id: safehouseId || null,
+        date_of_admission: admissionDate || null,
       })
       await onSaved()
     } catch (err) {
@@ -1302,81 +1913,75 @@ function ProfileEditDrawer({
   }
 
   return (
-    <CaseDrawer title="Edit resident profile" onClose={onClose}>
-      <form className="space-y-3" onSubmit={submit}>
+    <CaseDrawer title="Edit profile" onClose={onClose}>
+      <form className="space-y-4" onSubmit={submit}>
         <label className={label}>
           Case status
           <select className={input} value={caseStatus} onChange={(e) => setCaseStatus(e.target.value)}>
-            {CASE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            <option value="">—</option>
+            {CASE_STATUSES.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
         </label>
         <label className={label}>
-          Current risk level
-          <select className={input} value={risk} onChange={(e) => setRisk(e.target.value)}>
+          Risk level
+          <select className={input} value={riskLevel} onChange={(e) => setRiskLevel(e.target.value)}>
             <option value="">—</option>
-            {RISK_LEVELS.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            {RISK_LEVELS.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
+        </label>
+        <label className={label}>
+          Reintegration status
+          <input className={input} value={reintegrationStatus} onChange={(e) => setReintegrationStatus(e.target.value)} />
+        </label>
+        <label className={label}>
+          Reintegration type
+          <input className={input} value={reintegrationType} onChange={(e) => setReintegrationType(e.target.value)} />
+        </label>
+        <label className={label}>
+          Assigned social worker
+          <input className={input} value={assignedWorker} onChange={(e) => setAssignedWorker(e.target.value)} />
+        </label>
+        <label className={label}>
+          Present age
+          <input className={input} inputMode="numeric" value={presentAge} onChange={(e) => setPresentAge(e.target.value)} />
         </label>
         <label className={label}>
           Sex
           <select className={input} value={sex} onChange={(e) => setSex(e.target.value)}>
-            {SEX_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            <option value="">—</option>
+            {SEX_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
-        </label>
-        <label className={label}>
-          Case category
-          <input className={input} value={category} onChange={(e) => setCategory(e.target.value)} />
-        </label>
-        <label className={label}>
-          Reintegration status
-          <input className={input} value={reintStat} onChange={(e) => setReintStat(e.target.value)} />
-        </label>
-        <label className={label}>
-          Reintegration type
-          <input className={input} value={reintType} onChange={(e) => setReintType(e.target.value)} />
-        </label>
-        <label className={label}>
-          Date of admission
-          <input type="date" className={input} value={admission} onChange={(e) => setAdmission(e.target.value)} />
-        </label>
-        <label className={label}>
-          Assigned social worker
-          <input className={input} value={worker} onChange={(e) => setWorker(e.target.value)} />
         </label>
         <label className={label}>
           Safehouse
-          <select className={input} value={safeId} onChange={(e) => setSafeId(e.target.value)}>
+          <select className={input} value={safehouseId} onChange={(e) => setSafehouseId(e.target.value)}>
             <option value="">—</option>
-            {safehouses.map((s) => (
-              <option key={s.id} value={String(s.id)}>
-                {s.name}
+            {safehouses.map((option) => (
+              <option key={option.id} value={String(option.id)}>
+                {option.name}
               </option>
             ))}
           </select>
         </label>
         <label className={label}>
-          Present age
-          <input className={input} value={presentAge} onChange={(e) => setPresentAge(e.target.value)} />
+          Admission date
+          <input type="date" className={input} value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
         </label>
-        <label className={label}>
-          Length of stay
-          <input className={input} value={los} onChange={(e) => setLos(e.target.value)} />
-        </label>
-        <div className="flex gap-2 border-t border-border pt-4">
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           <button type="submit" disabled={saving} className={btnPrimary}>
-            {saving ? 'Saving…' : 'Save profile'}
+            {saving ? 'Saving…' : 'Save changes'}
           </button>
           <button type="button" className="text-sm text-muted-foreground hover:text-foreground" onClick={onClose}>
             Cancel

@@ -1,9 +1,9 @@
-import type { EducationRecord, HealthRecord, HomeVisitation, InterventionPlan, ProcessRecording } from '../../../../api/admin'
+import type { EducationRecord, HealthRecord, HomeVisitation, InterventionPlan, JsonTableRow, ProcessRecording } from '../../../../api/admin'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 
-export type MainWorkspaceTab = 'overview' | 'timeline' | 'goals' | 'plans' | 'safety' | 'info' | 'insights'
+export type MainWorkspaceTab = 'overview' | 'activity' | 'plans' | 'safety' | 'profile'
 
-export type TimelineKind = 'process' | 'visit' | 'education' | 'health' | 'plan'
+export type TimelineKind = 'process' | 'visit' | 'education' | 'health' | 'plan' | 'incident'
 
 export type TimelineItem = {
   key: string
@@ -21,6 +21,7 @@ export type TimelineItem = {
     | { kind: 'education'; row: EducationRecord }
     | { kind: 'health'; row: HealthRecord }
     | { kind: 'plan'; row: InterventionPlan }
+    | { kind: 'incident'; row: JsonTableRow }
 }
 
 export function planIsOverdue(p: InterventionPlan): boolean {
@@ -36,6 +37,7 @@ export function buildTimelineItems(
   edu: EducationRecord[],
   hl: HealthRecord[],
   plans: InterventionPlan[],
+  incidents: JsonTableRow[],
 ): TimelineItem[] {
   const items: TimelineItem[] = []
   for (const r of proc) {
@@ -116,6 +118,30 @@ export function buildTimelineItems(
       ref: { kind: 'plan', row: p },
     })
   }
+  for (const incident of incidents) {
+    const f = incident.fields
+    const t = new Date(f.incident_date ?? '').getTime()
+    const flags: TimelineItem['flags'] = []
+    if ((f.follow_up_required ?? '').toLowerCase() === 'true') flags.push({ label: 'Follow-up', tone: 'warning' })
+    if ((f.resolved ?? '').toLowerCase() !== 'true') flags.push({ label: 'Open', tone: 'danger' })
+    if (f.severity) {
+      flags.push({
+        label: f.severity,
+        tone: f.severity.toLowerCase() === 'high' ? 'danger' : f.severity.toLowerCase() === 'medium' ? 'warning' : 'default',
+      })
+    }
+    items.push({
+      key: `i-${incident.id}`,
+      kind: 'incident',
+      sort: Number.isFinite(t) ? t : 0,
+      dateIso: f.incident_date ?? '',
+      title: 'Incident',
+      summary: `${f.incident_type || 'Incident'}${f.description ? ` · ${f.description.slice(0, 100)}${f.description.length > 100 ? '…' : ''}` : ''}`,
+      worker: f.reported_by ?? undefined,
+      flags,
+      ref: { kind: 'incident', row: incident },
+    })
+  }
   return items.sort((a, b) => b.sort - a.sort)
 }
 
@@ -154,6 +180,9 @@ export function filterTimeline(
       } else if (it.kind === 'process') {
         const r = it.ref as { kind: 'process'; row: ProcessRecording }
         if (!r.row.followUpActions?.trim()) return false
+      } else if (it.kind === 'incident') {
+        const r = it.ref as { kind: 'incident'; row: JsonTableRow }
+        if ((r.row.fields.follow_up_required ?? '').toLowerCase() !== 'true') return false
       } else return false
     }
     if (opts.progressOnly) {
@@ -202,7 +231,7 @@ export function buildWorkspaceAlerts(params: {
       id: 'risk-level',
       level: 'risk',
       text: `Elevated risk level: ${params.riskLevel}`,
-      action: { kind: 'tab', tab: 'info' },
+      action: { kind: 'tab', tab: 'profile' },
     })
   }
   const overdue = params.plans.filter(planIsOverdue)
@@ -275,7 +304,7 @@ export function buildWorkspaceAlerts(params: {
       id: 'no-worker',
       level: 'warn',
       text: 'No assigned social worker on file',
-      action: { kind: 'tab', tab: 'info' },
+      action: { kind: 'tab', tab: 'profile' },
     })
   }
   if (!params.admission.trim()) {
@@ -283,7 +312,7 @@ export function buildWorkspaceAlerts(params: {
       id: 'no-admission',
       level: 'warn',
       text: 'Admission date missing',
-      action: { kind: 'tab', tab: 'info' },
+      action: { kind: 'tab', tab: 'profile' },
     })
   }
   return list

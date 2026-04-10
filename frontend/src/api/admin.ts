@@ -60,4 +60,5 @@ export {
   listIncidentReports,
   createIncidentReport,
   patchIncidentReport,
+  deleteIncidentReport,
 } from './adminRest'
