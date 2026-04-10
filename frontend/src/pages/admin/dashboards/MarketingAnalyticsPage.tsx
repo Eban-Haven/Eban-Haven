@@ -328,21 +328,22 @@ export function MarketingAnalyticsPage() {
                     and content momentum before dropping into broader fundraising attribution.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {SOCIAL_WINDOW_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setSocialWindow(option.value)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-                        socialWindow === option.value
-                          ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                          : 'border-border bg-background/80 text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                <div className="flex min-w-[180px] flex-col gap-1">
+                  <label htmlFor="marketing-social-window" className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    Social Window
+                  </label>
+                  <select
+                    id="marketing-social-window"
+                    value={socialWindow}
+                    onChange={(event) => setSocialWindow(event.target.value as (typeof SOCIAL_WINDOW_OPTIONS)[number]['value'])}
+                    className="rounded-xl border border-border bg-background/90 px-3 py-2 text-sm text-foreground shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  >
+                    {SOCIAL_WINDOW_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             </div>
