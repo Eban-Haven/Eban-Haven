@@ -68,6 +68,86 @@ public sealed class SocialChatContextService(
         LIMIT 5
         """;
 
+    private const string TopPlatformTacticalSql = """
+        SELECT
+            COALESCE(platform, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS median_revenue_per_post_php,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(donation_referrals, 0))::numeric, 2) AS median_donation_referrals
+        FROM social_media_posts
+        GROUP BY COALESCE(platform, 'Unknown')
+        HAVING COUNT(*) >= 5
+        ORDER BY median_revenue_per_post_php DESC, median_donation_referrals DESC, post_count DESC
+        LIMIT 1
+        """;
+
+    private const string TopDayOfWeekTacticalSql = """
+        SELECT
+            COALESCE(day_of_week, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS median_revenue_per_post_php,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(donation_referrals, 0))::numeric, 2) AS median_donation_referrals
+        FROM social_media_posts
+        GROUP BY COALESCE(day_of_week, 'Unknown')
+        HAVING COUNT(*) >= 5
+        ORDER BY median_revenue_per_post_php DESC, median_donation_referrals DESC, post_count DESC
+        LIMIT 1
+        """;
+
+    private const string TopTimeBucketTacticalSql = """
+        SELECT
+            CASE
+                WHEN COALESCE(post_hour, 0) BETWEEN 5 AND 10 THEN 'Morning (5am–11am)'
+                WHEN COALESCE(post_hour, 0) BETWEEN 11 AND 15 THEN 'Midday (11am–4pm)'
+                WHEN COALESCE(post_hour, 0) BETWEEN 16 AND 20 THEN 'Evening (4pm–9pm)'
+                ELSE 'Late night / early morning'
+            END AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS median_revenue_per_post_php,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(donation_referrals, 0))::numeric, 2) AS median_donation_referrals
+        FROM social_media_posts
+        GROUP BY 1
+        HAVING COUNT(*) >= 5
+        ORDER BY median_revenue_per_post_php DESC, median_donation_referrals DESC, post_count DESC
+        LIMIT 1
+        """;
+
+    private const string TopContentTopicTacticalSql = """
+        SELECT
+            COALESCE(content_topic, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(estimated_donation_value_php, 0))::numeric, 2) AS median_revenue_per_post_php,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(donation_referrals, 0))::numeric, 2) AS median_donation_referrals
+        FROM social_media_posts
+        GROUP BY COALESCE(content_topic, 'Unknown')
+        HAVING COUNT(*) >= 5
+        ORDER BY median_revenue_per_post_php DESC, median_donation_referrals DESC, post_count DESC
+        LIMIT 1
+        """;
+
+    private const string TopRecurringHashtagsTacticalSql = """
+        WITH exploded AS (
+            SELECT
+                LOWER(TRIM(tag)) AS label,
+                COALESCE(estimated_donation_value_php, 0) AS estimated_donation_value_php,
+                COALESCE(donation_referrals, 0) AS donation_referrals
+            FROM social_media_posts
+            CROSS JOIN LATERAL regexp_split_to_table(COALESCE(hashtags, ''), '\s*,\s*') AS tag
+            WHERE NULLIF(TRIM(tag), '') IS NOT NULL
+              AND NULLIF(TRIM(COALESCE(campaign_name, '')), '') IS NULL
+        )
+        SELECT
+            label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY estimated_donation_value_php)::numeric, 2) AS median_revenue_per_post_php,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY donation_referrals)::numeric, 2) AS median_donation_referrals
+        FROM exploded
+        GROUP BY label
+        HAVING COUNT(*) >= 20
+        ORDER BY median_revenue_per_post_php DESC, median_donation_referrals DESC, post_count DESC
+        LIMIT 4
+        """;
+
     // ── Public entry point ────────────────────────────────────────────────────
 
     public async Task<SocialChatContextSnapshot> BuildContextAsync(CancellationToken cancellationToken)
@@ -317,6 +397,8 @@ public sealed class SocialChatContextService(
             var validated = ReadStringArray(root, "validated_findings");
             var directional = ReadStringArray(root, "directional_findings");
             var dataGaps = ReadStringArray(root, "data_gaps");
+            var tacticalInsights = new List<SocialTacticalInsight>();
+            var recommendedHashtags = new List<string>();
 
             var recommendations = new List<StrategyRecommendation>();
             if (root.TryGetProperty("recommendations", out var recs) &&
@@ -336,11 +418,22 @@ public sealed class SocialChatContextService(
                 }
             }
 
+            var liveSocialInsights = await GetLiveSocialTacticalInsightsAsync(cancellationToken);
+            tacticalInsights.AddRange(liveSocialInsights.Insights);
+            recommendedHashtags.AddRange(liveSocialInsights.RecommendedHashtags);
+            dataGaps.AddRange(liveSocialInsights.DataGaps);
+
             if (validated.Count == 0)
                 validated.Add("No post-level findings are validated yet. Treat content guidance as directional until the pipeline is run on attributed post outcomes.");
 
             if (directional.Count == 0)
                 directional.Add("Track platform, CTA, timing, and attributed revenue per post so the analysis can move from hypothesis to evidence.");
+
+            if (tacticalInsights.Count > 0)
+            {
+                directional.AddRange(tacticalInsights.Select(insight =>
+                    $"{insight.Title}: {insight.Value}. {insight.Detail}"));
+            }
 
             if (recommendations.Count == 0)
             {
@@ -353,16 +446,112 @@ public sealed class SocialChatContextService(
             if (dataGaps.Count == 0)
                 dataGaps.Add("No explicit data gaps were returned by the post-strategy pipeline.");
 
+            if (recommendedHashtags.Count == 0)
+                recommendedHashtags.AddRange(FallbackRecommendedHashtags());
+
             return new PostStrategyInsightsSnapshot(
                 EvidenceStrength: evidenceStrength,
                 ValidatedFindings: validated,
                 DirectionalFindings: directional,
+                TacticalInsights: tacticalInsights,
+                RecommendedHashtags: recommendedHashtags
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
                 Recommendations: recommendations,
-                DataGaps: dataGaps);
+                DataGaps: dataGaps
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray());
         }
         catch
         {
             return FallbackPostStrategyInsights("Post-strategy pipeline is currently unavailable.");
+        }
+    }
+
+    private async Task<(IReadOnlyList<SocialTacticalInsight> Insights, IReadOnlyList<string> RecommendedHashtags, IReadOnlyList<string> DataGaps)>
+        GetLiveSocialTacticalInsightsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var conn = db.Database.GetDbConnection();
+            if (conn.State == ConnectionState.Closed)
+                await conn.OpenAsync(cancellationToken);
+
+            var insights = new List<SocialTacticalInsight>();
+            var recommendedHashtags = new List<string>();
+            var dataGaps = new List<string>();
+
+            var topPlatform = await conn.QuerySingleOrDefaultAsync<dynamic>(TopPlatformTacticalSql);
+            if (topPlatform is not null)
+            {
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-platform",
+                    Title: "Best platform",
+                    Value: (string)(topPlatform.label ?? "Unknown"),
+                    Detail: $"Typical post revenue is ₱{topPlatform.median_revenue_per_post_php:N0} with {topPlatform.median_donation_referrals:N1} donation referrals across {topPlatform.post_count} posts."));
+            }
+
+            var topDay = await conn.QuerySingleOrDefaultAsync<dynamic>(TopDayOfWeekTacticalSql);
+            if (topDay is not null)
+            {
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-day",
+                    Title: "Best day of week",
+                    Value: (string)(topDay.label ?? "Unknown"),
+                    Detail: $"Typical post revenue is ₱{topDay.median_revenue_per_post_php:N0} with {topDay.median_donation_referrals:N1} donation referrals across {topDay.post_count} posts."));
+            }
+
+            var topTime = await conn.QuerySingleOrDefaultAsync<dynamic>(TopTimeBucketTacticalSql);
+            if (topTime is not null)
+            {
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-time-bucket",
+                    Title: "Best posting window",
+                    Value: (string)(topTime.label ?? "Unknown"),
+                    Detail: $"Typical post revenue is ₱{topTime.median_revenue_per_post_php:N0} with {topTime.median_donation_referrals:N1} donation referrals across {topTime.post_count} posts."));
+            }
+
+            var topTopic = await conn.QuerySingleOrDefaultAsync<dynamic>(TopContentTopicTacticalSql);
+            if (topTopic is not null)
+            {
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-content-topic",
+                    Title: "Best content topic",
+                    Value: (string)(topTopic.label ?? "Unknown"),
+                    Detail: $"Typical post revenue is ₱{topTopic.median_revenue_per_post_php:N0} with {topTopic.median_donation_referrals:N1} donation referrals across {topTopic.post_count} posts."));
+            }
+
+            var hashtagRows = (await conn.QueryAsync<dynamic>(TopRecurringHashtagsTacticalSql)).ToList();
+            if (hashtagRows.Count > 0)
+            {
+                recommendedHashtags.AddRange(hashtagRows
+                    .Select(row => NormalizeHashtagForPrompt((string?)row.label))
+                    .Where(static tag => !string.IsNullOrWhiteSpace(tag)));
+
+                var hashtagSummary = string.Join(", ", hashtagRows.Select(row =>
+                {
+                    var label = NormalizeHashtagForPrompt((string?)row.label);
+                    var medianRevenue = Convert.ToDecimal(row.median_revenue_per_post_php ?? 0m);
+                    var postCount = Convert.ToInt32(row.post_count ?? 0);
+                    return $"{label} (₱{medianRevenue:N0}, n={postCount})";
+                }));
+
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-recurring-hashtags",
+                    Title: "Best recurring hashtags",
+                    Value: string.Join(' ', recommendedHashtags),
+                    Detail: $"Current recurring leaders are {hashtagSummary}."));
+            }
+            else
+            {
+                dataGaps.Add("No recurring hashtags currently meet the minimum post-count threshold for reliable ranking.");
+            }
+
+            return (insights, recommendedHashtags, dataGaps);
+        }
+        catch (Exception ex)
+        {
+            return ([], [], [$"Live social-post rankings unavailable: {ex.Message}"]);
         }
     }
 
@@ -382,6 +571,22 @@ public sealed class SocialChatContextService(
         return values;
     }
 
+    private static string NormalizeHashtagForPrompt(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var trimmed = value.Trim();
+        return trimmed.StartsWith('#') ? trimmed : $"#{trimmed}";
+    }
+
+    private static IReadOnlyList<string> FallbackRecommendedHashtags() =>
+    [
+        "#ebanhaven",
+        "#hopeforgirls",
+        "#traumainformedcare"
+    ];
+
     private static PostStrategyInsightsSnapshot FallbackPostStrategyInsights(string reason) => new(
         EvidenceStrength: $"Directional guidance only — {reason}",
         ValidatedFindings:
@@ -393,6 +598,15 @@ public sealed class SocialChatContextService(
             "Social media already contributes meaningful donor revenue, so content should stay tied to donation outcomes instead of being optimized only for reach or likes.",
             "Structured campaign-style posting is directionally stronger than sporadic standalone content in the current marketing analysis."
         ],
+        TacticalInsights:
+        [
+            new SocialTacticalInsight(
+                "best-posting-window",
+                "Best posting window",
+                "No live timing ranking available",
+                "Use this as a planning conversation starter only until live social-post rankings are available.")
+        ],
+        RecommendedHashtags: FallbackRecommendedHashtags(),
         Recommendations:
         [
             new StrategyRecommendation(

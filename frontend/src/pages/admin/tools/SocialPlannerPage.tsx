@@ -534,14 +534,6 @@ export function SocialPlannerPage() {
     [],
   )
 
-  async function sendToFacebook(post: PlannedSocialPost) {
-    await runLockedPlannedPostUpdate(
-      `facebook-${post.id}`,
-      'Failed to publish post.',
-      () => schedulePlannedSocialPostToFacebook(post.id),
-    )
-  }
-
   async function deletePost(id: number) {
     const key = `delete-${id}`
     setSavingIds((c) => new Set(c).add(key))

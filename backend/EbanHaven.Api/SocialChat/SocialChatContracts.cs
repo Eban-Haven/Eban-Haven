@@ -65,9 +65,17 @@ public sealed record StrategyRecommendation(
     string Title,
     string Detail);
 
+public sealed record SocialTacticalInsight(
+    string Key,
+    string Title,
+    string Value,
+    string Detail);
+
 public sealed record PostStrategyInsightsSnapshot(
     string EvidenceStrength,
     IReadOnlyList<string> ValidatedFindings,
     IReadOnlyList<string> DirectionalFindings,
+    IReadOnlyList<SocialTacticalInsight> TacticalInsights,
+    IReadOnlyList<string> RecommendedHashtags,
     IReadOnlyList<StrategyRecommendation> Recommendations,
     IReadOnlyList<string> DataGaps);

@@ -53,7 +53,7 @@ public sealed class OpenAISocialChatService(
                 .Select(static item => item.Text)
                 .Where(static text => !string.IsNullOrWhiteSpace(text)));
 
-        var structured = ParseStructuredReply(rawText, logger);
+        var structured = ApplyPostStrategyDefaults(ParseStructuredReply(rawText, logger), context);
         var message = BuildDisplayMessage(structured);
 
         return new SocialChatResponse(
@@ -97,6 +97,7 @@ public sealed class OpenAISocialChatService(
             - Generate post ideas in the postIdeas array.
             - Keep the planningSummary brief and lead with the recommendation first.
             - Use context data (top channels, campaign performance, causal effects, and postStrategyInsights) to inform platform, timing, CTA, and messaging angle.
+            - Include the strongest recommended hashtags from the current analysis unless the user explicitly asks for no hashtags.
             - Only ask clarifying questions if critical info is missing and it would significantly change the output.
 
             == USING LIVE PIPELINE DATA ==
@@ -106,6 +107,8 @@ public sealed class OpenAISocialChatService(
             - causalInsights.hypotheses → plausible but unvalidated hypotheses (label them clearly)
             - postStrategyInsights.validatedFindings → the strongest currently supported content, CTA, platform, and timing findings for post-level performance
             - postStrategyInsights.directionalFindings → useful but not fully validated post-level patterns; label them clearly as directional
+            - postStrategyInsights.tacticalInsights → current best platform/day/time/topic/hashtag rankings from the site's social media analytics; use these first for direct strategy questions
+            - postStrategyInsights.recommendedHashtags → strongest recurring hashtags from the current analysis; include 2-4 of these when they fit the post
             - postStrategyInsights.recommendations → concrete strategy rules that should shape generated content when they fit the user's request
             - postStrategyInsights.dataGaps → constraints that should reduce certainty and prevent overclaiming
             - If pipeline data is weak or unavailable, say so explicitly — never substitute generic advice without flagging it
@@ -182,6 +185,84 @@ public sealed class OpenAISocialChatService(
                 ],
                 Reasoning: [rawText.Trim()]);
         }
+    }
+
+    private static SocialChatStructuredReply ApplyPostStrategyDefaults(
+        SocialChatStructuredReply structured,
+        SocialChatContextSnapshot context)
+    {
+        if (structured.PostIdeas.Count == 0 || context.PostStrategyInsights.RecommendedHashtags.Count == 0)
+            return structured;
+
+        var recommended = context.PostStrategyInsights.RecommendedHashtags
+            .Select(NormalizeHashtag)
+            .Where(static tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (recommended.Length == 0)
+            return structured;
+
+        var updatedIdeas = structured.PostIdeas
+            .Select(idea => idea with { Hashtags = MergeHashtags(idea.Hashtags, recommended) })
+            .ToArray();
+
+        return structured with { PostIdeas = updatedIdeas };
+    }
+
+    private static IReadOnlyList<string> MergeHashtags(IReadOnlyList<string> existing, IReadOnlyList<string> recommended)
+    {
+        var existingNormalized = existing
+            .Select(NormalizeHashtag)
+            .Where(static tag => !string.IsNullOrWhiteSpace(tag))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var result = new List<string>();
+
+        foreach (var tag in existingNormalized.Take(2))
+            AddDistinct(result, tag);
+
+        foreach (var tag in recommended.Take(3))
+        {
+            if (result.Count >= 4)
+                break;
+
+            AddDistinct(result, tag);
+        }
+
+        foreach (var tag in existingNormalized.Skip(2))
+        {
+            if (result.Count >= 4)
+                break;
+
+            AddDistinct(result, tag);
+        }
+
+        if (result.Count == 0)
+        {
+            foreach (var tag in recommended.Take(3))
+                AddDistinct(result, tag);
+        }
+
+        return result;
+    }
+
+    private static void AddDistinct(List<string> target, string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag) || target.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            return;
+
+        target.Add(tag);
+    }
+
+    private static string NormalizeHashtag(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0)
+            return string.Empty;
+
+        return trimmed.StartsWith('#') ? trimmed : $"#{trimmed}";
     }
 
     private static string ExtractJson(string rawText)
