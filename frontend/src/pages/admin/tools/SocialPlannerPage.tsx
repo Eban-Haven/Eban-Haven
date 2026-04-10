@@ -5,7 +5,6 @@ import {
   Bell,
   Bot,
   CalendarClock,
-  CheckCheck,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -30,8 +29,6 @@ import {
   createPlannedSocialPosts,
   deletePlannedSocialPost,
   getPlannedSocialPosts,
-  patchPlannedSocialPostStatus,
-  requestSchedulePlannedSocialPost,
   schedulePlannedSocialPostToFacebook,
   updatePlannedSocialPost,
   type PlannedSocialPost,
@@ -1338,7 +1335,12 @@ export function SocialPlannerPage() {
                             <button
                               type="button"
                               className={`${btnPrimary} inline-flex items-center gap-1.5 px-3 py-2 text-xs disabled:opacity-50`}
-                              onClick={() => void sendToFacebook(post)}
+                              onClick={() =>
+                                void runLockedPlannedPostUpdate(
+                                  `facebook-${post.id}`,
+                                  'Failed to schedule to Facebook.',
+                                  () => schedulePlannedSocialPostToFacebook(post.id),
+                                )}
                               disabled={savingIds.has(`facebook-${post.id}`)}
                             >
                               {savingIds.has(`facebook-${post.id}`)
