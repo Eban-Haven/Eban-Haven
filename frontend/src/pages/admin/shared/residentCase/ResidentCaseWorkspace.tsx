@@ -30,8 +30,8 @@ import {
   type ResidentDetail,
   type SafehouseOption,
 } from '../../../../api/admin'
-import { alertError, btnPrimary, card, input, label, pageDesc, pageTitle } from '../adminStyles'
-import { BooleanBadge, CategoryBadge, ReintegrationBadge, RiskBadge, StatusBadge } from '../adminDataTable/AdminBadges'
+import { alertError, btnPrimary, input, label } from '../adminStyles'
+import { BooleanBadge, CategoryBadge, StatusBadge } from '../adminDataTable/AdminBadges'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 import { AdminDeleteModal } from '../adminDataTable/AdminDeleteModal'
 import { CASE_STATUSES, RISK_LEVELS, SEX_OPTIONS } from './caseConstants'
@@ -39,6 +39,7 @@ import { SimpleLineChart, SimpleMultiLineChart } from '../../dashboards/reports/
 import { EducationSection, HealthSection, HomeVisitDrawer, ProcessRecordingDrawer } from './CareProgressContent'
 import { PlansTabContent } from './PlansTabContent'
 import { SessionWorkflowDrawer } from './SessionWorkflowDrawer'
+import { ResidentCaseHeader } from './ResidentCaseHeader'
 import {
   buildTimelineItems,
   filterTimeline,
@@ -48,7 +49,20 @@ import {
   type TimelineKind,
   type WorkspaceQuickAction,
 } from './caseWorkspaceModel'
-import { CaseDrawer, EmptyState, ToggleField } from './caseUi'
+import {
+  ActivityActiveFilterChips,
+  ActivityAdvancedFiltersDrawer,
+  ActivityTabToolbar,
+  ActivityTimelineRow,
+  ALL_TIMELINE_KINDS,
+  activityAdvFiltersAreDefault,
+  draftFromApplied,
+  emptyActivityAdvDraft,
+  normalizeKindsForApply,
+  typesFilterChipLabel,
+  type ActivityFilterChip,
+} from './activityTimelineUi'
+import { CaseDrawer, EmptyState, SectionHeader, ToggleField } from './caseUi'
 import { deriveReadinessPrediction, deriveReadinessTier } from '../../../../components/ml/reintegrationReadinessShared'
 
 function gf(fields: Record<string, string>, ...keys: string[]): string {
@@ -256,6 +270,10 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const [tlConcerns, setTlConcerns] = useState(false)
   const [tlFollow, setTlFollow] = useState(false)
 
+  const [activityFilterDrawerOpen, setActivityFilterDrawerOpen] = useState(false)
+  const [activityFilterDraft, setActivityFilterDraft] = useState(emptyActivityAdvDraft)
+  const [activityAddMenuOpen, setActivityAddMenuOpen] = useState(false)
+
   const [createSig, setCreateSig] = useState({ education: 0, health: 0, plan: 0 })
   const [focusPlanId, setFocusPlanId] = useState<number | null>(null)
   const [expandedGoal, setExpandedGoal] = useState<GoalKey | null>(null)
@@ -344,6 +362,10 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const safehouseName = safehouses.find((item) => item.id === safehouseId)?.name ?? (safehouseId ? `Safehouse #${safehouseId}` : '—')
   const assignedWorker = gf(fields, 'assigned_social_worker', 'assignedSocialWorker')
   const admissionDate = gf(fields, 'date_of_admission', 'dateOfAdmission')
+  const caseControlNo = gf(fields, 'case_control_no', 'caseControlNo')
+  const caseCategory = gf(fields, 'case_category', 'caseCategory')
+  const presentAge = gf(fields, 'present_age', 'presentAge')
+  const lengthOfStay = gf(fields, 'length_of_stay', 'lengthOfStay')
 
   const latestHealth = useMemo(() => byNewestDate(hl, (row) => row.recordDate)[0] ?? null, [hl])
   const previousHealth = useMemo(() => byNewestDate(hl, (row) => row.recordDate)[1] ?? null, [hl])
@@ -483,6 +505,84 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       }),
     [timelineAll, timelineKinds, timelineFrom, timelineTo, timelineWorker, tlConcerns, tlFollow, timelineSearch],
   )
+
+  const activityAdvAppliedSnapshot = useMemo(
+    () => draftFromApplied(timelineFrom, timelineTo, timelineWorker, timelineKinds, tlFollow, tlConcerns),
+    [timelineFrom, timelineTo, timelineWorker, timelineKinds, tlFollow, tlConcerns],
+  )
+  const activityToolbarFiltersActive = !activityAdvFiltersAreDefault(activityAdvAppliedSnapshot)
+
+  const activityFilterChips = useMemo((): ActivityFilterChip[] => {
+    const chips: ActivityFilterChip[] = []
+    const q = timelineSearch.trim()
+    if (q) {
+      const short = q.length > 36 ? `${q.slice(0, 33)}…` : q
+      chips.push({ id: 'search', label: `Search: ${short}` })
+    }
+    if (timelineFrom || timelineTo) {
+      const fromL = timelineFrom ? formatAdminDate(timelineFrom) : '…'
+      const toL = timelineTo ? formatAdminDate(timelineTo) : '…'
+      chips.push({
+        id: 'dates',
+        label: timelineFrom && timelineTo ? `${fromL} – ${toL}` : timelineFrom ? `From ${fromL}` : `Until ${toL}`,
+      })
+    }
+    if (timelineWorker.trim()) {
+      chips.push({ id: 'worker', label: `Worker: ${timelineWorker.trim()}` })
+    }
+    const typeLabel = typesFilterChipLabel(timelineKinds)
+    if (typeLabel) chips.push({ id: 'types', label: typeLabel })
+    if (tlFollow) chips.push({ id: 'follow', label: 'Follow-up only' })
+    if (tlConcerns) chips.push({ id: 'flagged', label: 'Flagged only' })
+    return chips
+  }, [timelineSearch, timelineFrom, timelineTo, timelineWorker, timelineKinds, tlFollow, tlConcerns])
+
+  const openActivityFilterDrawer = useCallback(() => {
+    setActivityFilterDraft(draftFromApplied(timelineFrom, timelineTo, timelineWorker, timelineKinds, tlFollow, tlConcerns))
+    setActivityFilterDrawerOpen(true)
+  }, [timelineFrom, timelineTo, timelineWorker, timelineKinds, tlFollow, tlConcerns])
+
+  const applyActivityFilters = useCallback(() => {
+    const d = activityFilterDraft
+    const k = normalizeKindsForApply(d.kinds)
+    setTimelineFrom(d.dateFrom)
+    setTimelineTo(d.dateTo)
+    setTimelineWorker(d.worker)
+    setTimelineKinds(k)
+    setTlFollow(d.followOnly)
+    setTlConcerns(d.flaggedOnly)
+    setActivityFilterDrawerOpen(false)
+  }, [activityFilterDraft])
+
+  const clearActivityFilterDraft = useCallback(() => {
+    setActivityFilterDraft(emptyActivityAdvDraft())
+  }, [])
+
+  const removeActivityFilterChip = useCallback((id: string) => {
+    switch (id) {
+      case 'search':
+        setTimelineSearch('')
+        break
+      case 'dates':
+        setTimelineFrom('')
+        setTimelineTo('')
+        break
+      case 'worker':
+        setTimelineWorker('')
+        break
+      case 'types':
+        setTimelineKinds(new Set(ALL_TIMELINE_KINDS))
+        break
+      case 'follow':
+        setTlFollow(false)
+        break
+      case 'flagged':
+        setTlConcerns(false)
+        break
+      default:
+        break
+    }
+  }, [])
 
   const attentionItems = useMemo<AttentionItem[]>(() => {
     const items: AttentionItem[] = []
@@ -708,17 +808,16 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
     if (!readiness) return null
     const percent = Math.round(readiness.reintegration_probability * 100)
     const tier = deriveReadinessTier(readiness.reintegration_probability)
-    const label =
-      tier === 'High Readiness'
-        ? 'Approaching readiness'
-        : tier === 'Moderate Readiness'
-          ? 'Building readiness'
-          : 'Needs more support'
+    const label = percent >= 85 ? 'Ready' : percent >= 70 ? 'Approaching readiness' : percent >= 50 ? 'Needs support' : 'Not ready'
     return {
       percent,
       label,
       prediction: deriveReadinessPrediction(readiness.reintegration_probability),
       topImprovement: readiness.top_improvements[0]?.label ?? 'Maintain current support plan',
+      tone: (tier === 'High Readiness' ? 'success' : tier === 'Moderate Readiness' ? 'warning' : 'danger') as
+        | 'success'
+        | 'warning'
+        | 'danger',
     }
   }, [readiness])
 
@@ -838,6 +937,11 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
     if (item.ref.kind === 'incident') setDeleteIncidentId(item.ref.row.id)
   }
 
+  function bumpCreateFromActivityMenu(kind: (typeof ACTIVITY_TYPES)[number]['id']) {
+    setActivityAddMenuOpen(false)
+    bumpCreate(kind)
+  }
+
   if (!Number.isFinite(residentId) || residentId <= 0) {
     return <p className="text-destructive">Invalid resident.</p>
   }
@@ -871,50 +975,27 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           ← Residents
         </Link>
 
-        <div className={`${card} flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between`}>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className={pageTitle}>{internalCode}</h2>
-              {gf(fields, 'case_status', 'caseStatus') ? <StatusBadge status={gf(fields, 'case_status', 'caseStatus')} /> : null}
-              {gf(fields, 'current_risk_level', 'currentRiskLevel') ? <RiskBadge level={gf(fields, 'current_risk_level', 'currentRiskLevel')} /> : null}
-              {gf(fields, 'reintegration_type', 'reintegrationType') ? <CategoryBadge>{gf(fields, 'reintegration_type', 'reintegrationType')}</CategoryBadge> : null}
-              {gf(fields, 'reintegration_status', 'reintegrationStatus') ? <ReintegrationBadge value={gf(fields, 'reintegration_status', 'reintegrationStatus')} /> : null}
-            </div>
-            <p className={`${pageDesc} mt-2`}>
-              {safehouseName}
-              {' · '}
-              {assignedWorker || 'No worker assigned'}
-              {admissionDate ? ` · Admitted ${formatAdminDate(admissionDate)}` : ''}
-            </p>
-          </div>
-
-          <div className="relative flex flex-wrap gap-2 lg:justify-end">
-            <button type="button" className={btnPrimary} onClick={() => setAddMenuOpen((open) => !open)}>
-              Add
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
-              onClick={() => setSessionWorkflowOpen(true)}
-            >
-              Start session
-            </button>
-            {addMenuOpen ? (
-              <div className={`${card} absolute right-0 top-full z-40 mt-2 min-w-[15rem] space-y-1 py-2 shadow-lg`}>
-                {ACTIVITY_TYPES.map((activity) => (
-                  <button
-                    key={activity.id}
-                    type="button"
-                    className="block w-full px-4 py-2 text-left text-sm hover:bg-muted"
-                    onClick={() => bumpCreate(activity.id)}
-                  >
-                    {activity.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <ResidentCaseHeader
+          internalCode={internalCode}
+          caseStatus={gf(fields, 'case_status', 'caseStatus') || undefined}
+          currentRiskLevel={gf(fields, 'current_risk_level', 'currentRiskLevel') || undefined}
+          reintegrationType={gf(fields, 'reintegration_type', 'reintegrationType') || undefined}
+          reintegrationStatus={gf(fields, 'reintegration_status', 'reintegrationStatus') || undefined}
+          safehouseName={safehouseName}
+          assignedWorker={assignedWorker || undefined}
+          admissionLabel={admissionDate ? formatAdminDate(admissionDate) : undefined}
+          caseCategory={caseCategory || undefined}
+          caseControlNo={caseControlNo || undefined}
+          presentAge={presentAge || undefined}
+          lengthOfStay={lengthOfStay || undefined}
+          readiness={readinessSummary}
+          onOpenReadiness={() => navigate(`/admin/reintigration-readiness/${residentId}`)}
+          onToggleAddMenu={() => setAddMenuOpen((open) => !open)}
+          onStartSession={() => setSessionWorkflowOpen(true)}
+          addMenuOpen={addMenuOpen}
+          activityTypes={ACTIVITY_TYPES}
+          onSelectActivity={bumpCreate}
+        />
       </div>
 
       {error ? <div className={alertError}>{error}</div> : null}
@@ -1045,83 +1126,28 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
 
       {mainTab === 'activity' ? (
         <div className="space-y-6">
-          <div className={`${card} space-y-4`}>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label className={label}>
-                From
-                <input type="date" className={input} value={timelineFrom} onChange={(e) => setTimelineFrom(e.target.value)} />
-              </label>
-              <label className={label}>
-                To
-                <input type="date" className={input} value={timelineTo} onChange={(e) => setTimelineTo(e.target.value)} />
-              </label>
-              <label className={label}>
-                Worker
-                <input className={input} value={timelineWorker} onChange={(e) => setTimelineWorker(e.target.value)} placeholder="Search worker" />
-              </label>
-              <label className={label}>
-                Search
-                <input className={input} value={timelineSearch} onChange={(e) => setTimelineSearch(e.target.value)} placeholder="Keyword" />
-              </label>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              {(['process', 'visit', 'incident', 'education', 'health', 'plan'] as TimelineKind[]).map((kind) => (
-                <label key={kind} className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={timelineKinds.has(kind)}
-                    onChange={() => {
-                      setTimelineKinds((prev) => {
-                        const next = new Set(prev)
-                        if (next.has(kind)) next.delete(kind)
-                        else next.add(kind)
-                        return next
-                      })
-                    }}
-                  />
-                  {kind}
-                </label>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm text-foreground">
-                <input type="checkbox" checked={tlFollow} onChange={(e) => setTlFollow(e.target.checked)} />
-                Follow-up only
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-border px-3 py-1.5 text-sm text-foreground">
-                <input type="checkbox" checked={tlConcerns} onChange={(e) => setTlConcerns(e.target.checked)} />
-                Flagged only
-              </label>
-            </div>
-
-            <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-              {ACTIVITY_TYPES.map((activity) => (
-                <InlineActionButton key={activity.id} onClick={() => bumpCreate(activity.id)}>
-                  {activity.label}
-                </InlineActionButton>
-              ))}
-            </div>
-          </div>
-
-          <EducationSection
-            residentId={residentId}
-            rows={edu}
-            onReload={load}
-            openCreateSignal={createSig.education}
-            hideChrome
-            initialOpenRecordId={tlEduId}
-            onInitialOpenConsumed={() => setTlEduId(null)}
+          <ActivityTabToolbar
+            search={timelineSearch}
+            onSearchChange={setTimelineSearch}
+            onOpenFilters={openActivityFilterDrawer}
+            filtersActive={activityToolbarFiltersActive}
+            addMenuOpen={activityAddMenuOpen}
+            onToggleAddMenu={() => setActivityAddMenuOpen((open) => !open)}
+            onAddPick={bumpCreateFromActivityMenu}
+            addOptions={ACTIVITY_TYPES}
           />
-          <HealthSection
-            residentId={residentId}
-            rows={hl}
-            onReload={load}
-            openCreateSignal={createSig.health}
-            hideChrome
-            initialOpenRecordId={tlHealthId}
-            onInitialOpenConsumed={() => setTlHealthId(null)}
+
+          <ActivityActiveFilterChips chips={activityFilterChips} onRemove={removeActivityFilterChip} />
+
+          <ActivityAdvancedFiltersDrawer
+            open={activityFilterDrawerOpen}
+            onClose={() => setActivityFilterDrawerOpen(false)}
+            draft={activityFilterDraft}
+            setDraft={setActivityFilterDraft}
+            keywordSearch={timelineSearch}
+            onKeywordSearchChange={setTimelineSearch}
+            onApply={applyActivityFilters}
+            onClearDraft={clearActivityFilterDraft}
           />
 
           <div className="space-y-2">
@@ -1129,9 +1155,40 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
               <EmptyState title="No activity matches these filters" />
             ) : (
               timelineFiltered.map((item) => (
-                <TimelineRow key={item.key} item={item} onOpen={onTimelineSelect} onEdit={openTimelineEdit} onDelete={requestDeleteFromTimeline} />
+                <ActivityTimelineRow
+                  key={item.key}
+                  item={item}
+                  onOpen={onTimelineSelect}
+                  onEdit={openTimelineEdit}
+                  onDelete={requestDeleteFromTimeline}
+                />
               ))
             )}
+          </div>
+
+          <div className="space-y-4 border-t border-border pt-8">
+            <SectionHeader
+              title="Education & health records"
+              description="Open a row from the timeline above, or add and edit records here."
+            />
+            <EducationSection
+              residentId={residentId}
+              rows={edu}
+              onReload={load}
+              openCreateSignal={createSig.education}
+              hideChrome
+              initialOpenRecordId={tlEduId}
+              onInitialOpenConsumed={() => setTlEduId(null)}
+            />
+            <HealthSection
+              residentId={residentId}
+              rows={hl}
+              onReload={load}
+              openCreateSignal={createSig.health}
+              hideChrome
+              initialOpenRecordId={tlHealthId}
+              onInitialOpenConsumed={() => setTlHealthId(null)}
+            />
           </div>
         </div>
       ) : null}
@@ -2810,47 +2867,6 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
-    </div>
-  )
-}
-
-function TimelineRow({
-  item,
-  onOpen,
-  onEdit,
-  onDelete,
-}: {
-  item: TimelineItem
-  onOpen: (item: TimelineItem) => void
-  onEdit: (item: TimelineItem) => void
-  onDelete: (item: TimelineItem) => void
-}) {
-  const canDelete = item.ref.kind === 'process' || item.ref.kind === 'visit' || item.ref.kind === 'incident'
-  const editLabel = item.ref.kind === 'education' || item.ref.kind === 'health' || item.ref.kind === 'plan' ? 'Open' : 'Edit'
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-primary">{item.title}</span>
-            <span className="text-sm text-muted-foreground">{formatAdminDate(item.dateIso)}</span>
-            {item.worker ? <span className="text-sm text-muted-foreground">· {item.worker}</span> : null}
-          </div>
-          <p className="mt-2 text-sm text-foreground">{item.summary}</p>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {item.flags.map((flag) => (
-              <span key={flag.label} className={`rounded-full px-2 py-1 text-xs font-medium ${toneClass(flag.tone)}`}>
-                {flag.label}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <InlineActionButton onClick={() => onOpen(item)}>View</InlineActionButton>
-          <InlineActionButton onClick={() => onEdit(item)}>{editLabel}</InlineActionButton>
-          {canDelete ? <InlineActionButton onClick={() => onDelete(item)}>Delete</InlineActionButton> : null}
-        </div>
-      </div>
     </div>
   )
 }
