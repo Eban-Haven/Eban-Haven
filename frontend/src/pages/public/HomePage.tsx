@@ -210,7 +210,7 @@ export function HomePage() {
               <div className="overflow-hidden rounded-2xl shadow-2xl">
                 <img
                   src={IMAGES.mission}
-                  alt="Hands gently holding a paper origami crane, symbolizing hope and healing"
+                  alt="Young girls gathered together in a warm community setting, reflecting safety, support, and hope"
                   className="h-80 w-full object-cover lg:h-96"
                 />
               </div>
@@ -221,9 +221,12 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="bg-background py-20 lg:py-28">
+      <section className="relative overflow-hidden border-y border-border/60 bg-muted/30 py-20 lg:py-28">
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-primary/5 to-transparent" />
+        <div className="absolute -left-16 top-16 h-40 w-40 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute -right-20 bottom-10 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto mb-10 max-w-3xl text-center">
+          <div className="relative mx-auto mb-10 max-w-3xl text-center">
             <span className="text-xs font-semibold uppercase tracking-widest text-accent">Ghana focus</span>
             <h2 className="mt-3 font-heading text-3xl font-bold text-foreground lg:text-4xl">
               Women and girls in Ghana deserve safety and dignity
