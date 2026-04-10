@@ -408,7 +408,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         }
         if (string.IsNullOrWhiteSpace(row.InternalCode))
         {
-            row.InternalCode = $"R-{row.ResidentId:D4}";
+            row.InternalCode = $"LS-{row.ResidentId:D4}";
         }
         db.SaveChanges();
 
@@ -1373,7 +1373,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
     private string ResidentCode(int residentId)
     {
         var r = db.Residents.FirstOrDefault(x => x.ResidentId == residentId);
-        return r is null ? $"R-{residentId}" : r.InternalCode;
+        return r is null ? $"LS-{residentId}" : r.InternalCode;
     }
 
     private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s;

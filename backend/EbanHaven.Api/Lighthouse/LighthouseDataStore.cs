@@ -82,7 +82,7 @@ public sealed class LighthouseDataStore
     private string ResidentCode(int residentId)
     {
         var r = _residents.FirstOrDefault(x => GetInt(x, "resident_id") == residentId);
-        return r is null ? $"R-{residentId}" : GetStr(r, "internal_code");
+        return r is null ? $"LS-{residentId}" : GetStr(r, "internal_code");
     }
 
     private string SupporterName(int supporterId)
@@ -282,7 +282,7 @@ public sealed class LighthouseDataStore
                 row[k] = string.Empty;
             row["resident_id"] = next.ToString(CultureInfo.InvariantCulture);
             row["case_control_no"] = $"C{next:D4}";
-            row["internal_code"] = string.IsNullOrWhiteSpace(internalCode) ? $"R-{next:D4}" : internalCode.Trim();
+            row["internal_code"] = string.IsNullOrWhiteSpace(internalCode) ? $"LS-{next:D4}" : internalCode.Trim();
             row["safehouse_id"] = "1";
             row["case_status"] = caseStatus;
             row["case_category"] = string.IsNullOrWhiteSpace(caseCategory) ? "Surrendered" : caseCategory!;

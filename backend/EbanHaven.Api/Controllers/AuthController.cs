@@ -92,7 +92,7 @@ public sealed class AuthController(
                 DisplayName = body.DisplayName?.Trim() ?? email,
                 Email = email,
                 Region = body.Region?.Trim(),
-                Country = body.Country?.Trim() ?? "Philippines",
+                Country = string.IsNullOrWhiteSpace(body.Country) ? "Ghana" : body.Country.Trim(),
                 Status = "Active",
             });
         }
