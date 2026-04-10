@@ -39,7 +39,7 @@ const TIER_STYLES: Record<AtRiskDonor["risk_tier"], { badge: string; dot: string
 
 function ProbabilityBar({ probability }: { probability: number }) {
   const pct   = Math.round(probability * 100);
-  const color = probability >= 0.75 ? "bg-red-500"
+  const color = probability >= 0.85 ? "bg-red-500"
                : probability >= 0.55 ? "bg-amber-400"
                : "bg-sky-400";
   return (

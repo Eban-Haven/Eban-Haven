@@ -355,7 +355,7 @@ def _score_churn(features: DonorFeatures) -> DonorChurnResponse:
     prob = float(_churn_model.predict_proba(df)[0, 1])
 
     prediction = "At Risk" if prob >= threshold else "Stable"
-    risk_tier  = "High Risk" if prob >= 0.75 else ("Moderate Risk" if prob >= threshold else "Low Risk")
+    risk_tier  = "High Risk" if prob >= 0.85 else ("Moderate Risk" if prob >= threshold else "Low Risk")
 
     return DonorChurnResponse(
         supporter_id=features.supporter_id,
@@ -388,7 +388,7 @@ def predict_churn_batch(features_list: list[DonorFeatures]):
                 supporter_id=f.supporter_id,
                 churn_probability=round(float(p), 4),
                 prediction="At Risk" if float(p) >= _churn_meta["best_threshold"] else "Stable",
-                risk_tier="High Risk" if float(p) >= 0.75 else (
+                risk_tier="High Risk" if float(p) >= 0.85 else (
                     "Moderate Risk" if float(p) >= _churn_meta["best_threshold"] else "Low Risk"
                 ),
                 threshold_used=round(_churn_meta["best_threshold"], 4),
