@@ -1,1 +1,7 @@
 .claude/
+
+# macOS Finder junk
+.DS_Store
+
+# .NET publish output (do not commit build artifacts)
+**/publish/
