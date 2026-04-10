@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { alertError, card } from '../shared/adminStyles'
+import { alertError } from '../shared/adminStyles'
 import {
   createDonation,
   getDonations,
@@ -237,42 +237,14 @@ export function DonorDetailPage() {
             </div>
           </div>
 
-          <div className={`${card} space-y-5`}>
-            <div>
-              <h3 className="text-base font-semibold text-foreground">Metrics layout preview</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Both versions are shown here so we can compare them on the actual donor page before choosing one.
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Option A · Card stats</p>
-                <div className="mt-3">
-                  <DonorMetricsRow
-                    variant="cards"
-                    lifetimeTotal={metrics.totalMonetary}
-                    donationCount={metrics.donationCount}
-                    averageGift={metrics.averageGift}
-                    lastDonationLabel={metrics.last ? new Date(metrics.last.donationDate).toLocaleDateString() : '—'}
-                    lastDonationType={metrics.last?.donationType ?? ''}
-                  />
-                </div>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Option B · Inline row</p>
-                <div className="mt-3">
-                  <DonorMetricsRow
-                    variant="line"
-                    lifetimeTotal={metrics.totalMonetary}
-                    donationCount={metrics.donationCount}
-                    averageGift={metrics.averageGift}
-                    lastDonationLabel={metrics.last ? new Date(metrics.last.donationDate).toLocaleDateString() : '—'}
-                    lastDonationType={metrics.last?.donationType ?? ''}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <DonorMetricsRow
+            variant="cards"
+            lifetimeTotal={metrics.totalMonetary}
+            donationCount={metrics.donationCount}
+            averageGift={metrics.averageGift}
+            lastDonationLabel={metrics.last ? new Date(metrics.last.donationDate).toLocaleDateString() : '—'}
+            lastDonationType={metrics.last?.donationType ?? ''}
+          />
 
           <DonationPanel
             donations={donations}

@@ -9,7 +9,6 @@ import {
   LineChart,
   LogOut,
   Mail,
-  Menu,
   PanelLeftClose,
   PanelLeft,
   Star,
@@ -222,16 +221,6 @@ export function AdminLayout() {
           sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64'
         }`}
       >
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 lg:px-6">
-          <button
-            type="button"
-            className="rounded-lg p-2 text-muted-foreground hover:bg-muted lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        </header>
         <main className="flex-1 bg-background p-4 lg:p-8">
           <Outlet />
         </main>
