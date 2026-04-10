@@ -587,6 +587,25 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             .Select(g => new { SafehouseId = g.Key, Count = g.Count() })
             .ToDictionary(x => x.SafehouseId, x => x.Count);
 
+        // Per-safehouse education/health from resident records (preferred). Monthly metrics table is often empty.
+        var activeResidentQuery = db.Residents.Where(r => r.CaseStatus.ToLower() == "active");
+
+        var eduBySh = db.EducationRecords
+            .Where(e => e.ProgressPercent != null)
+            .Join(activeResidentQuery, e => e.ResidentId, r => r.ResidentId, (e, r) => new { r.SafehouseId, Val = e.ProgressPercent!.Value })
+            .GroupBy(x => x.SafehouseId)
+            .Select(g => new { g.Key, Avg = g.Average(x => x.Val) })
+            .ToList()
+            .ToDictionary(x => x.Key, x => x.Avg);
+
+        var hlBySh = db.HealthWellbeingRecords
+            .Where(h => h.GeneralHealthScore != null)
+            .Join(activeResidentQuery, h => h.ResidentId, r => r.ResidentId, (h, r) => new { r.SafehouseId, Val = h.GeneralHealthScore!.Value })
+            .GroupBy(x => x.SafehouseId)
+            .Select(g => new { g.Key, Avg = g.Average(x => x.Val) })
+            .ToList()
+            .ToDictionary(x => x.Key, x => x.Avg);
+
         var perf = db.Safehouses
             .Where(s => s.Status.ToLower() == "active")
             .ToList()
@@ -595,14 +614,16 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
                 var cap = Math.Max(s.CapacityGirls, 1);
                 var lm = latestMonth.FirstOrDefault(x => x.SafehouseId == s.SafehouseId);
                 var activeResidents = activeResidentsBySafehouse.GetValueOrDefault(s.SafehouseId, 0);
+                double? edu = eduBySh.TryGetValue(s.SafehouseId, out var eAvg) ? Math.Round(eAvg, 1) : lm?.AvgEducationProgress;
+                double? hl = hlBySh.TryGetValue(s.SafehouseId, out var hAvg) ? Math.Round(hAvg, 2) : lm?.AvgHealthScore;
                 return new SafehousePerformanceDto(
                     s.SafehouseId,
                     s.Name,
                     activeResidents,
                     cap,
                     Math.Round(100.0 * s.CurrentOccupancy / cap, 1),
-                    lm?.AvgEducationProgress,
-                    lm?.AvgHealthScore);
+                    edu,
+                    hl);
             })
             .OrderBy(x => x.SafehouseId)
             .ToList();

@@ -30,6 +30,36 @@ function formatMonthLabel(month: string) {
   return date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
 }
 
+function parseYearMonth(m: string): { y: number; mon: number } | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(m.trim())
+  if (!match) return null
+  return { y: Number(match[1]), mon: Number(match[2]) }
+}
+
+function formatYearMonth(y: number, mon: number) {
+  return `${y}-${String(mon).padStart(2, '0')}`
+}
+
+/** Every calendar month from start through end (inclusive), in order. */
+function expandMonthRangeInclusive(startKey: string, endKey: string): string[] {
+  const a = parseYearMonth(startKey)
+  const b = parseYearMonth(endKey)
+  if (!a || !b) return []
+  const out: string[] = []
+  let y = a.y
+  let mon = a.mon
+  const endOrd = b.y * 100 + b.mon
+  while (y * 100 + mon <= endOrd) {
+    out.push(formatYearMonth(y, mon))
+    mon += 1
+    if (mon > 12) {
+      mon = 1
+      y += 1
+    }
+  }
+  return out
+}
+
 function innerPanelClassName(extra = '') {
   return `rounded-lg border border-border bg-muted/15 p-4 ${extra}`.trim()
 }
@@ -39,6 +69,7 @@ export function ReportsPage() {
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [donationTrendWindow, setDonationTrendWindow] = useState<'all' | '36' | '24' | '12'>('all')
 
   useEffect(() => {
     let cancelled = false
@@ -63,13 +94,36 @@ export function ReportsPage() {
     }
   }, [])
 
-  const donationTrends = useMemo(() => reports?.donationTrends.slice(-12) ?? [], [reports])
-  const latestTrend = donationTrends[donationTrends.length - 1]
-  const previousTrend = donationTrends[donationTrends.length - 2]
-  const changePercent =
-    latestTrend && previousTrend && previousTrend.monetaryTotalPhp > 0
-      ? ((latestTrend.monetaryTotalPhp - previousTrend.monetaryTotalPhp) / previousTrend.monetaryTotalPhp) * 100
-      : null
+  const sortedRawDonationTrends = useMemo(
+    () => [...(reports?.donationTrends ?? [])].sort((a, b) => a.month.localeCompare(b.month)),
+    [reports?.donationTrends],
+  )
+
+  const changePercent = useMemo(() => {
+    if (sortedRawDonationTrends.length < 2) return null
+    const latest = sortedRawDonationTrends[sortedRawDonationTrends.length - 1]
+    const prev = sortedRawDonationTrends[sortedRawDonationTrends.length - 2]
+    if (prev.monetaryTotalPhp <= 0) return null
+    return ((latest.monetaryTotalPhp - prev.monetaryTotalPhp) / prev.monetaryTotalPhp) * 100
+  }, [sortedRawDonationTrends])
+
+  const latestTrend = sortedRawDonationTrends[sortedRawDonationTrends.length - 1]
+
+  const donationTrendsFull = useMemo(() => {
+    const raw = reports?.donationTrends ?? []
+    if (raw.length === 0) return []
+    const sorted = [...raw].sort((a, b) => a.month.localeCompare(b.month))
+    const map = new Map(raw.map((t) => [t.month, t]))
+    const months = expandMonthRangeInclusive(sorted[0].month, sorted[sorted.length - 1].month)
+    return months.map((month) => map.get(month) ?? { month, monetaryTotalPhp: 0, donationCount: 0 })
+  }, [reports?.donationTrends])
+
+  const donationTrends = useMemo(() => {
+    if (donationTrendsFull.length === 0) return []
+    if (donationTrendWindow === 'all') return donationTrendsFull
+    const n = Number(donationTrendWindow)
+    return donationTrendsFull.slice(-n)
+  }, [donationTrendsFull, donationTrendWindow])
 
   if (loading) return <p className="text-sm text-muted-foreground">Loading reports…</p>
 
@@ -78,6 +132,10 @@ export function ReportsPage() {
   }
 
   const maxTrend = Math.max(...donationTrends.map((t) => t.monetaryTotalPhp), 1)
+  const trendRangeLabel =
+    donationTrendsFull.length > 0
+      ? `${formatMonthLabel(donationTrendsFull[0].month)} – ${formatMonthLabel(donationTrendsFull[donationTrendsFull.length - 1].month)}`
+      : null
   const strongestSafehouse = [...reports.safehousePerformance].sort(
     (a, b) =>
       (b.avgEducationProgress ?? 0) + (b.avgHealthScore ?? 0) - ((a.avgEducationProgress ?? 0) + (a.avgHealthScore ?? 0)),
@@ -169,26 +227,71 @@ export function ReportsPage() {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_14rem]">
-            <div className={innerPanelClassName()}>
-              <div className="flex h-64 items-end gap-2 sm:gap-3">
-                {donationTrends.map((trend) => {
-                  const height = `${Math.max((trend.monetaryTotalPhp / maxTrend) * 100, 8)}%`
-                  return (
-                    <div key={trend.month} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-                      <div className="relative flex h-full w-full items-end">
-                        <div
-                          className={`w-full rounded-t-md ${RPT.teal}`}
-                          style={{ height }}
-                          title={`${trend.month}: ${formatUsd(trend.monetaryTotalPhp)}`}
-                        />
-                      </div>
-                      <span className="font-sans text-[10px] font-medium text-muted-foreground sm:text-[11px]">
-                        {formatMonthLabel(trend.month)}
-                      </span>
-                    </div>
-                  )
-                })}
+            <div className={innerPanelClassName('space-y-3')}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {trendRangeLabel ? (
+                    <>
+                      Full series <span className="font-medium text-foreground">{trendRangeLabel}</span>
+                      {donationTrendWindow !== 'all' ? (
+                        <span className="text-muted-foreground"> · showing last {donationTrendWindow} months</span>
+                      ) : null}
+                    </>
+                  ) : null}
+                </p>
+                <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
+                  {(
+                    [
+                      ['all', 'All'],
+                      ['36', '36 mo'],
+                      ['24', '24 mo'],
+                      ['12', '12 mo'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setDonationTrendWindow(key)}
+                      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                        donationTrendWindow === key
+                          ? 'bg-card text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
+              {donationTrends.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No monetary donation months in the dataset yet.</p>
+              ) : (
+                <div className="overflow-x-auto pb-1">
+                  <div className="inline-flex items-stretch gap-1.5 sm:gap-2">
+                    {donationTrends.map((trend) => {
+                      const frac = maxTrend > 0 ? trend.monetaryTotalPhp / maxTrend : 0
+                      const barPct = Math.max(frac * 100, trend.monetaryTotalPhp > 0 ? 5 : 1)
+                      return (
+                        <div key={trend.month} className="flex h-64 w-8 shrink-0 flex-col sm:w-9">
+                          <div className="flex min-h-0 flex-1 flex-col justify-end">
+                            <div
+                              className={`min-h-[3px] w-full rounded-t-md ${RPT.teal} ${trend.monetaryTotalPhp <= 0 ? 'opacity-40' : ''}`}
+                              style={{ height: `${barPct}%` }}
+                              title={`${trend.month}: ${formatUsd(trend.monetaryTotalPhp)} · ${trend.donationCount} gifts`}
+                            />
+                          </div>
+                          <span className="mt-1.5 block min-h-[2.25rem] text-center text-[9px] font-medium leading-tight text-muted-foreground sm:text-[10px]">
+                            {formatMonthLabel(trend.month)}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Months with no gifts appear as short markers so the timeline stays continuous from first to last donation month.
+              </p>
             </div>
 
             <div className="space-y-3">

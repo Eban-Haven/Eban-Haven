@@ -9,13 +9,15 @@ import {
   ClipboardList,
   FileText,
   GitBranch,
+  GraduationCap,
   Heart,
+  HeartPulse,
   Home,
   Mail,
+  ShieldAlert,
   TrendingUp,
   Users,
   Video,
-  Waypoints,
 } from 'lucide-react'
 import {
   getDashboard,
@@ -28,7 +30,6 @@ import {
 import {
   alertError,
   card,
-  linkTile,
   pageDesc,
   pageTitle,
   statCardInner,
@@ -36,14 +37,6 @@ import {
   statCardValue,
 } from '../shared/adminStyles'
 import { formatUsd } from '../../../utils/currency'
-
-/** Bar accents — same donut palette as Reports & resident Goals */
-const RPT = {
-  teal: 'bg-[#3D6D66] dark:bg-[#4f8f86]',
-  navy: 'bg-[#2D424D] dark:bg-[#4a6670]',
-  ochre: 'bg-[#E09E4E] dark:bg-[#c88a42]',
-  peach: 'bg-[#E8A87C] dark:bg-[#d09068]',
-} as const
 
 function listRowShell(extra = '') {
   return `rounded-lg border border-border bg-muted/15 px-3 py-2 text-sm ${extra}`.trim()
@@ -72,7 +65,7 @@ function KpiCard({
           {sub && <p className={statCardSub}>{sub}</p>}
         </div>
         <div className="shrink-0 rounded-lg bg-muted/50 p-2">
-          <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+          <Icon className="h-4 w-4 text-primary" aria-hidden />
         </div>
       </div>
     </div>
@@ -91,7 +84,7 @@ function SafehouseBar({
   capacity: number
 }) {
   const pct = capacity > 0 ? Math.round((occupancy / capacity) * 100) : 0
-  const barClass = pct >= 90 ? 'bg-destructive' : pct >= 70 ? RPT.ochre : RPT.teal
+  const barClass = pct >= 90 ? 'bg-destructive' : pct >= 70 ? 'bg-accent' : 'bg-primary'
   return (
     <li className="space-y-1">
       <div className="flex items-center justify-between text-sm">
@@ -111,13 +104,17 @@ function SafehouseBar({
   )
 }
 
-const quickActions = [
-  { label: 'Add resident', icon: Users, to: '/admin/residents' },
-  { label: 'Add donor', icon: Heart, to: '/admin/donors' },
-  { label: 'Log session', icon: FileText, to: '/admin/process-recordings' },
-  { label: 'Home visit', icon: Home, to: '/admin/home-visitations' },
-  { label: 'Email donors', icon: Mail, to: '/admin/email-hub' },
-  { label: 'Reports', icon: BarChart3, to: '/admin/reports' },
+const quickActions: { id: string; label: string; icon: React.ElementType; to: string }[] = [
+  { id: 'add-resident', label: 'Add resident', icon: Users, to: '/admin/residents?new=1' },
+  { id: 'add-donor', label: 'Add donor', icon: Heart, to: '/admin/donors?new=1' },
+  { id: 'log-session', label: 'Log session', icon: FileText, to: '/admin/process-recordings?new=1' },
+  { id: 'record-home-visit', label: 'Record home visit', icon: Home, to: '/admin/home-visitations?new=1' },
+  { id: 'add-education', label: 'Add education record', icon: GraduationCap, to: '/admin/residents?pickFor=education' },
+  { id: 'add-health', label: 'Add health report', icon: HeartPulse, to: '/admin/residents?pickFor=health' },
+  { id: 'add-incident', label: 'Add incident report', icon: ShieldAlert, to: '/admin/residents?pickFor=incident' },
+  { id: 'add-plan', label: 'Add intervention plan', icon: ClipboardList, to: '/admin/residents?pickFor=plan' },
+  { id: 'email-donors', label: 'Email donors', icon: Mail, to: '/admin/email-hub' },
+  { id: 'reports', label: 'Reports', icon: BarChart3, to: '/admin/reports' },
 ]
 
 function daysUntil(dateStr: string | null): number | null {
@@ -205,13 +202,13 @@ export function AdminDashboardPage() {
         <h2 className={pageTitle}>Admin Dashboard</h2>
         <p className={pageDesc}>Live overview of operations — residents, donors, conferences, and outcomes.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {quickActions.map(({ label, icon: Icon, to }) => (
+          {quickActions.map(({ id, label, icon: Icon, to }) => (
             <Link
-              key={to}
+              key={id}
               to={to}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:bg-muted/40"
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-medium text-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-muted/50"
             >
-              <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
               {label}
             </Link>
           ))}
@@ -223,34 +220,34 @@ export function AdminDashboardPage() {
           label="Active residents"
           value={String(data.activeResidentsTotal)}
           sub={`across ${data.safehouses.length} safehouse${data.safehouses.length === 1 ? '' : 's'}`}
-          accentClass={RPT.teal}
+          accentClass="bg-primary"
           icon={Users}
         />
         <KpiCard
           label="Monetary gifts (30 d)"
           value={formatUsd(data.monetaryDonationsLast30DaysPhp)}
-          accentClass={RPT.ochre}
+          accentClass="bg-accent"
           icon={Heart}
         />
         <KpiCard
           label="Reintegration success"
           value={`${data.reintegration.successRatePercent}%`}
           sub={`${data.reintegration.completedCount} completed · ${data.reintegration.inProgressCount} in progress`}
-          accentClass={RPT.navy}
+          accentClass="bg-foreground/55"
           icon={TrendingUp}
         />
         <KpiCard
           label="Process recordings"
           value={String(data.processRecordingsCount)}
           sub="all-time sessions"
-          accentClass={RPT.peach}
+          accentClass="bg-primary/45"
           icon={ClipboardList}
         />
         <KpiCard
           label="Home & field visits"
           value={String(data.homeVisitationsLast90Days)}
           sub="last 90 days"
-          accentClass={RPT.teal}
+          accentClass="bg-accent/70"
           icon={Video}
         />
       </div>
@@ -258,7 +255,7 @@ export function AdminDashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <Home className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <Home className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             Safehouse occupancy
           </h3>
           {data.safehouses.length === 0 ? (
@@ -274,7 +271,7 @@ export function AdminDashboardPage() {
 
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <CalendarDays className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             Upcoming case conferences
             {conferencesSorted.length > 0 && <span className={badgeMuted}>{conferencesSorted.length}</span>}
           </h3>
@@ -293,7 +290,7 @@ export function AdminDashboardPage() {
                       isUrgent
                         ? 'border-l-destructive/60 bg-destructive/5'
                         : isSoon
-                          ? 'border-l-[#E09E4E] bg-[#E09E4E]/8 dark:bg-[#E09E4E]/10'
+                          ? 'border-l-accent bg-accent/10'
                           : 'border-l-border bg-muted/15'
                     } rounded-r-lg rounded-tl-sm`}
                   >
@@ -307,7 +304,7 @@ export function AdminDashboardPage() {
                             isUrgent
                               ? 'bg-destructive/10 text-destructive'
                               : isSoon
-                                ? 'bg-[#E09E4E]/15 text-[#8b5a1a] dark:text-[#ebb866]'
+                                ? 'bg-accent/20 text-foreground'
                                 : 'bg-muted text-muted-foreground'
                           }`}
                         >
@@ -370,10 +367,10 @@ export function AdminDashboardPage() {
 
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <CheckCircle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <CheckCircle className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             Reintegration pipeline
             {reintegrationReady.length > 0 && (
-              <span className={`${RPT.teal} ml-auto rounded-full px-2 py-0.5 text-xs font-semibold text-white`}>
+              <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
                 {reintegrationReady.length}
               </span>
             )}
@@ -394,7 +391,7 @@ export function AdminDashboardPage() {
                         {r.lengthOfStay ? ` · ${r.lengthOfStay}` : ''}
                       </p>
                     </div>
-                    <span className="rounded-full bg-[#3D6D66]/12 px-2 py-0.5 text-xs font-semibold text-[#2a524d] dark:bg-[#3D6D66]/25 dark:text-[#a8d4cc]">
+                    <span className="rounded-full bg-primary/12 px-2 py-0.5 text-xs font-semibold text-primary">
                       {r.reintegrationStatus}
                     </span>
                   </div>
@@ -417,10 +414,10 @@ export function AdminDashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <GitBranch className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             Donors at churn risk
             {atRiskDonors.length > 0 && (
-              <span className={`${RPT.ochre} ml-auto rounded-full px-2 py-0.5 text-xs font-semibold text-white`}>
+              <span className="ml-auto rounded-full bg-accent/20 px-2 py-0.5 text-xs font-semibold text-foreground">
                 {atRiskDonors.length}
               </span>
             )}
@@ -440,7 +437,7 @@ export function AdminDashboardPage() {
                       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                         d.risk_tier === 'High Risk'
                           ? 'bg-destructive/10 text-destructive'
-                          : 'bg-[#E09E4E]/15 text-[#8b5a1a] dark:text-[#ebb866]'
+                          : 'bg-accent/15 text-foreground'
                       }`}
                     >
                       {Math.round(d.churn_probability * 100)}% churn
@@ -457,7 +454,7 @@ export function AdminDashboardPage() {
 
         <div className={card}>
           <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <Heart className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            <Heart className="h-4 w-4 shrink-0 text-primary" aria-hidden />
             Recent contributions
           </h3>
           {data.recentDonations.length === 0 ? (
@@ -485,60 +482,6 @@ export function AdminDashboardPage() {
           )}
           <Link to="/admin/donors" className="mt-4 flex items-center gap-1 text-xs font-medium text-primary hover:underline">
             View all supporters <ArrowRight className="h-3 w-3" aria-hidden />
-          </Link>
-        </div>
-      </div>
-
-      <div>
-        <h3 className="mb-3 text-base font-semibold text-foreground">All tools</h3>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          <Link to="/admin/donors" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <Heart className="h-4 w-4" aria-hidden /> Supporters & gifts
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/donor-pipeline" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4" aria-hidden /> Donor tools
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/email-hub" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <Mail className="h-4 w-4" aria-hidden /> Donor Outreach
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/residents" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <ClipboardList className="h-4 w-4" aria-hidden /> Residents
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/resident-pipeline" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <Waypoints className="h-4 w-4" aria-hidden /> Resident tools
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/home-visitations" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <Video className="h-4 w-4" aria-hidden /> Home visitations
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/process-recordings" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <FileText className="h-4 w-4" aria-hidden /> Process recordings
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
-          </Link>
-          <Link to="/admin/reports" className={linkTile}>
-            <span className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" aria-hidden /> Reports
-            </span>
-            <ArrowRight className="h-4 w-4 opacity-70" aria-hidden />
           </Link>
         </div>
       </div>

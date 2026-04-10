@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   alertError,
   btnPrimary,
@@ -69,6 +69,7 @@ function emptyFilters() {
 
 export function ProcessRecordingsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [residents, setResidents] = useState<ResidentSummary[]>([])
   const [rows, setRows] = useState<ProcessRecording[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -114,6 +115,14 @@ export function ProcessRecordingsPage() {
   useEffect(() => {
     void loadAll()
   }, [loadAll])
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    setShowNew(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     if (!showNew || residents.length === 0) return

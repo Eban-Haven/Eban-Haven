@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   alertError,
   btnPrimary,
@@ -52,6 +52,7 @@ function emptyDonorFilters() {
 
 export function DonorsAdminPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<Supporter[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,6 +91,14 @@ export function DonorsAdminPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    setAddOpen(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const regionOptions = useMemo(() => uniqSortedStrings(rows.map((r) => r.region)), [rows])
   const statusOptions = useMemo(() => uniqSortedStrings(rows.map((r) => r.status)), [rows])

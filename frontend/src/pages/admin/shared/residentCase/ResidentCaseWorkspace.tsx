@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   createIncidentReport,
@@ -233,7 +233,16 @@ function toneClass(tone: 'danger' | 'warning' | 'default' | 'success') {
   return 'border border-[#D1D5DB] bg-[#F3F4F6] text-[#4B5563]'
 }
 
-export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
+export type ResidentWorkspaceQuickAdd = 'education' | 'health' | 'incident' | 'plan'
+
+export function ResidentCaseWorkspace({
+  residentId,
+  initialQuickAdd,
+}: {
+  residentId: number
+  /** From `/admin/residents/:id?add=education` etc. Opens the matching create flow once. */
+  initialQuickAdd?: ResidentWorkspaceQuickAdd | null
+}) {
   const navigate = useNavigate()
   const [mainTab, setMainTab] = useState<MainWorkspaceTab>('overview')
   const [detail, setDetail] = useState<ResidentDetail | null>(null)
@@ -839,6 +848,35 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       setCreateSig((state) => ({ ...state, health: state.health + 1 }))
     }
   }
+
+  const quickAddAppliedRef = useRef(false)
+  useEffect(() => {
+    quickAddAppliedRef.current = false
+  }, [residentId])
+
+  useEffect(() => {
+    if (!initialQuickAdd || quickAddAppliedRef.current) return
+    quickAddAppliedRef.current = true
+    if (initialQuickAdd === 'education') {
+      setMainTab('activity')
+      setCreateSig((s) => ({ ...s, education: s.education + 1 }))
+      return
+    }
+    if (initialQuickAdd === 'health') {
+      setMainTab('activity')
+      setCreateSig((s) => ({ ...s, health: s.health + 1 }))
+      return
+    }
+    if (initialQuickAdd === 'incident') {
+      setIncidentDrawer({ mode: 'create', row: null })
+      setMainTab('activity')
+      return
+    }
+    if (initialQuickAdd === 'plan') {
+      setMainTab('plans')
+      setCreateSig((s) => ({ ...s, plan: s.plan + 1 }))
+    }
+  }, [initialQuickAdd, residentId])
 
   function runWorkspaceAction(action: WorkspaceQuickAction) {
     switch (action.kind) {

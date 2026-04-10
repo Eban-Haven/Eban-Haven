@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   alertError,
   btnPrimary,
@@ -59,6 +59,15 @@ const sexOptions = ['F', 'M'] as const
 const reintegrationStatuses = ['In Progress', 'Completed', 'On Hold', 'Not Started'] as const
 const reintegrationTypes = ['Family Reunification', 'Independent Living', 'Foster Care', 'Shelter Extension'] as const
 const riskOptions = ['Low', 'Medium', 'High', 'Critical'] as const
+
+const PICK_FOR_RECORD = new Set(['education', 'health', 'incident', 'plan'])
+
+const pickForLabels: Record<string, string> = {
+  education: 'an education record',
+  health: 'a health & wellbeing record',
+  incident: 'an incident report',
+  plan: 'an intervention plan',
+}
 
 type ResidentFormState = {
   safehouse_id: string
@@ -461,6 +470,7 @@ function ResidentProfileForm({
 
 export function ResidentsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [rows, setRows] = useState<ResidentSummary[]>([])
   const [safehouses, setSafehouses] = useState<Awaited<ReturnType<typeof getSafehouses>>>([])
   const [error, setError] = useState<string | null>(null)
@@ -497,6 +507,23 @@ export function ResidentsPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const pickForParam = searchParams.get('pickFor')
+  const pickFor =
+    pickForParam && PICK_FOR_RECORD.has(pickForParam) ? (pickForParam as 'education' | 'health' | 'incident' | 'plan') : null
+
+  useEffect(() => {
+    if (loading || searchParams.get('new') !== '1') return
+    setFormMode('add')
+    setEditingResidentId(null)
+    setResidentForm(blankResidentForm(safehouses[0]?.id))
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    setSearchParams(next, { replace: true })
+    requestAnimationFrame(() =>
+      document.getElementById('resident-profile-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    )
+  }, [loading, searchParams, safehouses, setSearchParams])
 
   const safehouseOptions = useMemo(
     () => safehouses.map((s) => ({ id: s.id, label: `${s.name} (${s.code})` })),
@@ -686,6 +713,13 @@ export function ResidentsPage() {
 
       {error && <div className={alertError}>{error}</div>}
 
+      {pickFor ? (
+        <div className="rounded-lg border border-primary/25 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          <span className="font-medium">Add {pickForLabels[pickFor] ?? 'a record'}:</span>{' '}
+          choose a resident below to open their case file — the right form will open automatically.
+        </div>
+      ) : null}
+
       <AdminListToolbar
         searchValue={q}
         onSearchChange={setQ}
@@ -824,7 +858,13 @@ export function ResidentsPage() {
               </tr>
             ) : (
               filteredSorted.map((r) => (
-                <tr key={r.id} className={`${tableRowHover} cursor-pointer`} onClick={() => navigate(`/admin/residents/${r.id}`)}>
+                <tr
+                  key={r.id}
+                  className={`${tableRowHover} cursor-pointer`}
+                  onClick={() =>
+                    navigate(pickFor ? `/admin/residents/${r.id}?add=${pickFor}` : `/admin/residents/${r.id}`)
+                  }
+                >
                   <td className="pl-3 pr-2 py-2.5" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} aria-label={`Select ${r.internalCode}`} />
                   </td>

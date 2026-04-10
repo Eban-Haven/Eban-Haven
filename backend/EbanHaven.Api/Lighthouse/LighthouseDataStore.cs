@@ -809,6 +809,41 @@ public sealed class LighthouseDataStore
                 .Select(g => g.OrderByDescending(x => x.Start).First())
                 .ToList();
 
+            var residentSafehouse = _residents
+                .Where(r => GetStr(r, "case_status").Equals("Active", StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(r => GetInt(r, "resident_id"), r => GetInt(r, "safehouse_id"));
+
+            var eduLists = new Dictionary<int, List<double>>();
+            foreach (var e in _educationRecords)
+            {
+                var rid = GetInt(e, "resident_id");
+                if (!residentSafehouse.TryGetValue(rid, out var sh)) continue;
+                if (!double.TryParse(GetStr(e, "progress_percent"), NumberStyles.Any, CultureInfo.InvariantCulture, out var v)) continue;
+                if (!eduLists.TryGetValue(sh, out var list))
+                {
+                    list = [];
+                    eduLists[sh] = list;
+                }
+                list.Add(v);
+            }
+
+            var hlLists = new Dictionary<int, List<double>>();
+            foreach (var h in _healthRecords)
+            {
+                var rid = GetInt(h, "resident_id");
+                if (!residentSafehouse.TryGetValue(rid, out var sh)) continue;
+                if (!double.TryParse(GetStr(h, "general_health_score"), NumberStyles.Any, CultureInfo.InvariantCulture, out var v)) continue;
+                if (!hlLists.TryGetValue(sh, out var list))
+                {
+                    list = [];
+                    hlLists[sh] = list;
+                }
+                list.Add(v);
+            }
+
+            var eduAvgBySh = eduLists.ToDictionary(kv => kv.Key, kv => kv.Value.Average());
+            var hlAvgBySh = hlLists.ToDictionary(kv => kv.Key, kv => kv.Value.Average());
+
             var perf = _safehouses
                 .Where(s => GetStr(s, "status").Equals("Active", StringComparison.OrdinalIgnoreCase))
                 .Select(s =>
@@ -817,6 +852,8 @@ public sealed class LighthouseDataStore
                     var occ = GetInt(s, "current_occupancy");
                     var cap = Math.Max(GetInt(s, "capacity_girls"), 1);
                     var lm = latestMonth.FirstOrDefault(x => x.Sh == id);
+                    double? edu = eduAvgBySh.TryGetValue(id, out var eAvg) ? Math.Round(eAvg, 1) : lm?.Edu;
+                    double? hl = hlAvgBySh.TryGetValue(id, out var hAvg) ? Math.Round(hAvg, 2) : lm?.Hl;
                     return new SafehousePerformanceDto(
                         id,
                         GetStr(s, "name"),
@@ -825,8 +862,8 @@ public sealed class LighthouseDataStore
                             GetStr(r, "case_status").Equals("Active", StringComparison.OrdinalIgnoreCase)),
                         cap,
                         Math.Round(100.0 * occ / cap, 1),
-                        lm?.Edu,
-                        lm?.Hl);
+                        edu,
+                        hl);
                 })
                 .OrderBy(x => x.SafehouseId)
                 .ToList();
