@@ -93,6 +93,8 @@ type CurrentStateCard = {
 type GoalCardData = {
   key: GoalKey
   label: string
+  /** Shown under the progress ring on the Plans tab. */
+  ringTitle: string
   target: number
   current: number | null
   currentLabel: string
@@ -359,6 +361,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       health: {
         key: 'health',
         label: 'Health goal',
+        ringTitle: 'Physical Health',
         target: latestHealthPlan?.targetValue ?? 4.2,
         current: latestHealth?.healthScore ?? null,
         currentLabel: scoreLabel(latestHealth?.healthScore ?? null),
@@ -368,6 +371,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       education: {
         key: 'education',
         label: 'Education goal',
+        ringTitle: 'Education',
         target: latestEducationPlan?.targetValue ?? 0.85,
         current: latestEducation?.attendanceRate ?? null,
         currentLabel: attendanceLabel(latestEducation?.attendanceRate ?? null),
@@ -377,6 +381,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       safety: {
         key: 'safety',
         label: 'Safety goal',
+        ringTitle: 'Safety',
         target: latestSafetyPlan?.targetValue ?? 4.2,
         current: safetyScore,
         currentLabel: scoreLabel(safetyScore),
@@ -1155,6 +1160,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                     <ProgressRing label={goal.label} progress={percentage(goal.current, goal.target)}>
                       <div className="text-xl font-semibold tabular-nums text-foreground">{goal.currentLabel}</div>
                     </ProgressRing>
+                    <h3 className="mt-3 text-center text-base font-semibold text-foreground">{goal.ringTitle}</h3>
                   </button>
                 ))}
               </div>
