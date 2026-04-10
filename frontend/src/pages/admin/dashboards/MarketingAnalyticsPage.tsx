@@ -22,6 +22,13 @@ function pct(n: number) {
   return `${n.toFixed(1)}%`
 }
 
+function prettyLabel(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+}
+
 const SOCIAL_WINDOW_OPTIONS = [
   { value: 'all', label: 'All Time' },
   { value: 'day', label: 'Today' },
@@ -46,7 +53,7 @@ function CampaignRevenueChart({ campaigns }: { campaigns: CampaignPerformance[] 
         <div key={c.campaignName} className="group flex items-center gap-4">
           {/* Label */}
           <div className="w-36 shrink-0 text-right">
-            <span className="text-sm text-foreground">{c.campaignName}</span>
+            <span className="text-sm text-foreground">{prettyLabel(c.campaignName)}</span>
             <span className="block text-xs text-muted-foreground">{c.donationCount} gifts</span>
           </div>
 
@@ -100,7 +107,7 @@ function ChannelRevenueChart({ channels }: { channels: ChannelAttribution[] }) {
         <div key={ch.channelSource} className="group flex items-center gap-4">
           {/* Label */}
           <div className="w-36 shrink-0 text-right">
-            <span className="text-sm text-foreground">{ch.channelSource}</span>
+            <span className="text-sm text-foreground">{prettyLabel(ch.channelSource)}</span>
             <span className="block text-xs text-muted-foreground">{ch.uniqueDonors} donors</span>
           </div>
 
