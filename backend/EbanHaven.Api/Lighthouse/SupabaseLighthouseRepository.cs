@@ -11,6 +11,8 @@ namespace EbanHaven.Api.Lighthouse;
 public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthouseRepository
 {
     private static readonly ConcurrentDictionary<string, HashSet<string>> ColumnCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, Dictionary<string, (string DataType, string UdtName)>> ColumnTypeCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly Regex CamelBoundaryRegex = new("(?<!^)([A-Z])", RegexOptions.Compiled);
 
     /// <summary>Coerce incoming instants to UTC before persisting (JSON often uses <see cref="DateTimeKind.Unspecified"/>).</summary>
@@ -299,6 +301,7 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         if (patch.Count == 0) return true;
 
         var columns = GetColumns("residents");
+        var types = GetColumnTypes("residents");
         var pairs = new List<(string Col, string? Val)>();
         foreach (var (k, v) in patch)
         {
@@ -310,9 +313,42 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
 
         if (pairs.Count == 0) return true;
 
+        static string CastType(string dataType, string udtName)
+        {
+            // information_schema.columns.data_type values are verbose; normalize to a safe cast type.
+            return dataType.ToLowerInvariant() switch
+            {
+                "integer" => "integer",
+                "bigint" => "bigint",
+                "smallint" => "smallint",
+                "numeric" => "numeric",
+                "real" => "real",
+                "double precision" => "double precision",
+                "boolean" => "boolean",
+                "date" => "date",
+                "timestamp with time zone" => "timestamptz",
+                "timestamp without time zone" => "timestamp",
+                "uuid" => "uuid",
+                // Treat all strings as text for casting.
+                "text" => "text",
+                "character varying" => "text",
+                "character" => "text",
+                // Postgres enums / custom types show as USER-DEFINED; use udt_name.
+                "user-defined" => udtName,
+                _ => "text",
+            };
+        }
+
         using var cmd = db.Database.GetDbConnection().CreateCommand();
         if (cmd.Connection!.State != ConnectionState.Open) cmd.Connection.Open();
-        cmd.CommandText = $"update public.residents set {string.Join(", ", pairs.Select((p, i) => $"{p.Col} = @p{i}"))} where resident_id = @id";
+        var setClause = string.Join(", ", pairs.Select((p, i) =>
+        {
+            var t = types.TryGetValue(p.Col, out var meta)
+                ? CastType(meta.DataType, meta.UdtName)
+                : "text";
+            return $"{p.Col} = cast(@p{i} as {t})";
+        }));
+        cmd.CommandText = $"update public.residents set {setClause} where resident_id = @id";
         var idParam = cmd.CreateParameter();
         idParam.ParameterName = "id";
         idParam.Value = id;
@@ -321,7 +357,8 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
         {
             var p = cmd.CreateParameter();
             p.ParameterName = $"p{i}";
-            p.Value = pairs[i].Val is null ? DBNull.Value : pairs[i].Val;
+            // Normalize empty strings to NULL for patch semantics + type casting safety.
+            p.Value = string.IsNullOrWhiteSpace(pairs[i].Val) ? DBNull.Value : pairs[i].Val!.Trim();
             cmd.Parameters.Add(p);
         }
 
@@ -1393,6 +1430,31 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             while (reader.Read())
                 set.Add(reader.GetString(0));
             return set;
+        });
+    }
+
+    private Dictionary<string, (string DataType, string UdtName)> GetColumnTypes(string table)
+    {
+        return ColumnTypeCache.GetOrAdd(table, _ =>
+        {
+            using var cmd = db.Database.GetDbConnection().CreateCommand();
+            if (cmd.Connection!.State != ConnectionState.Open) cmd.Connection.Open();
+            cmd.CommandText =
+                "select column_name, data_type, udt_name from information_schema.columns where table_schema = 'public' and table_name = @t";
+            var p = cmd.CreateParameter();
+            p.ParameterName = "t";
+            p.Value = table;
+            cmd.Parameters.Add(p);
+            using var reader = cmd.ExecuteReader();
+            var dict = new Dictionary<string, (string DataType, string UdtName)>(StringComparer.OrdinalIgnoreCase);
+            while (reader.Read())
+            {
+                var name = reader.GetString(0);
+                var dataType = reader.IsDBNull(1) ? "text" : reader.GetString(1);
+                var udtName = reader.IsDBNull(2) ? "text" : reader.GetString(2);
+                dict[name] = (dataType, udtName);
+            }
+            return dict;
         });
     }
 
