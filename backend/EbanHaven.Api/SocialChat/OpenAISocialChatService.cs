@@ -85,13 +85,17 @@ public sealed class OpenAISocialChatService(
 
             QUESTION / ADVICE (user asks about strategy, timing, channels, analysis, "what works", "when is best", "which channel", "should I", "how do I", etc.):
             - Answer the question DIRECTLY and CONCISELY in planningSummary.
+            - Default to a SHORT answer: 2 short paragraphs max, or 3 bullets max when bullets are clearer.
+            - Keep planningSummary under 120 words unless the user explicitly asks for detail.
             - ALWAYS reference specific numbers from the context snapshot when available (channel revenue, donor counts, causal effect sizes, R² values).
             - Clearly label what is statistically validated (causalInsights.insights) vs. hypothesis (causalInsights.hypotheses) vs. general best practice.
             - Set postIdeas to an EMPTY array []. Do NOT generate posts.
+            - Leave captions, timingRecommendations, ctaRecommendations, confidenceNotes, and reasoning EMPTY unless they are necessary to answer the user well.
             - Do not pad the answer with unnecessary post ideas — the user asked a question, not for content.
 
             CONTENT REQUEST (user says "write", "create", "draft", "give me posts", "generate", "plan content", "make me", etc.):
             - Generate post ideas in the postIdeas array.
+            - Keep the planningSummary brief and lead with the recommendation first.
             - Use context data (top channels, campaign performance, causal effects, and postStrategyInsights) to inform platform, timing, CTA, and messaging angle.
             - Only ask clarifying questions if critical info is missing and it would significantly change the output.
 
@@ -228,15 +232,6 @@ public sealed class OpenAISocialChatService(
             sb.AppendLine("Here are a few social content directions to review:");
             foreach (var idea in structured.PostIdeas.Take(3))
                 sb.AppendLine($"- {idea.Title}: {idea.WhyItFits}");
-        }
-
-        if (structured.ConfidenceNotes.Count > 0)
-        {
-            if (sb.Length > 0)
-                sb.AppendLine();
-            sb.AppendLine("Confidence notes:");
-            foreach (var note in structured.ConfidenceNotes.Take(3))
-                sb.AppendLine($"- {note.Label}: {note.Detail}");
         }
 
         if (sb.Length == 0 && structured.Reasoning.Count > 0)
