@@ -31,6 +31,7 @@ import { BooleanBadge, CategoryBadge, ReintegrationBadge, RiskBadge, StatusBadge
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 import { AdminDeleteModal } from '../adminDataTable/AdminDeleteModal'
 import { CASE_STATUSES, RISK_LEVELS, SEX_OPTIONS } from './caseConstants'
+import { SimpleLineChart } from '../../dashboards/reports/ChartCard'
 import { EducationSection, HealthSection, HomeVisitDrawer, ProcessRecordingDrawer } from './CareProgressContent'
 import { PlansTabContent } from './PlansTabContent'
 import { SessionWorkflowDrawer } from './SessionWorkflowDrawer'
@@ -1119,14 +1120,12 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                     }`}
                   >
                     <ProgressRing label={goal.label} progress={percentage(goal.current, goal.target)}>
-                      <div className="text-xl font-semibold tabular-nums text-foreground">{goal.currentLabel}</div>
-                      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Current</div>
+                      <div className="text-lg font-semibold tabular-nums text-foreground">{goal.currentLabel}</div>
                     </ProgressRing>
                     <div className="mt-4 flex items-center justify-between gap-3">
-                      <p className="text-sm text-muted-foreground">Target {goal.targetLabel}</p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{goal.label.replace(' goal', '')}</p>
                       <TrendBadge trend={currentStateCards[goal.key].trend} />
                     </div>
-                    <p className="mt-2 line-clamp-2 text-sm text-foreground">{goal.detail}</p>
                   </button>
                 ))}
               </div>
@@ -1595,7 +1594,7 @@ function ProgressRing({ label, progress, children }: { label: string; progress: 
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - normalized / 100)
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col items-center text-center">
       <div className="relative h-16 w-16 shrink-0">
         <svg viewBox="0 0 52 52" className="h-16 w-16 -rotate-90">
           <circle cx="26" cy="26" r={radius} fill="none" stroke="currentColor" strokeOpacity="0.14" strokeWidth="4" />
@@ -1614,10 +1613,8 @@ function ProgressRing({ label, progress, children }: { label: string; progress: 
         </svg>
         <div className="absolute inset-0 grid place-items-center text-center">{children}</div>
       </div>
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{Math.round(normalized)}% of target</p>
-      </div>
+      <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
+      <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">{Math.round(normalized)}% of target</p>
     </div>
   )
 }
@@ -1695,16 +1692,20 @@ function GoalDrillIn({
   onOpenIncident: (row: JsonTableRow) => void
   onOpenVisit: (row: HomeVisitation) => void
 }) {
+  if (goal === 'health') {
+    return (
+      <HealthGoalDrillIn
+        data={data}
+        healthRows={healthRows}
+        relatedPlan={relatedPlan}
+        onAddHealth={onAddHealth}
+        onOpenHealth={onOpenHealth}
+      />
+    )
+  }
+
   const rows =
-    goal === 'health'
-      ? byNewestDate(healthRows, (row) => row.recordDate).slice(0, 3).map((row) => ({
-          key: `h-${row.id}`,
-          title: formatAdminDate(row.recordDate),
-          body: row.notes || 'Health record',
-          meta: row.healthScore != null ? `Score ${row.healthScore}` : 'No score',
-          onOpen: () => onOpenHealth(row.id),
-        }))
-      : goal === 'education'
+    goal === 'education'
         ? byNewestDate(educationRows, (row) => row.recordDate).slice(0, 3).map((row) => ({
             key: `e-${row.id}`,
             title: formatAdminDate(row.recordDate),
@@ -1766,12 +1767,196 @@ function GoalDrillIn({
         )}
       </div>
       <div className="flex flex-wrap gap-2">
-        {goal === 'health' ? <InlineActionButton onClick={onAddHealth}>Add health record</InlineActionButton> : null}
         {goal === 'education' ? <InlineActionButton onClick={onAddEducation}>Add education record</InlineActionButton> : null}
         {goal === 'safety' ? <InlineActionButton onClick={onLogIncident}>Log incident</InlineActionButton> : null}
       </div>
     </div>
   )
+}
+
+function HealthGoalDrillIn({
+  data,
+  healthRows,
+  relatedPlan,
+  onAddHealth,
+  onOpenHealth,
+}: {
+  data: GoalCardData
+  healthRows: HealthRecord[]
+  relatedPlan: InterventionPlan | null
+  onAddHealth: () => void
+  onOpenHealth: (id: number) => void
+}) {
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const sortedRows = byNewestDate(healthRows, (row) => row.recordDate)
+  const latest = sortedRows[0] ?? null
+  const selected = sortedRows.find((row) => row.id === selectedId) ?? latest
+
+  const chartPoints = sortedRows
+    .slice()
+    .reverse()
+    .map((row) => ({
+      label: new Date(row.recordDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      value: row.healthScore ?? 0,
+    }))
+    .filter((row) => Number.isFinite(row.value))
+
+  const latestAppointmentChips = [
+    latest?.dentalCheckupDone ? { label: 'Last dental', row: latest } : null,
+    latest?.medicalCheckupDone ? { label: 'Last medical', row: latest } : null,
+    latest?.psychologicalCheckupDone ? { label: 'Last psych', row: latest } : null,
+  ].filter(Boolean) as { label: string; row: HealthRecord }[]
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-5 lg:grid-cols-[1.4fr_0.8fr]">
+        <div className="rounded-xl border border-border bg-background px-4 py-4">
+          <p className="text-sm font-semibold text-foreground">Health</p>
+          {chartPoints.length > 0 ? (
+            <div className="mt-4">
+              <SimpleLineChart
+                points={chartPoints}
+                formatY={(n) => n.toFixed(1)}
+                height={220}
+                ariaLabel="Health score trend"
+              />
+            </div>
+          ) : (
+            <EmptyState title="No health scores yet" />
+          )}
+        </div>
+
+        <div className="rounded-xl border border-border bg-muted/20 px-4 py-4">
+          <p className="text-sm font-semibold text-foreground">Latest recap</p>
+          {latest ? (
+            <div className="mt-3 space-y-2 text-sm">
+              <p className="font-medium text-foreground">{formatAdminDate(latest.recordDate)}</p>
+              <p className="text-muted-foreground">Overall score {data.currentLabel}</p>
+              <div className="grid gap-2">
+                <MiniMetric label="Weight" value={latest.weightKg != null ? `${latest.weightKg} kg` : '—'} />
+                <MiniMetric label="Height" value={latest.heightCm != null ? `${latest.heightCm} cm` : '—'} />
+                <MiniMetric label="BMI" value={latest.bmi != null ? latest.bmi.toFixed(1) : '—'} />
+                <MiniMetric label="Nutrition" value={latest.nutritionScore != null ? latest.nutritionScore.toFixed(1) : '—'} />
+                <MiniMetric label="Sleep" value={latest.sleepQualityScore != null ? latest.sleepQualityScore.toFixed(1) : '—'} />
+                <MiniMetric label="Energy" value={latest.energyLevelScore != null ? latest.energyLevelScore.toFixed(1) : '—'} />
+                <MiniMetric label="General health" value={latest.healthScore != null ? latest.healthScore.toFixed(1) : '—'} />
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">No health record yet.</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        {latestAppointmentChips.length > 0 ? (
+          latestAppointmentChips.map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              onClick={() => setSelectedId(chip.row.id)}
+              className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+                selected?.id === chip.row.id ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'
+              }`}
+            >
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">{chip.label}</p>
+              <p className="mt-1 text-sm font-medium text-foreground">{formatAdminDate(chip.row.recordDate)}</p>
+            </button>
+          ))
+        ) : (
+          <span className="text-sm text-muted-foreground">No recent appointment dates recorded.</span>
+        )}
+      </div>
+
+      {selected ? (
+        <div className="rounded-xl border border-border bg-muted/20 px-4 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">{formatAdminDate(selected.recordDate)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{healthStatusLabel(selected.notes)}</p>
+            </div>
+            <InlineActionButton onClick={() => onOpenHealth(selected.id)}>Open full record</InlineActionButton>
+          </div>
+          {selected.notes ? <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{selected.notes}</p> : null}
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm font-semibold text-foreground">Appointment notes</p>
+          <InlineActionButton onClick={onAddHealth}>Add health record</InlineActionButton>
+        </div>
+        {relatedPlan ? (
+          <div className="rounded-xl bg-muted/20 px-4 py-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <CategoryBadge>{relatedPlan.planCategory}</CategoryBadge>
+              <StatusBadge status={relatedPlan.status} />
+            </div>
+            <p className="mt-2 text-sm text-foreground">{relatedPlan.planDescription}</p>
+          </div>
+        ) : null}
+        {sortedRows.length === 0 ? (
+          <EmptyState title="No appointments yet" />
+        ) : (
+          sortedRows.map((row) => (
+            <button
+              key={row.id}
+              type="button"
+              onClick={() => setSelectedId((value) => (value === row.id ? null : row.id))}
+              className="w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/30"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-foreground">{formatAdminDate(row.recordDate)}</span>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    Score {row.healthScore != null ? row.healthScore.toFixed(1) : '—'}
+                  </span>
+                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    {healthStatusLabel(row.notes)}
+                  </span>
+                </div>
+                <span className="text-sm text-muted-foreground">{selectedId === row.id ? 'Hide' : 'Open'}</span>
+              </div>
+              {selectedId === row.id ? (
+                <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <MiniMetric label="Nutrition" value={row.nutritionScore != null ? row.nutritionScore.toFixed(1) : '—'} />
+                    <MiniMetric label="Sleep" value={row.sleepQualityScore != null ? row.sleepQualityScore.toFixed(1) : '—'} />
+                    <MiniMetric label="Energy" value={row.energyLevelScore != null ? row.energyLevelScore.toFixed(1) : '—'} />
+                    <MiniMetric label="BMI" value={row.bmi != null ? row.bmi.toFixed(1) : '—'} />
+                    <MiniMetric label="Dental" value={row.dentalCheckupDone ? 'Done' : '—'} />
+                    <MiniMetric label="Medical" value={row.medicalCheckupDone ? 'Done' : '—'} />
+                    <MiniMetric label="Psych" value={row.psychologicalCheckupDone ? 'Done' : '—'} />
+                  </div>
+                  <div className="rounded-lg bg-muted/20 px-4 py-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Notes</p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{row.notes || 'No notes recorded.'}</p>
+                  </div>
+                </div>
+              ) : null}
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
+    </div>
+  )
+}
+
+function healthStatusLabel(notes: string | null | undefined): string {
+  const value = (notes ?? '').trim()
+  if (!value) return 'No status'
+  const firstLine = value.split('\n')[0]?.trim() ?? ''
+  const firstSentence = firstLine.split('.').find(Boolean)?.trim() ?? firstLine
+  return firstSentence.length > 28 ? `${firstSentence.slice(0, 28)}…` : firstSentence
 }
 
 function TimelineRow({
