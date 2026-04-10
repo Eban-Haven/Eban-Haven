@@ -453,6 +453,10 @@ export function LoginPage() {
                 onError={setError}
                 onCredential={completeGoogleAuth}
               />
+              <p className="text-center text-xs text-muted-foreground">
+                First time here? Switch to <strong>Register</strong> and use &quot;Sign up with Google&quot; to create your donor
+                account—then you can use Google on Sign in.
+              </p>
             </form>
           ) : (
             <form onSubmit={onRegister} className="space-y-6" noValidate>
