@@ -16,7 +16,7 @@ import {
   type Supporter,
 } from '../../../api/admin'
 import { PUBLIC_CONTACT, SITE_DISPLAY_NAME } from '../../../site'
-import { alertError, btnPrimary, card, input, label, pageDesc, pageTitle, sectionFormTitle } from '../shared/adminStyles'
+import { alertError, btnPrimary, card, input, label, pageDesc, pageTitle } from '../shared/adminStyles'
 import { formatUsd } from '../../../utils/currency'
 
 const toneOptions = ['Warm', 'Direct', 'Celebratory', 'Re-engagement'] as const
