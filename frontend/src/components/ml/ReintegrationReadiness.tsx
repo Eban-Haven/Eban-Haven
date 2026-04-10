@@ -4,6 +4,7 @@ import {
   deriveReadinessPrediction,
   deriveReadinessTier,
   formatFeatureValue,
+  normalizeImprovementLabel,
   type ImprovementArea,
   type ReintegrationResult,
   READINESS_READY_THRESHOLD,
@@ -57,7 +58,7 @@ function ImprovementCard({ area, rank }: { area: ImprovementArea; rank: number }
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-gray-800">{area.label}</span>
+          <span className="text-xs font-semibold text-gray-800">{normalizeImprovementLabel(area.label)}</span>
           <div className="flex items-center gap-1.5 text-[11px] shrink-0">
             <span className="text-red-600 font-medium">
               {isLowerBetter && area.resident_value > area.benchmark_value ? '▲ ' : '▼ '}

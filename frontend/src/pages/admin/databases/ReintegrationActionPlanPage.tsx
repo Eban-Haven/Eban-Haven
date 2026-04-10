@@ -36,6 +36,7 @@ import {
   deriveReadinessPrediction,
   deriveReadinessTier,
   formatFeatureValue,
+  normalizeImprovementLabel,
   type ImprovementArea,
   type ReintegrationResult,
 } from '../../../components/ml/reintegrationReadinessShared'
@@ -1315,7 +1316,7 @@ export function ReintegrationActionPlanPage() {
                         <span className={`mt-1 h-2.5 w-2.5 rounded-full ${priorityAccent}`} />
                         <div>
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Priority {index + 1}</p>
-                          <h3 className="mt-1 text-base font-semibold text-foreground">{area.label}</h3>
+                          <h3 className="mt-1 text-base font-semibold text-foreground">{normalizeImprovementLabel(area.label)}</h3>
                         </div>
                       </div>
                       <div className="text-right text-xs text-muted-foreground">

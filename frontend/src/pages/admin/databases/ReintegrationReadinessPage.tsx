@@ -6,6 +6,7 @@ import {
   deriveReadinessPrediction,
   deriveReadinessTier,
   formatFeatureValue,
+  normalizeImprovementLabel,
   type ReintegrationResult,
   TIER_CONFIG,
   topImprovementLabel,
@@ -366,7 +367,7 @@ export function ReintegrationReadinessPage() {
                           <td className="px-3 py-3 align-top">
                             {topArea ? (
                               <div>
-                                <p className="font-medium text-foreground">{topArea.label}</p>
+                                <p className="font-medium text-foreground">{normalizeImprovementLabel(topArea.label)}</p>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                   {formatFeatureValue(topArea.feature, topArea.resident_value)} vs benchmark{' '}
                                   {formatFeatureValue(topArea.feature, topArea.benchmark_value)}

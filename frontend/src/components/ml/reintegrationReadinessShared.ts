@@ -79,8 +79,12 @@ export function formatFeatureValue(feature: string, value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)
 }
 
+export function normalizeImprovementLabel(label: string): string {
+  return label.replace(/\bProgramme\b/g, 'Program')
+}
+
 export function topImprovementLabel(result: ReintegrationResult): string {
-  return result.top_improvements[0]?.label ?? 'Maintain current support plan'
+  return normalizeImprovementLabel(result.top_improvements[0]?.label ?? 'Maintain current support plan')
 }
 
 export function deriveReadinessTier(probability: number): ReintegrationResult['risk_tier'] {
