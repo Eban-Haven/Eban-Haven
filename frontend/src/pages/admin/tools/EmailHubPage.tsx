@@ -347,12 +347,9 @@ export function EmailHubPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className={`${pageTitle} flex items-center gap-2`}>
-          <MailPlus className="h-7 w-7 text-primary" />
-          Donor Outreach
-        </h2>
+    <div className="space-y-6">
+      <div className="border-l-4 border-primary pl-4">
+        <h2 className={pageTitle}>Donor Outreach</h2>
         <p className={pageDesc}>
           Review donor history, generate a tailored outreach email, and open a ready-to-send draft from the admin tools area.
         </p>
@@ -364,7 +361,10 @@ export function EmailHubPage() {
         <aside className={`${card} space-y-4 self-start`}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className={sectionFormTitle}>Donors</p>
+              <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <MailPlus className="h-4 w-4 text-primary" />
+                Donors
+              </p>
               <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 {atRiskMap.size > 0 && (
                   <span className="flex items-center gap-1 font-medium text-red-600">
@@ -445,13 +445,13 @@ export function EmailHubPage() {
                     key={supporter.id}
                     className={`rounded-xl border p-3 transition-colors ${
                       selected
-                        ? 'border-primary/50 bg-primary/10'
+                        ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20'
                         : isHigh
-                          ? 'border-red-200 bg-red-50/60 hover:bg-red-50'
+                          ? 'border-red-200 bg-red-50/50 hover:bg-red-50/80'
                           : isMod
-                            ? 'border-amber-200 bg-amber-50/60 hover:bg-amber-50'
+                            ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50/80'
                             : upgrade
-                              ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50'
+                              ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70'
                               : 'border-border bg-background hover:border-primary/30 hover:bg-muted/40'
                     }`}
                   >
@@ -662,11 +662,17 @@ export function EmailHubPage() {
                 )}
               </div>
 
-              <div className={`${card} space-y-5`}>
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <p className={sectionFormTitle}>Email composer</p>
+              <div className={`${card} p-0 overflow-hidden`}>
+                <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Email composer</h3>
+                    <p className="text-xs text-muted-foreground">Generate a personalised outreach email for this donor.</p>
+                  </div>
                 </div>
+                <div className="space-y-5 p-5">
 
                 <label className={label}>
                   Email goal
@@ -881,12 +887,13 @@ export function EmailHubPage() {
                       <p className="text-xs text-muted-foreground">{generated.strategy}</p>
                     </div>
                     {sendResult ? (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
                         Sent to {sendResult.toEmail} at {new Date(sendResult.sentAtUtc).toLocaleString()}.
                       </div>
                     ) : null}
                   </div>
                 ) : null}
+                </div>
               </div>
             </>
           )}
