@@ -64,7 +64,7 @@ import {
 } from './activityTimelineUi'
 import { CaseDrawer, EmptyState, SectionHeader, ToggleField } from './caseUi'
 import { deriveReadinessPrediction, deriveReadinessTier } from '../../../../components/ml/reintegrationReadinessShared'
-import { RESIDENT_SEMANTIC } from '../residentSemanticPalette'
+import { RESIDENT_GOAL_RING, RESIDENT_GOAL_SECTION, RESIDENT_SEMANTIC } from '../residentSemanticPalette'
 
 function gf(fields: Record<string, string>, ...keys: string[]): string {
   for (const k of keys) {
@@ -1207,7 +1207,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                       expandedGoal === goal.key ? 'border-primary bg-muted/20' : 'border-border bg-card hover:bg-muted/30'
                     }`}
                   >
-                    <ProgressRing label={goal.label} progress={percentage(goal.current, goal.target)}>
+                    <ProgressRing goalKey={goal.key} label={goal.label} progress={percentage(goal.current, goal.target)}>
                       <div className="text-xl font-semibold tabular-nums text-foreground">{goal.currentLabel}</div>
                     </ProgressRing>
                     <h3 className="mt-3 text-center text-base font-semibold text-foreground">{goal.ringTitle}</h3>
@@ -1591,7 +1591,17 @@ function SignalGroupCard({
   )
 }
 
-function ProgressRing({ label, progress, children }: { label: string; progress: number; children: ReactNode }) {
+function ProgressRing({
+  goalKey,
+  label,
+  progress,
+  children,
+}: {
+  goalKey: GoalKey
+  label: string
+  progress: number
+  children: ReactNode
+}) {
   const normalized = Math.max(0, Math.min(progress, 100))
   const radius = 44
   const circumference = 2 * Math.PI * radius
@@ -1599,17 +1609,18 @@ function ProgressRing({ label, progress, children }: { label: string; progress: 
   const vb = 108
   const c = vb / 2
   const sw = 7
+  const accentStroke = RESIDENT_GOAL_RING[goalKey]
   return (
     <div className="flex flex-col items-center text-center" aria-label={`${label}, ${Math.round(normalized)} percent of target`}>
       <div className="relative h-[9.25rem] w-[9.25rem] shrink-0">
         <svg viewBox={`0 0 ${vb} ${vb}`} className="h-full w-full -rotate-90">
-          <circle cx={c} cy={c} r={radius} fill="none" className="stroke-border/50" strokeWidth={sw} />
+          <circle cx={c} cy={c} r={radius} fill="none" className="stroke-[#d8e3e1]/90 dark:stroke-border/55" strokeWidth={sw} />
           <circle
             cx={c}
             cy={c}
             r={radius}
             fill="none"
-            className="stroke-teal-600 dark:stroke-teal-400"
+            className={accentStroke}
             strokeWidth={sw}
             strokeLinecap="round"
             strokeDasharray={circumference}
@@ -1654,11 +1665,10 @@ function InlineDetailCard({
   )
 }
 
-/** Small “Stats” kicker, rule, then history title — separates summary blocks from searchable lists. */
+/** Rule + history title — separates summary blocks from searchable lists. */
 function DrillInHistoryHeading({ historyTitle }: { historyTitle: string }) {
   return (
     <div className="space-y-4 pt-1">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Stats</p>
       <div className="h-px w-full bg-border" role="presentation" />
       <h3 className="font-heading text-lg font-semibold tracking-tight text-foreground sm:text-xl">{historyTitle}</h3>
     </div>
@@ -1839,6 +1849,26 @@ function appointmentStatusChipClass(category: ReturnType<typeof healthStatusCate
   return RESIDENT_SEMANTIC.warning.chip
 }
 
+function parseOptionalHealthScore15(s: string): number | undefined {
+  const t = s.trim()
+  if (!t) return undefined
+  const n = parseFloat(t.replace(',', '.'))
+  if (!Number.isFinite(n) || n < 1 || n > 5) {
+    throw new Error('Wellbeing scores must be between 1 and 5.')
+  }
+  return n
+}
+
+function parseOptionalNonNegativeNumber(s: string): number | undefined {
+  const t = s.trim()
+  if (!t) return undefined
+  const n = parseFloat(t.replace(',', '.'))
+  if (!Number.isFinite(n) || n < 0) {
+    throw new Error('Enter a valid number (zero or greater).')
+  }
+  return n
+}
+
 function RecapScoreCell({ label, valueNum }: { label: string; valueNum: number | null }) {
   const tone =
     valueNum == null || !Number.isFinite(valueNum) ? 'neutral' : valueNum < 3 ? 'low' : valueNum > 4.2 ? 'high' : 'mid'
@@ -1879,8 +1909,18 @@ function HealthGoalDrillIn({
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [apptSearch, setApptSearch] = useState('')
   const [apptFilter, setApptFilter] = useState<'all' | 'stable' | 'improving' | 'declining'>('all')
+  const [healthScoreDraft, setHealthScoreDraft] = useState('')
+  const [nutritionDraft, setNutritionDraft] = useState('')
+  const [sleepDraft, setSleepDraft] = useState('')
+  const [energyDraft, setEnergyDraft] = useState('')
+  const [weightDraft, setWeightDraft] = useState('')
+  const [heightDraft, setHeightDraft] = useState('')
+  const [bmiDraft, setBmiDraft] = useState('')
+  const [dentalCheckDraft, setDentalCheckDraft] = useState(false)
+  const [medicalCheckDraft, setMedicalCheckDraft] = useState(false)
+  const [psychCheckDraft, setPsychCheckDraft] = useState(false)
   const [notesDraft, setNotesDraft] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
+  const [savingRow, setSavingRow] = useState(false)
   const [notesErr, setNotesErr] = useState<string | null>(null)
   const [deleteHealthId, setDeleteHealthId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -1904,33 +1944,33 @@ function HealthGoalDrillIn({
         {
           key: 'gen',
           name: 'General health',
-          strokeClass: 'stroke-teal-600 dark:stroke-teal-400',
-          fillClass: 'fill-teal-600 dark:fill-teal-400',
-          legendClass: 'bg-teal-600 dark:bg-teal-400',
+          strokeClass: 'stroke-[#1a5f5c] dark:stroke-[#3dafa2]',
+          fillClass: 'fill-[#1a5f5c] dark:fill-[#3dafa2]',
+          legendClass: 'bg-[#1a5f5c] dark:bg-[#3dafa2]',
           values: chronological.map((r) => r.healthScore),
         },
         {
           key: 'nut',
           name: 'Nutrition',
-          strokeClass: 'stroke-amber-600 dark:stroke-amber-400',
-          fillClass: 'fill-amber-600 dark:fill-amber-400',
-          legendClass: 'bg-amber-600 dark:bg-amber-400',
+          strokeClass: 'stroke-[#c9a227] dark:stroke-[#e3bc2a]',
+          fillClass: 'fill-[#c9a227] dark:fill-[#e3bc2a]',
+          legendClass: 'bg-[#c9a227] dark:bg-[#e3bc2a]',
           values: chronological.map((r) => r.nutritionScore),
         },
         {
           key: 'slp',
           name: 'Sleep quality',
-          strokeClass: 'stroke-sky-500 dark:stroke-sky-400',
-          fillClass: 'fill-sky-500 dark:fill-sky-400',
-          legendClass: 'bg-sky-500',
+          strokeClass: 'stroke-[#243d52] dark:stroke-[#6b94a8]',
+          fillClass: 'fill-[#243d52] dark:fill-[#6b94a8]',
+          legendClass: 'bg-[#243d52] dark:bg-[#6b94a8]',
           values: chronological.map((r) => r.sleepQualityScore),
         },
         {
           key: 'en',
           name: 'Energy level',
-          strokeClass: 'stroke-violet-500 dark:stroke-violet-400',
-          fillClass: 'fill-violet-500 dark:fill-violet-400',
-          legendClass: 'bg-violet-500',
+          strokeClass: 'stroke-[#d4a08c] dark:stroke-[#e8b8a8]',
+          fillClass: 'fill-[#c98a72] dark:fill-[#e8b8a8]',
+          legendClass: 'bg-[#d4a08c] dark:bg-[#e8b8a8]',
           values: chronological.map((r) => r.energyLevelScore),
         },
       ],
@@ -1982,24 +2022,76 @@ function HealthGoalDrillIn({
 
   useEffect(() => {
     if (selectedId == null) {
+      setHealthScoreDraft('')
+      setNutritionDraft('')
+      setSleepDraft('')
+      setEnergyDraft('')
+      setWeightDraft('')
+      setHeightDraft('')
+      setBmiDraft('')
+      setDentalCheckDraft(false)
+      setMedicalCheckDraft(false)
+      setPsychCheckDraft(false)
       setNotesDraft('')
       return
     }
     const r = sortedRows.find((x) => x.id === selectedId)
-    setNotesDraft(r?.notes ?? '')
+    if (!r) return
+    setHealthScoreDraft(r.healthScore != null && Number.isFinite(r.healthScore) ? String(r.healthScore) : '')
+    setNutritionDraft(r.nutritionScore != null && Number.isFinite(r.nutritionScore) ? String(r.nutritionScore) : '')
+    setSleepDraft(r.sleepQualityScore != null && Number.isFinite(r.sleepQualityScore) ? String(r.sleepQualityScore) : '')
+    setEnergyDraft(r.energyLevelScore != null && Number.isFinite(r.energyLevelScore) ? String(r.energyLevelScore) : '')
+    setWeightDraft(r.weightKg != null && Number.isFinite(r.weightKg) ? String(r.weightKg) : '')
+    setHeightDraft(r.heightCm != null && Number.isFinite(r.heightCm) ? String(r.heightCm) : '')
+    setBmiDraft(r.bmi != null && Number.isFinite(r.bmi) ? String(r.bmi) : '')
+    setDentalCheckDraft(Boolean(r.dentalCheckupDone))
+    setMedicalCheckDraft(Boolean(r.medicalCheckupDone))
+    setPsychCheckDraft(Boolean(r.psychologicalCheckupDone))
+    setNotesDraft(r.notes ?? '')
     setNotesErr(null)
   }, [selectedId, sortedRows])
 
-  async function saveNotesForRow(id: number) {
+  async function saveHealthRow(id: number) {
     setNotesErr(null)
-    setSavingNotes(true)
+    setSavingRow(true)
     try {
-      await patchHealthRecord(id, { notes: notesDraft.trim() })
+      let healthScore: number | undefined
+      let nutritionScore: number | undefined
+      let sleepQualityScore: number | undefined
+      let energyLevelScore: number | undefined
+      let weightKg: number | undefined
+      let heightCm: number | undefined
+      let bmi: number | undefined
+      try {
+        healthScore = parseOptionalHealthScore15(healthScoreDraft)
+        nutritionScore = parseOptionalHealthScore15(nutritionDraft)
+        sleepQualityScore = parseOptionalHealthScore15(sleepDraft)
+        energyLevelScore = parseOptionalHealthScore15(energyDraft)
+        weightKg = parseOptionalNonNegativeNumber(weightDraft)
+        heightCm = parseOptionalNonNegativeNumber(heightDraft)
+        bmi = parseOptionalNonNegativeNumber(bmiDraft)
+      } catch (e) {
+        setNotesErr(e instanceof Error ? e.message : 'Invalid values')
+        return
+      }
+      await patchHealthRecord(id, {
+        ...(healthScore !== undefined ? { healthScore } : {}),
+        ...(nutritionScore !== undefined ? { nutritionScore } : {}),
+        ...(sleepQualityScore !== undefined ? { sleepQualityScore } : {}),
+        ...(energyLevelScore !== undefined ? { energyLevelScore } : {}),
+        ...(weightKg !== undefined ? { weightKg } : {}),
+        ...(heightCm !== undefined ? { heightCm } : {}),
+        ...(bmi !== undefined ? { bmi } : {}),
+        dentalCheckupDone: dentalCheckDraft,
+        medicalCheckupDone: medicalCheckDraft,
+        psychologicalCheckupDone: psychCheckDraft,
+        notes: notesDraft.trim(),
+      })
       await onReload()
     } catch (e) {
       setNotesErr(e instanceof Error ? e.message : 'Save failed')
     } finally {
-      setSavingNotes(false)
+      setSavingRow(false)
     }
   }
 
@@ -2007,9 +2099,13 @@ function HealthGoalDrillIn({
     <div className="space-y-5">
       <div className="grid gap-4 lg:grid-cols-[1.35fr_0.85fr]">
         <div className="rounded-lg border border-border/80 bg-white px-3 py-3 shadow-sm dark:bg-card">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wellbeing trend</p>
+          <p
+            className={`font-sans text-xs font-semibold uppercase tracking-[0.14em] ${RESIDENT_GOAL_SECTION.wellbeing}`}
+          >
+            WELLBEING TREND
+          </p>
           {chartPack && hasAnyChartPoint ? (
-            <div className="mt-2">
+            <div className="mt-2 font-sans">
               <SimpleMultiLineChart
                 labels={chartPack.labels}
                 series={chartPack.series}
@@ -2018,6 +2114,7 @@ function HealthGoalDrillIn({
                 yMin={1}
                 yMax={5}
                 variant="minimal"
+                compactTypography
                 ariaLabel="Wellbeing scores over time"
               />
             </div>
@@ -2027,23 +2124,35 @@ function HealthGoalDrillIn({
         </div>
 
         <div className="rounded-lg border border-border/80 bg-white px-3 py-3 shadow-sm dark:bg-card">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Latest recap</p>
           {latest ? (
-            <div className="mt-2 space-y-2.5 text-sm">
-              <p className="text-center text-xs font-medium text-muted-foreground">{formatAdminDate(latest.recordDate)}</p>
-              <p className="text-center text-xs text-muted-foreground">Overall {data.currentLabel}</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                <RecapScoreCell label="General health" valueNum={latest.healthScore} />
-                <RecapScoreCell label="Nutrition score" valueNum={latest.nutritionScore} />
-                <RecapScoreCell label="Sleep quality" valueNum={latest.sleepQualityScore} />
-                <RecapScoreCell label="Energy level" valueNum={latest.energyLevelScore} />
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/55 pb-2">
+                <p
+                  className={`font-sans text-xs font-semibold uppercase tracking-[0.14em] ${RESIDENT_GOAL_SECTION.recapTitle}`}
+                >
+                  LATEST RECAP
+                </p>
+                <span
+                  className={`shrink-0 font-sans text-sm font-semibold tabular-nums ${RESIDENT_GOAL_SECTION.recapDate}`}
+                >
+                  {formatAdminDate(latest.recordDate)}
+                </span>
               </div>
-              <div className="grid gap-1.5 border-t border-border/60 pt-2">
-                <MiniMetric label="Weight" value={latest.weightKg != null ? `${latest.weightKg} kg` : '—'} />
-                <MiniMetric label="Height" value={latest.heightCm != null ? `${latest.heightCm} cm` : '—'} />
-                <MiniMetric label="BMI" value={latest.bmi != null ? latest.bmi.toFixed(1) : '—'} />
+              <div className="mt-2 space-y-2.5 text-sm">
+                <p className="text-center text-xs text-muted-foreground">Overall {data.currentLabel}</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <RecapScoreCell label="General health" valueNum={latest.healthScore} />
+                  <RecapScoreCell label="Nutrition score" valueNum={latest.nutritionScore} />
+                  <RecapScoreCell label="Sleep quality" valueNum={latest.sleepQualityScore} />
+                  <RecapScoreCell label="Energy level" valueNum={latest.energyLevelScore} />
+                </div>
+                <div className="grid gap-1.5 border-t border-border/60 pt-2">
+                  <MiniMetric label="Weight" value={latest.weightKg != null ? `${latest.weightKg} kg` : '—'} />
+                  <MiniMetric label="Height" value={latest.heightCm != null ? `${latest.heightCm} cm` : '—'} />
+                  <MiniMetric label="BMI" value={latest.bmi != null ? latest.bmi.toFixed(1) : '—'} />
+                </div>
               </div>
-            </div>
+            </>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">No health record yet.</p>
           )}
@@ -2052,7 +2161,7 @@ function HealthGoalDrillIn({
 
       <div className="grid gap-3 md:grid-cols-3">
         <div className="flex min-h-[8.5rem] flex-col items-center justify-center rounded-xl border border-border bg-card px-4 py-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Latest dental</p>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${RESIDENT_GOAL_SECTION.dental}`}>Latest dental</p>
           {latestDental ? (
             <p className="mt-3 text-lg font-semibold tabular-nums text-foreground">{formatAdminDate(latestDental.recordDate)}</p>
           ) : (
@@ -2060,7 +2169,7 @@ function HealthGoalDrillIn({
           )}
         </div>
         <div className="flex min-h-[8.5rem] flex-col items-center justify-center rounded-xl border border-border bg-card px-4 py-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Latest medical</p>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${RESIDENT_GOAL_SECTION.medical}`}>Latest medical</p>
           {latestMedical ? (
             <p className="mt-3 text-lg font-semibold tabular-nums text-foreground">{formatAdminDate(latestMedical.recordDate)}</p>
           ) : (
@@ -2068,7 +2177,9 @@ function HealthGoalDrillIn({
           )}
         </div>
         <div className="flex min-h-[8.5rem] flex-col items-center justify-center rounded-xl border border-border bg-card px-4 py-6 text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Latest psychological</p>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${RESIDENT_GOAL_SECTION.psychological}`}>
+            Latest psychological
+          </p>
           {latestPsych ? (
             <p className="mt-3 text-lg font-semibold tabular-nums text-foreground">{formatAdminDate(latestPsych.recordDate)}</p>
           ) : (
@@ -2079,8 +2190,7 @@ function HealthGoalDrillIn({
 
       <DrillInHistoryHeading historyTitle="Appointment history" />
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-wrap items-end gap-2">
           <div className="min-w-[10rem] flex-1">
             <label className={label} htmlFor="appt-notes-search">
               Search
@@ -2108,8 +2218,9 @@ function HealthGoalDrillIn({
             </select>
           </label>
           <InlineActionButton onClick={onAddHealth}>Add</InlineActionButton>
-        </div>
+      </div>
 
+      <div className="space-y-2 pt-8">
         {notesErr ? <div className={alertError}>{notesErr}</div> : null}
 
         {sortedRows.length === 0 ? (
@@ -2144,20 +2255,114 @@ function HealthGoalDrillIn({
                 </button>
                 {selectedId === row.id ? (
                   <div className="mt-4 space-y-4 border-t border-border/60 pt-4">
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      <MiniMetric label="Nutrition" value={row.nutritionScore != null ? row.nutritionScore.toFixed(1) : '—'} />
-                      <MiniMetric label="Sleep" value={row.sleepQualityScore != null ? row.sleepQualityScore.toFixed(1) : '—'} />
-                      <MiniMetric label="Energy" value={row.energyLevelScore != null ? row.energyLevelScore.toFixed(1) : '—'} />
-                      <MiniMetric label="BMI" value={row.bmi != null ? row.bmi.toFixed(1) : '—'} />
-                      <MiniMetric label="Dental" value={row.dentalCheckupDone ? 'Done' : '—'} />
-                      <MiniMetric label="Medical" value={row.medicalCheckupDone ? 'Done' : '—'} />
-                      <MiniMetric label="Psych" value={row.psychologicalCheckupDone ? 'Done' : '—'} />
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <label className={label}>
+                        General health (1–5)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={healthScoreDraft}
+                          onChange={(e) => setHealthScoreDraft(e.target.value)}
+                          placeholder="e.g. 4.2"
+                        />
+                      </label>
+                      <label className={label}>
+                        Nutrition (1–5)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={nutritionDraft}
+                          onChange={(e) => setNutritionDraft(e.target.value)}
+                          placeholder="e.g. 3.5"
+                        />
+                      </label>
+                      <label className={label}>
+                        Sleep (1–5)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={sleepDraft}
+                          onChange={(e) => setSleepDraft(e.target.value)}
+                          placeholder="e.g. 4"
+                        />
+                      </label>
+                      <label className={label}>
+                        Energy (1–5)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={energyDraft}
+                          onChange={(e) => setEnergyDraft(e.target.value)}
+                          placeholder="e.g. 3.8"
+                        />
+                      </label>
+                      <label className={label}>
+                        Weight (kg)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={weightDraft}
+                          onChange={(e) => setWeightDraft(e.target.value)}
+                          placeholder="e.g. 62"
+                        />
+                      </label>
+                      <label className={label}>
+                        Height (cm)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={heightDraft}
+                          onChange={(e) => setHeightDraft(e.target.value)}
+                          placeholder="e.g. 165"
+                        />
+                      </label>
+                      <label className={label}>
+                        BMI
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={bmiDraft}
+                          onChange={(e) => setBmiDraft(e.target.value)}
+                          placeholder="e.g. 22.5"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border"
+                          checked={dentalCheckDraft}
+                          onChange={(e) => setDentalCheckDraft(e.target.checked)}
+                        />
+                        <span>Dental checkup done</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border"
+                          checked={medicalCheckDraft}
+                          onChange={(e) => setMedicalCheckDraft(e.target.checked)}
+                        />
+                        <span>Medical checkup done</span>
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border"
+                          checked={psychCheckDraft}
+                          onChange={(e) => setPsychCheckDraft(e.target.checked)}
+                        />
+                        <span>Psychological checkup done</span>
+                      </label>
                     </div>
                     <div>
                       <label className={label}>
                         <span className="flex items-center justify-between gap-2">
                           <span>Notes</span>
-                          <span className="text-[10px] font-normal normal-case text-muted-foreground">Editing — save or delete below</span>
+                          <span className="text-[10px] font-normal normal-case text-muted-foreground">
+                            Editing record — save or delete below
+                          </span>
                         </span>
                         <textarea
                           key={`health-notes-${row.id}`}
@@ -2166,17 +2371,16 @@ function HealthGoalDrillIn({
                           value={notesDraft}
                           onChange={(e) => setNotesDraft(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          autoFocus
                         />
                       </label>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           type="button"
                           className={btnPrimary}
-                          disabled={savingNotes}
-                          onClick={() => void saveNotesForRow(row.id)}
+                          disabled={savingRow}
+                          onClick={() => void saveHealthRow(row.id)}
                         >
-                          {savingNotes ? 'Saving…' : 'Save notes'}
+                          {savingRow ? 'Saving…' : 'Save changes'}
                         </button>
                         <InlineActionButton onClick={() => onOpenHealth(row.id)}>Full record</InlineActionButton>
                         <button
@@ -2451,36 +2655,36 @@ function EducationGoalDrillIn({
 
       <DrillInHistoryHeading historyTitle="Educational history" />
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-[10rem] flex-1">
-            <label className={label} htmlFor="ed-rec-search">
-              Search
-            </label>
-            <input
-              id="ed-rec-search"
-              type="search"
-              className={input}
-              value={edSearch}
-              onChange={(e) => setEdSearch(e.target.value)}
-              placeholder="School, notes, date…"
-            />
-          </div>
-          <label className={label}>
-            Filter
-            <select
-              className={input}
-              value={edFilter}
-              onChange={(e) => setEdFilter(e.target.value as typeof edFilter)}
-            >
-              <option value="all">All</option>
-              <option value="active">Active / in progress</option>
-              <option value="completed">Completed</option>
-            </select>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-[10rem] flex-1">
+          <label className={label} htmlFor="ed-rec-search">
+            Search
           </label>
-          <InlineActionButton onClick={onAddEducation}>Add</InlineActionButton>
+          <input
+            id="ed-rec-search"
+            type="search"
+            className={input}
+            value={edSearch}
+            onChange={(e) => setEdSearch(e.target.value)}
+            placeholder="School, notes, date…"
+          />
         </div>
+        <label className={label}>
+          Filter
+          <select
+            className={input}
+            value={edFilter}
+            onChange={(e) => setEdFilter(e.target.value as typeof edFilter)}
+          >
+            <option value="all">All</option>
+            <option value="active">Active / in progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </label>
+        <InlineActionButton onClick={onAddEducation}>Add</InlineActionButton>
+      </div>
 
+      <div className="space-y-2 pt-8">
         {err ? <div className={alertError}>{err}</div> : null}
 
         {sortedRows.length === 0 ? (
@@ -2858,51 +3062,51 @@ function SafetyGoalDrillIn({
       <div className="space-y-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Notes & record list</p>
 
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[10rem] flex-1">
-              <label className={label} htmlFor="safety-rec-search">
-                Search
-              </label>
-              <input
-                id="safety-rec-search"
-                type="search"
-                className={input}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Notes, location, type…"
-              />
-            </div>
-            <label className={label}>
-              Type
-              <select
-                className={input}
-                value={filter}
-                onChange={(e) => setFilter(e.target.value as typeof filter)}
-              >
-                <option value="all">All</option>
-                <option value="visit">Visits</option>
-                <option value="incident">Incidents</option>
-              </select>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[10rem] flex-1">
+            <label className={label} htmlFor="safety-rec-search">
+              Search
             </label>
-            <label className={label}>
-              Location
-              <select
-                className={input}
-                value={locationFilter}
-                onChange={(e) => setLocationFilter(e.target.value)}
-              >
-                <option value="">All locations</option>
-                {locationOptions.map((loc) => (
-                  <option key={loc} value={loc}>
-                    {loc}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <InlineActionButton onClick={onLogIncident}>Add</InlineActionButton>
+            <input
+              id="safety-rec-search"
+              type="search"
+              className={input}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Notes, location, type…"
+            />
           </div>
+          <label className={label}>
+            Type
+            <select
+              className={input}
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as typeof filter)}
+            >
+              <option value="all">All</option>
+              <option value="visit">Visits</option>
+              <option value="incident">Incidents</option>
+            </select>
+          </label>
+          <label className={label}>
+            Location
+            <select
+              className={input}
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+            >
+              <option value="">All locations</option>
+              {locationOptions.map((loc) => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </select>
+          </label>
+          <InlineActionButton onClick={onLogIncident}>Add</InlineActionButton>
+        </div>
 
+        <div className="space-y-2 pt-8">
           {notesErr ? <div className={alertError}>{notesErr}</div> : null}
 
           {safetyRecords.length === 0 ? (

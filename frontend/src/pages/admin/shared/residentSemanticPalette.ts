@@ -52,3 +52,22 @@ export const RESIDENT_SEMANTIC = {
 } as const
 
 export type ResidentSemanticKey = keyof typeof RESIDENT_SEMANTIC
+
+/**
+ * Resident Goals tab — donut-inspired accents (teal, navy, ochre, peach). No white strokes on rings.
+ * Aligns with goal summary cards and wellbeing chart series.
+ */
+export const RESIDENT_GOAL_RING: Record<'health' | 'education' | 'safety', string> = {
+  health: 'stroke-[#1a5f5c] dark:stroke-[#3dafa2]',
+  education: 'stroke-[#243d52] dark:stroke-[#6b94a8]',
+  safety: 'stroke-[#c9a227] dark:stroke-[#e3bc2a]',
+}
+
+export const RESIDENT_GOAL_SECTION = {
+  wellbeing: 'text-[#1a5f5c] dark:text-[#5fd4c4]',
+  recapTitle: 'text-[#243d52] dark:text-[#8ab4c8]',
+  recapDate: 'text-[#1a6b7a] dark:text-[#5fd4c4]',
+  dental: 'text-[#1a5f5c] dark:text-[#5fd4c4]',
+  medical: 'text-[#243d52] dark:text-[#8ab4c8]',
+  psychological: 'text-[#b8860b] dark:text-[#e3bc2a]',
+} as const

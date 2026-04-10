@@ -135,6 +135,7 @@ export function SimpleMultiLineChart({
   yMin,
   yMax,
   variant = 'default',
+  compactTypography = false,
 }: {
   labels: string[]
   series: {
@@ -152,6 +153,8 @@ export function SimpleMultiLineChart({
   yMax?: number
   /** `minimal`: flat white-friendly panel, lighter grid — for embedded resident health cards. */
   variant?: 'default' | 'minimal'
+  /** Smaller axis/date labels + sans typography — resident Goals wellbeing chart. */
+  compactTypography?: boolean
 }) {
   const [hoverI, setHoverI] = useState<number | null>(null)
   if (labels.length === 0) return null
@@ -181,11 +184,18 @@ export function SimpleMultiLineChart({
       : 'relative rounded-xl border border-border/60 bg-gradient-to-b from-muted/25 to-muted/5 p-3 shadow-sm'
 
   const gridStroke = variant === 'minimal' ? 'stroke-border/30' : 'stroke-border/40'
-  const scaleTextClass = variant === 'minimal' ? 'fill-muted-foreground/80 text-[9px]' : 'fill-muted-foreground text-[10px]'
+  const scaleTextClass =
+    compactTypography && variant === 'minimal'
+      ? 'fill-muted-foreground/85 font-sans text-[8px] font-medium tracking-tight'
+      : variant === 'minimal'
+        ? 'fill-muted-foreground/80 text-[9px]'
+        : 'fill-muted-foreground text-[10px]'
   const xLabelClass =
-    variant === 'minimal'
-      ? 'fill-muted-foreground text-[9px] pointer-events-none'
-      : 'fill-muted-foreground text-[8px] pointer-events-none'
+    compactTypography && variant === 'minimal'
+      ? 'fill-muted-foreground font-sans text-[7px] font-medium tracking-tight pointer-events-none'
+      : variant === 'minimal'
+        ? 'fill-muted-foreground text-[9px] pointer-events-none'
+        : 'fill-muted-foreground text-[8px] pointer-events-none'
 
   return (
     <div className={variant === 'minimal' ? 'space-y-2' : 'space-y-3'}>
@@ -271,7 +281,13 @@ export function SimpleMultiLineChart({
             }),
           )}
           {labels.map((lab, i) => (
-            <text key={`${lab}-${i}`} x={xAt(i)} y={height - 6} textAnchor="middle" className={xLabelClass}>
+            <text
+              key={`${lab}-${i}`}
+              x={xAt(i)}
+              y={compactTypography && variant === 'minimal' ? height - 10 : height - 6}
+              textAnchor="middle"
+              className={xLabelClass}
+            >
               {lab}
             </text>
           ))}
@@ -290,7 +306,7 @@ export function SimpleMultiLineChart({
         </svg>
       </div>
       <ul
-        className={`flex flex-wrap gap-x-3 gap-y-1 ${variant === 'minimal' ? 'text-[10px]' : 'text-[11px]'}`}
+        className={`flex flex-wrap gap-x-3 gap-y-1 font-sans ${variant === 'minimal' ? (compactTypography ? 'text-[9px]' : 'text-[10px]') : 'text-[11px]'}`}
         aria-label="Legend"
       >
         {series.map((s) => (

@@ -300,8 +300,7 @@ export function ContributionsAdminPage() {
       <div>
         <h2 className={pageTitle}>Donations</h2>
         <p className={pageDesc}>
-          Donations ledger — open a row to view the supporter profile. Filters use types and ranges; delete requires
-          confirmation.
+          Donations ledger — open a row to view the supporter profile.
         </p>
       </div>
       {error && <div className={alertError}>{error}</div>}

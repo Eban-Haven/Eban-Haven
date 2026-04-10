@@ -301,9 +301,6 @@ export function CaseConferencesAdminPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-foreground">Conference Preview</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Showing up to {UPCOMING_CONFERENCE_LIMIT} scheduled or recent conferences for quick review.
-            </p>
           </div>
           <button
             type="button"
@@ -318,12 +315,6 @@ export function CaseConferencesAdminPage() {
         {showUpcoming && (
           <div className="mt-4 space-y-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Upcoming Case Conferences</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Scheduled conferences are shown in chronological order, followed by the most recent past meetings.
-                </p>
-              </div>
               <label className="block md:w-72">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Search resident</span>
                 <input

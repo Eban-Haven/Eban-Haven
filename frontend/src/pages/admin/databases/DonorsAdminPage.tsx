@@ -258,8 +258,7 @@ export function DonorsAdminPage() {
       <div>
         <h2 className={pageTitle}>Donors</h2>
         <p className={pageDesc}>
-          Supporters directory — filter, sort, and open a row for the full profile. Select rows to delete in bulk
-          (confirmation required).
+          Supporters directory — filter, sort, and open a row for the full profile. Select rows to delete in bulk.
         </p>
       </div>
 
