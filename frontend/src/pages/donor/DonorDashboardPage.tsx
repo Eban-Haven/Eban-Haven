@@ -122,13 +122,11 @@ export function DonorDashboardPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-5rem)] bg-muted/30 py-16 lg:py-24">
-      <div className="mx-auto max-w-3xl px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border border-border bg-card p-8 shadow-sm"
-        >
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-border bg-card p-8 shadow-sm"
+    >
           <div className="mb-8 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary">
               <Heart className="h-5 w-5 fill-current text-primary-foreground" />
@@ -330,8 +328,6 @@ export function DonorDashboardPage() {
               )}
             </>
           )}
-        </motion.div>
-      </div>
-    </div>
+    </motion.div>
   )
 }

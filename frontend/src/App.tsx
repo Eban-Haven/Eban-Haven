@@ -8,7 +8,9 @@ import { PrivacyPage } from './pages/public/PrivacyPage'
 import { LoginPage } from './pages/public/LoginPage'
 import { AccessibilityPage } from './pages/public/AccessibilityPage'
 import { RequireDonor } from './components/RequireDonor'
+import { DonorLayout } from './layouts/DonorLayout'
 import { DonorDashboardPage } from './pages/donor/DonorDashboardPage'
+import { DonorAccountPage } from './pages/donor/DonorAccountPage'
 import { AdminDashboardPage } from './pages/admin/dashboards/AdminDashboardPage'
 import { DonorsAdminPage } from './pages/admin/databases/DonorsAdminPage'
 import { DonorDetailPage } from './pages/admin/databases/DonorDetailPage'
@@ -45,10 +47,13 @@ export default function App() {
           path="/donor-dashboard"
           element={
             <RequireDonor>
-              <DonorDashboardPage />
+              <DonorLayout />
             </RequireDonor>
           }
-        />
+        >
+          <Route index element={<DonorDashboardPage />} />
+          <Route path="account" element={<DonorAccountPage />} />
+        </Route>
       </Route>
       <Route
         path="/admin"

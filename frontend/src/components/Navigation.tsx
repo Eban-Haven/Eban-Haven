@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LayoutDashboard, LogIn, LogOut, Menu, Shield, X } from 'lucide-react'
+import { LayoutDashboard, LogIn, LogOut, Menu, Shield, UserRound, X } from 'lucide-react'
 import { SiteLogoMark } from './SiteLogoMark'
 import { SITE_DISPLAY_NAME } from '../site'
 import { logoutAndReload } from '../api/auth'
@@ -72,7 +72,7 @@ export function Navigation() {
                 <Link
                   to="/donor-dashboard"
                   className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                    isActive('/donor-dashboard')
+                    location.pathname.startsWith('/donor-dashboard')
                       ? 'border-primary bg-primary/10 text-primary'
                       : 'border-border text-foreground hover:bg-muted'
                   }`}
@@ -163,8 +163,8 @@ export function Navigation() {
                   >
                     Login →
                   </Link>
-                ) : isDonorRole(session.role) ? (
-                  <div className="flex flex-col gap-2 border-t border-border pt-3">
+            ) : isDonorRole(session.role) ? (
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
                     <Link
                       to="/donor-dashboard"
                       className="inline-flex items-center gap-2 text-sm font-medium text-foreground"
@@ -172,6 +172,14 @@ export function Navigation() {
                     >
                       <LayoutDashboard className="h-4 w-4" />
                       My dashboard
+                    </Link>
+                    <Link
+                      to="/donor-dashboard/account"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                      onClick={() => setOpen(false)}
+                    >
+                      <UserRound className="h-4 w-4" />
+                      Account
                     </Link>
                     <button
                       type="button"

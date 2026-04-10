@@ -1,15 +1,17 @@
 using System.Security.Claims;
 using EbanHaven.Api.Auth;
+using EbanHaven.Api.DataAccess;
 using EbanHaven.Api.Lighthouse;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace EbanHaven.Api.Controllers;
 
 [ApiController]
 [Route("api/donor")]
 [Authorize(Policy = DonorOnlyPolicy.Name)]
-public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
+public sealed class DonorController(ILighthouseRepository repo, HavenDbContext db) : ControllerBase
 {
     [HttpGet("dashboard")]
     public IActionResult Dashboard()
@@ -107,7 +109,97 @@ public sealed class DonorController(ILighthouseRepository repo) : ControllerBase
             return BadRequest(new { error = ex.Message });
         }
     }
+
+    [HttpGet("account")]
+    public async Task<IActionResult> GetAccount(CancellationToken cancellationToken)
+    {
+        var email = GetDonorEmail();
+        if (string.IsNullOrWhiteSpace(email))
+            return Unauthorized(new { error = "A valid donor email claim is required." });
+
+        var normalized = email.Trim().ToLowerInvariant();
+        var profile = await db.Profiles.AsNoTracking()
+            .FirstOrDefaultAsync(
+                p => p.Email != null && p.Email.ToLower() == normalized,
+                cancellationToken);
+
+        var supporter = repo.ListSupporters()
+            .FirstOrDefault(s => string.Equals(s.Email, email, StringComparison.OrdinalIgnoreCase));
+
+        return Ok(new
+        {
+            email = normalized,
+            fullName = profile?.FullName,
+            supporter,
+        });
+    }
+
+    [HttpPatch("account")]
+    public async Task<IActionResult> PatchAccount([FromBody] DonorPatchAccountRequest body, CancellationToken cancellationToken)
+    {
+        var email = GetDonorEmail();
+        if (string.IsNullOrWhiteSpace(email))
+            return Unauthorized(new { error = "A valid donor email claim is required." });
+
+        var normalized = email.Trim().ToLowerInvariant();
+        var profile = await db.Profiles.FirstOrDefaultAsync(
+            p => p.Email != null && p.Email.ToLower() == normalized,
+            cancellationToken);
+
+        if (profile is null)
+            return BadRequest(new { error = "No account profile was found for your login. Contact support." });
+
+        if (body.FullName is not null)
+            profile.FullName = string.IsNullOrWhiteSpace(body.FullName) ? null : body.FullName.Trim();
+
+        var supporterDto = repo.ListSupporters()
+            .FirstOrDefault(s => string.Equals(s.Email, email, StringComparison.OrdinalIgnoreCase));
+
+        var fields = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        if (body.DisplayName is not null) fields["display_name"] = body.DisplayName;
+        if (body.FirstName is not null) fields["first_name"] = body.FirstName;
+        if (body.LastName is not null) fields["last_name"] = body.LastName;
+        if (body.Phone is not null) fields["phone"] = body.Phone;
+        if (body.Region is not null) fields["region"] = body.Region;
+        if (body.Country is not null) fields["country"] = body.Country;
+        if (body.OrganizationName is not null) fields["organization_name"] = body.OrganizationName;
+
+        if (supporterDto is not null && fields.Count > 0)
+            repo.PatchSupporterFields(supporterDto.Id, fields);
+        else if (body.FullName is not null)
+            await db.SaveChangesAsync(cancellationToken);
+
+        var profileOut = await db.Profiles.AsNoTracking()
+            .FirstOrDefaultAsync(
+                p => p.Email != null && p.Email.ToLower() == normalized,
+                cancellationToken);
+
+        var supporterOut = repo.ListSupporters()
+            .FirstOrDefault(s => string.Equals(s.Email, email, StringComparison.OrdinalIgnoreCase));
+
+        return Ok(new
+        {
+            email = normalized,
+            fullName = profileOut?.FullName,
+            supporter = supporterOut,
+        });
+    }
+
+    private string? GetDonorEmail() =>
+        User.FindFirst(ClaimTypes.Email)?.Value
+        ?? User.FindFirst("email")?.Value
+        ?? User.FindFirst("sub")?.Value;
 }
+
+public sealed record DonorPatchAccountRequest(
+    string? FullName,
+    string? DisplayName,
+    string? FirstName,
+    string? LastName,
+    string? Phone,
+    string? Region,
+    string? Country,
+    string? OrganizationName);
 
 public sealed record DonorCreateDonationRequest(
     string DonationType,

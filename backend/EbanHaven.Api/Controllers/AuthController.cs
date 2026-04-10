@@ -139,7 +139,11 @@ public sealed class AuthController(
 
         var profile = await db.Profiles.FirstOrDefaultAsync(p => p.Email != null && p.Email.ToLower() == email);
         if (profile is null && mode == "login")
-            return NotFound(new { error = "No donor account exists for this Google email yet. Use Google sign up first." });
+            return BadRequest(new
+            {
+                error =
+                    "No donor account exists for this Google email yet. Open the Register tab and use “Sign up with Google”, or create an account with email and password first.",
+            });
 
         var displayName = string.IsNullOrWhiteSpace(payload.Name) ? email : payload.Name.Trim();
 
