@@ -24,6 +24,14 @@ function pct(n: number) {
 
 function prettyLabel(value: string) {
   if (value.startsWith('#')) return value
+  const compact = value.replace(/[\s_-]+/g, '').toLowerCase()
+  const preservedLabels: Record<string, string> = {
+    tiktok: 'TikTok',
+    youtube: 'YouTube',
+    linkedin: 'LinkedIn',
+    whatsapp: 'WhatsApp',
+  }
+  if (preservedLabels[compact]) return preservedLabels[compact]
   return value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
