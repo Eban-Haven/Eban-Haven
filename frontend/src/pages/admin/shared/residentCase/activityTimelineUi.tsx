@@ -2,6 +2,7 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { ChevronDown, Filter, X } from 'lucide-react'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 import { btnPrimary, input, label } from '../adminStyles'
+import { RESIDENT_SEMANTIC } from '../residentSemanticPalette'
 import { CaseDrawer } from './caseUi'
 import type { TimelineItem, TimelineKind } from './caseWorkspaceModel'
 
@@ -17,10 +18,10 @@ const KIND_LABELS: Record<TimelineKind, string> = {
 }
 
 function toneChipClass(tone: 'danger' | 'warning' | 'default' | 'success') {
-  if (tone === 'danger') return 'bg-destructive/10 text-destructive'
-  if (tone === 'warning') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
-  if (tone === 'success') return 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-100'
-  return 'bg-muted text-muted-foreground'
+  if (tone === 'danger') return RESIDENT_SEMANTIC.danger.chip
+  if (tone === 'warning') return RESIDENT_SEMANTIC.warning.chip
+  if (tone === 'success') return RESIDENT_SEMANTIC.success.chip
+  return 'border border-[#D1D5DB] bg-[#F3F4F6] text-[#4B5563]'
 }
 
 export type ActivityAdvFilterDraft = {
@@ -363,8 +364,7 @@ export function ActivityAdvancedFiltersDrawer({
 
 const rowActionBtn =
   'rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors'
-const rowDeleteBtn =
-  'rounded-lg border border-destructive/40 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors'
+const rowDeleteBtn = `${RESIDENT_SEMANTIC.danger.outlineButton} transition-colors`
 
 export function ActivityTimelineRow({
   item,

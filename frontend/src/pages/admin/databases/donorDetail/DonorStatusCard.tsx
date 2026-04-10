@@ -3,6 +3,7 @@ import { LoaderCircle } from 'lucide-react'
 import type { AtRiskDonorInfo, DonorUpgradeInfo, Supporter } from '../../../../api/adminTypes'
 import { btnPrimary, card } from '../../shared/adminStyles'
 import { StatusBadge } from '../../shared/adminDataTable/AdminBadges'
+import { RESIDENT_SEMANTIC } from '../../shared/residentSemanticPalette'
 
 type Props = {
   supporter: Supporter
@@ -31,8 +32,22 @@ function isDonateMorePotential(c: AtRiskDonorInfo, donationCount: number) {
   )
 }
 
-const chipBase =
-  'inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-medium leading-tight'
+/** Full-width insight pills on the donor detail card (semantic palette + readable size). */
+const insightChipBase =
+  'inline-flex max-w-full min-w-0 items-center rounded-full border px-4 py-2 text-sm font-medium leading-snug'
+
+function lapseInsightChipClass(churn: AtRiskDonorInfo) {
+  if (churn.risk_tier === 'High Risk') return RESIDENT_SEMANTIC.danger.chip
+  return RESIDENT_SEMANTIC.warning.chip
+}
+
+function upgradePropensityChipClass(propensityTier: string | undefined) {
+  const t = propensityTier?.trim().toLowerCase() ?? ''
+  if (t === 'high') return RESIDENT_SEMANTIC.success.chip
+  if (t === 'moderate') return RESIDENT_SEMANTIC.warning.chip
+  if (t === 'low') return RESIDENT_SEMANTIC.neutral.chip
+  return RESIDENT_SEMANTIC.success.chip
+}
 
 export function DonorStatusCard({
   supporter,
@@ -73,9 +88,7 @@ export function DonorStatusCard({
             ) : null}
             {upgrade && showUpgradeChip ? (
               <div className="flex flex-wrap gap-2 pt-1">
-                <span
-                  className={`${chipBase} border-emerald-200/90 bg-emerald-50 text-emerald-950 dark:border-emerald-800/80 dark:bg-emerald-950/40 dark:text-emerald-100`}
-                >
+                <span className={`${insightChipBase} ${upgradePropensityChipClass(upgrade.propensity_tier)}`}>
                   Upgrade propensity · {Math.round(upgrade.upgrade_probability * 100)}%
                   {upgrade.propensity_tier ? ` · ${upgrade.propensity_tier}` : ''}
                 </span>
@@ -91,24 +104,20 @@ export function DonorStatusCard({
             <div className="flex flex-wrap gap-2">
               {showLapse ? (
                 <span
-                  className={`${chipBase} border-amber-200/90 bg-amber-50 text-amber-950 dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-100`}
+                  className={`${insightChipBase} ${lapseInsightChipClass(churn)}`}
                   title={churn.top_risk_signals?.length ? churn.top_risk_signals.join(' · ') : undefined}
                 >
                   Lapse risk · {Math.round(churn.churn_probability * 100)}% · {churn.risk_tier}
                 </span>
               ) : null}
               {showUpgradeChip && upgrade ? (
-                <span
-                  className={`${chipBase} border-emerald-200/90 bg-emerald-50 text-emerald-950 dark:border-emerald-800/80 dark:bg-emerald-950/40 dark:text-emerald-100`}
-                >
+                <span className={`${insightChipBase} ${upgradePropensityChipClass(upgrade.propensity_tier)}`}>
                   Upgrade propensity · {Math.round(upgrade.upgrade_probability * 100)}%
                   {upgrade.propensity_tier ? ` · ${upgrade.propensity_tier}` : ''}
                 </span>
               ) : null}
               {showPotential ? (
-                <span
-                  className={`${chipBase} border-sky-200/90 bg-sky-50 text-sky-950 dark:border-sky-800/80 dark:bg-sky-950/40 dark:text-sky-100`}
-                >
+                <span className={`${insightChipBase} ${RESIDENT_SEMANTIC.success.chip}`}>
                   Stable engagement · growth opportunity
                 </span>
               ) : null}

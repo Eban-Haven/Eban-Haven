@@ -23,15 +23,15 @@ export function DonorMetricsRow({
         <MetricCard
           label="Lifetime total"
           value={moneyPhp.format(lifetimeTotal)}
-          subtext="Recorded across all contribution types with amounts"
+          subtext=""
         />
-        <MetricCard label="Donations" value={donationCount} subtext="Contribution records linked to this donor" />
+        <MetricCard label="Donations" value={donationCount} subtext="" />
         <MetricCard
           label="Average gift"
           value={donationCount ? moneyPhp.format(averageGift) : '—'}
-          subtext="Average amount across recorded donations"
+          subtext=""
         />
-        <MetricCard label="Most recent" value={lastDonationLabel} subtext={lastDonationType || 'No donation history yet'} />
+        <MetricCard label="Most recent donation" value={lastDonationLabel} subtext=""/>
       </div>
     )
   }

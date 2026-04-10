@@ -9,6 +9,7 @@ import {
   READINESS_READY_THRESHOLD,
   TIER_CONFIG,
 } from './reintegrationReadinessShared'
+import { RESIDENT_SEMANTIC } from '../../pages/admin/shared/residentSemanticPalette'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -157,16 +158,19 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 shadow-sm p-5">
+      <div
+        className={`rounded-2xl border shadow-sm p-5 ${RESIDENT_SEMANTIC.danger.border} ${RESIDENT_SEMANTIC.danger.bg}`}
+      >
         <div className="flex items-start gap-3">
           <span className="text-lg mt-0.5">⚠️</span>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-red-800">Reintegration readiness unavailable</p>
-            <p className="text-xs text-red-600 mt-1">{error}</p>
+            <p className={`text-sm font-semibold ${RESIDENT_SEMANTIC.danger.textBold}`}>Reintegration readiness unavailable</p>
+            <p className={`text-xs mt-1 ${RESIDENT_SEMANTIC.danger.text}`}>{error}</p>
           </div>
           <button
             onClick={fetchResult}
-            className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-700 hover:bg-red-100 transition"
+            type="button"
+            className={`text-xs px-3 py-1.5 rounded-lg border bg-background transition hover:opacity-90 ${RESIDENT_SEMANTIC.danger.border} ${RESIDENT_SEMANTIC.danger.text}`}
           >
             Retry
           </button>
@@ -183,9 +187,13 @@ export function ReintegrationReadiness({ residentId }: { residentId: number }) {
   const isReady = prediction === 'Ready'
 
   return (
-    <div className={`rounded-2xl border shadow-sm overflow-hidden ${isReady ? "border-emerald-200" : "border-gray-200"} bg-white`}>
+    <div
+      className={`rounded-2xl border shadow-sm overflow-hidden bg-white ${isReady ? `${RESIDENT_SEMANTIC.success.border}` : 'border-gray-200'}`}
+    >
       {/* ── Header ── */}
-      <div className={`px-5 py-4 border-b flex items-center justify-between ${isReady ? 'border-emerald-100 bg-emerald-50/40' : 'border-gray-100'}`}>
+      <div
+        className={`px-5 py-4 border-b flex items-center justify-between ${isReady ? `${RESIDENT_SEMANTIC.success.border} ${RESIDENT_SEMANTIC.success.bgSoft}` : 'border-gray-100'}`}
+      >
         <div>
           <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
             <span className="text-lg">{config.icon}</span>

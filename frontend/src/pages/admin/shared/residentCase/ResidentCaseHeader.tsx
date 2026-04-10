@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp, Play, Plus } from 'lucide-react'
 import { btnPrimary } from '../adminStyles'
+import { RESIDENT_SEMANTIC } from '../residentSemanticPalette'
 import { CategoryBadge, ReintegrationBadge, RiskBadge, StatusBadge } from '../adminDataTable/AdminBadges'
 
 type ActivityType = {
@@ -188,8 +189,8 @@ export function ResidentCaseHeader({
 }
 
 function readinessToneClass(tone: ReadinessSummary['tone'] | undefined) {
-  if (tone === 'success') return 'border-emerald-300/80 bg-emerald-50/80 hover:bg-emerald-100/70'
-  if (tone === 'warning') return 'border-amber-300/80 bg-amber-50/80 hover:bg-amber-100/70'
-  if (tone === 'danger') return 'border-destructive/25 bg-destructive/5 hover:bg-destructive/10'
+  if (tone === 'success') return `${RESIDENT_SEMANTIC.success.border} bg-[#E8F7EE]/80 hover:bg-[#E8F7EE]`
+  if (tone === 'warning') return `${RESIDENT_SEMANTIC.warning.border} bg-[#FFF4E5]/80 hover:bg-[#FFF4E5]`
+  if (tone === 'danger') return `${RESIDENT_SEMANTIC.danger.border} bg-[#FDECEC]/70 hover:bg-[#FDECEC]`
   return 'border-border bg-muted/20 hover:bg-muted/40'
 }

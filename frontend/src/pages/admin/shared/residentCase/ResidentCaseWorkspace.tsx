@@ -31,7 +31,7 @@ import {
   type SafehouseOption,
 } from '../../../../api/admin'
 import { alertError, btnPrimary, input, label } from '../adminStyles'
-import { BooleanBadge, CategoryBadge, StatusBadge } from '../adminDataTable/AdminBadges'
+import { BooleanBadge, CategoryBadge } from '../adminDataTable/AdminBadges'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 import { AdminDeleteModal } from '../adminDataTable/AdminDeleteModal'
 import { CASE_STATUSES, RISK_LEVELS, SEX_OPTIONS } from './caseConstants'
@@ -64,6 +64,7 @@ import {
 } from './activityTimelineUi'
 import { CaseDrawer, EmptyState, SectionHeader, ToggleField } from './caseUi'
 import { deriveReadinessPrediction, deriveReadinessTier } from '../../../../components/ml/reintegrationReadinessShared'
+import { RESIDENT_SEMANTIC } from '../residentSemanticPalette'
 
 function gf(fields: Record<string, string>, ...keys: string[]): string {
   for (const k of keys) {
@@ -78,7 +79,6 @@ const TAB_LABELS: { k: MainWorkspaceTab; label: string }[] = [
   { k: 'overview', label: 'Overview' },
   { k: 'activity', label: 'Activity' },
   { k: 'plans', label: 'Plans & goals' },
-  { k: 'safety', label: 'Safety' },
   { k: 'profile', label: 'Profile' },
 ]
 
@@ -227,10 +227,10 @@ function parseEducationExtendedLite(json: string | null | undefined): EducationE
 }
 
 function toneClass(tone: 'danger' | 'warning' | 'default' | 'success') {
-  if (tone === 'danger') return 'bg-destructive/10 text-destructive'
-  if (tone === 'warning') return 'bg-amber-500/15 text-amber-900 dark:text-amber-100'
-  if (tone === 'success') return 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-100'
-  return 'bg-muted text-muted-foreground'
+  if (tone === 'danger') return RESIDENT_SEMANTIC.danger.chip
+  if (tone === 'warning') return RESIDENT_SEMANTIC.warning.chip
+  if (tone === 'success') return RESIDENT_SEMANTIC.success.chip
+  return 'border border-[#D1D5DB] bg-[#F3F4F6] text-[#4B5563]'
 }
 
 export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
@@ -627,7 +627,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
         count: unresolvedIncidents.length,
         tone: 'danger',
         actionLabel: 'Resolve',
-        action: { kind: 'tab', tab: 'safety' },
+        action: { kind: 'tab', tab: 'activity' },
       })
     }
     if (latestEducation?.attendanceRate != null && previousEducation?.attendanceRate != null && latestEducation.attendanceRate < previousEducation.attendanceRate) {
@@ -677,7 +677,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           source: 'Incident',
           date: row.fields.incident_date ?? '',
           summary: row.fields.description?.trim() || row.fields.incident_type || 'Incident follow-up required',
-          action: { kind: 'tab', tab: 'safety' },
+          action: { kind: 'tab', tab: 'activity' },
         })
       })
     plans
@@ -943,14 +943,14 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   }
 
   if (!Number.isFinite(residentId) || residentId <= 0) {
-    return <p className="text-destructive">Invalid resident.</p>
+    return <p className={RESIDENT_SEMANTIC.danger.text}>Invalid resident.</p>
   }
 
   if (loading) return <p className="text-muted-foreground">Loading case…</p>
   if (error && !detail) {
     return (
       <div className="space-y-3">
-        <p className="text-destructive">{error}</p>
+        <p className={RESIDENT_SEMANTIC.danger.text}>{error}</p>
         <Link to="/admin/residents" className="text-sm text-primary hover:underline">
           ← Back to residents
         </Link>
@@ -960,7 +960,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   if (!detail) {
     return (
       <div className="space-y-3">
-        <p className="text-destructive">Resident not found.</p>
+        <p className={RESIDENT_SEMANTIC.danger.text}>Resident not found.</p>
         <Link to="/admin/residents" className="text-sm text-primary hover:underline">
           ← Back to residents
         </Link>
@@ -1072,7 +1072,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                       setMainTab('activity')
                       if (latestEducation) setTlEduId(latestEducation.id)
                     } else {
-                      setMainTab('safety')
+                      setMainTab('activity')
                     }
                   }}
                   className="rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-muted/40"
@@ -1264,92 +1264,6 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
         />
       ) : null}
 
-      {mainTab === 'safety' ? (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h3 className="text-base font-semibold text-foreground">Safety summary</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Critical concerns, visits, and flagged sessions in one place.</p>
-            </div>
-            <button type="button" className={btnPrimary} onClick={() => bumpCreate('incident')}>
-              Log incident
-            </button>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <SummaryTile label="Unresolved incidents" value={unresolvedIncidents.length} />
-            <SummaryTile label="Safety-related visits" value={vis.filter((row) => row.safetyConcernsNoted || row.followUpNeeded).length} />
-            <SummaryTile label="Flagged sessions" value={proc.filter((row) => row.concernsFlagged).length} />
-          </div>
-
-          <SafetyBlock title="Incidents">
-            {inc.length === 0 ? (
-              <EmptyState title="No incidents logged" hint="Use Log incident to add the first one." />
-            ) : (
-              inc.map((row) => (
-                <SafetyRow
-                  key={row.id}
-                  title={row.fields.incident_type || 'Incident'}
-                  subtitle={row.fields.description || 'No description'}
-                  meta={[
-                    row.fields.incident_date ? formatAdminDate(row.fields.incident_date) : '',
-                    row.fields.severity || '',
-                    (row.fields.resolved ?? '').toLowerCase() === 'true' ? 'Resolved' : 'Open',
-                  ]}
-                  onView={() => setIncidentDrawer({ mode: 'view', row })}
-                  onEdit={() => setIncidentDrawer({ mode: 'edit', row })}
-                  onDelete={() => setDeleteIncidentId(row.id)}
-                />
-              ))
-            )}
-          </SafetyBlock>
-
-          <SafetyBlock title="Visits with safety concerns or follow-up">
-            {vis.filter((row) => row.safetyConcernsNoted || row.followUpNeeded).length === 0 ? (
-              <EmptyState title="No safety-related visits" />
-            ) : (
-              vis
-                .filter((row) => row.safetyConcernsNoted || row.followUpNeeded)
-                .map((row) => (
-                  <SafetyRow
-                    key={row.id}
-                    title={`Home visit · ${formatAdminDate(row.visitDate)}`}
-                    subtitle={row.followUpNotes || row.observations || row.purpose || 'No notes'}
-                    meta={[
-                      row.socialWorker,
-                      row.safetyConcernsNoted ? 'Safety concern' : '',
-                      row.followUpNeeded ? 'Follow-up needed' : '',
-                    ]}
-                    onView={() => setVisitDrawer({ mode: 'view', row })}
-                    onEdit={() => setVisitDrawer({ mode: 'edit', row })}
-                    onDelete={() => setDeleteVisitId(row.id)}
-                  />
-                ))
-            )}
-          </SafetyBlock>
-
-          <SafetyBlock title="Sessions with concerns flagged">
-            {proc.filter((row) => row.concernsFlagged).length === 0 ? (
-              <EmptyState title="No flagged sessions" />
-            ) : (
-              proc
-                .filter((row) => row.concernsFlagged)
-                .map((row) => (
-                  <SafetyRow
-                    key={row.id}
-                    title={`Session · ${formatAdminDate(row.sessionDate)}`}
-                    subtitle={row.sessionNarrative}
-                    meta={[row.socialWorker, row.sessionType, row.followUpActions ? 'Follow-up noted' : '']}
-                    onView={() => setProcDrawer({ mode: 'view', row })}
-                    onEdit={() => setProcDrawer({ mode: 'edit', row })}
-                    onDelete={() => setDeleteProcessId(row.id)}
-                  />
-                ))
-            )}
-          </SafetyBlock>
-        </div>
-      ) : null}
-
       {mainTab === 'profile' ? (
         <div className="space-y-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1363,7 +1277,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           </div>
 
           {criticalBackground.length > 0 ? (
-            <div className="rounded-2xl border border-amber-400/40 bg-amber-500/5 px-5 py-4">
+            <div className={`rounded-2xl border px-5 py-4 ${RESIDENT_SEMANTIC.warning.border} ${RESIDENT_SEMANTIC.warning.bgSoft}`}>
               <p className="text-sm font-semibold text-foreground">Critical background</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {criticalBackground.map((item) => (
@@ -1655,7 +1569,11 @@ function SignalGroupCard({
 }) {
   return (
     <div className="min-w-0">
-      <p className={`text-sm font-semibold ${tone === 'success' ? 'text-emerald-700 dark:text-emerald-300' : tone === 'warning' ? 'text-amber-800 dark:text-amber-200' : 'text-destructive'}`}>
+      <p
+        className={`text-sm font-semibold ${
+          tone === 'success' ? RESIDENT_SEMANTIC.success.textBold : tone === 'warning' ? RESIDENT_SEMANTIC.warning.textBold : RESIDENT_SEMANTIC.danger.textBold
+        }`}
+      >
         {title}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -1669,15 +1587,6 @@ function SignalGroupCard({
           ))
         )}
       </div>
-    </div>
-  )
-}
-
-function SummaryTile({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   )
 }
@@ -1732,8 +1641,8 @@ function InlineDetailCard({ title, children }: { title: string; children: ReactN
 }
 
 function TrendBadge({ trend }: { trend: 'up' | 'down' | 'flat' }) {
-  if (trend === 'up') return <span className="text-emerald-700 dark:text-emerald-300">Up</span>
-  if (trend === 'down') return <span className="text-destructive">Down</span>
+  if (trend === 'up') return <span className={RESIDENT_SEMANTIC.success.text}>Up</span>
+  if (trend === 'down') return <span className={RESIDENT_SEMANTIC.danger.text}>Down</span>
   return <span>Flat</span>
 }
 
@@ -1849,65 +1758,7 @@ function GoalDrillIn({
     )
   }
 
-  const rows =
-    [
-            ...incidentRows.slice(0, 3).map((row) => ({
-              key: `i-${row.id}`,
-              title: row.fields.incident_type || 'Incident',
-              body: row.fields.description || 'No description',
-              meta: row.fields.incident_date ? formatAdminDate(row.fields.incident_date) : 'No date',
-              onOpen: () => onOpenIncident(row),
-            })),
-            ...visitRows
-              .filter((row) => row.safetyConcernsNoted || row.followUpNeeded)
-              .slice(0, 2)
-              .map((row) => ({
-                key: `v-${row.id}`,
-                title: `Visit · ${formatAdminDate(row.visitDate)}`,
-                body: row.followUpNotes || row.observations || 'Safety-related visit',
-                meta: row.followUpNeeded ? 'Follow-up needed' : 'Safety concern',
-                onOpen: () => onOpenVisit(row),
-              })),
-          ]
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-3">
-        <FocusCell label="Target" value={data.targetLabel} />
-        <FocusCell label="Current" value={data.currentLabel} />
-        <FocusCell label="Progress" value={`${Math.round(percentage(data.current, data.target))}%`} />
-      </div>
-      <p className="text-sm text-muted-foreground">{data.detail}</p>
-      {relatedPlan ? (
-        <div className="rounded-xl bg-muted/20 px-4 py-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <CategoryBadge>{relatedPlan.planCategory}</CategoryBadge>
-            <StatusBadge status={relatedPlan.status} />
-          </div>
-          <p className="mt-2 text-sm text-foreground">{relatedPlan.planDescription}</p>
-          {relatedPlan.targetDate ? <p className="mt-1 text-xs text-muted-foreground">Target {formatAdminDate(relatedPlan.targetDate)}</p> : null}
-        </div>
-      ) : null}
-      <div className="space-y-2">
-        {rows.length === 0 ? (
-          <EmptyState title="No related records yet" />
-        ) : (
-          rows.map((row) => (
-            <button key={row.key} type="button" onClick={row.onOpen} className="w-full rounded-xl border border-border/70 bg-background px-4 py-3 text-left hover:bg-muted/30">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium text-foreground">{row.title}</span>
-                <span className="text-xs text-muted-foreground">{row.meta}</span>
-              </div>
-              <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{row.body}</p>
-            </button>
-          ))
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {goal === 'safety' ? <InlineActionButton onClick={onLogIncident}>Log incident</InlineActionButton> : null}
-      </div>
-    </div>
-  )
+  return null
 }
 
 function stripHealthStatusPrefix(text: string): string {
@@ -1930,9 +1781,9 @@ function appointmentStatusChipText(notes: string | null | undefined): string {
 }
 
 function appointmentStatusChipClass(category: ReturnType<typeof healthStatusCategory>): string {
-  if (category === 'improving') return 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
-  if (category === 'declining') return 'bg-destructive/15 text-destructive'
-  return 'bg-amber-500/15 text-amber-950 dark:text-amber-100'
+  if (category === 'improving') return RESIDENT_SEMANTIC.success.chip
+  if (category === 'declining') return RESIDENT_SEMANTIC.danger.chip
+  return RESIDENT_SEMANTIC.warning.chip
 }
 
 function RecapScoreCell({ label, valueNum }: { label: string; valueNum: number | null }) {
@@ -1942,16 +1793,12 @@ function RecapScoreCell({ label, valueNum }: { label: string; valueNum: number |
     <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-        {tone === 'low' ? <span className="h-2 w-2 shrink-0 rounded-full bg-destructive" title="Below 3" /> : null}
-        {tone === 'high' ? <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Above 4.2" /> : null}
+        {tone === 'low' ? <span className={`h-2 w-2 shrink-0 rounded-full ${RESIDENT_SEMANTIC.danger.dot}`} title="Below 3" /> : null}
+        {tone === 'high' ? <span className={`h-2 w-2 shrink-0 rounded-full ${RESIDENT_SEMANTIC.success.dot}`} title="Above 4.2" /> : null}
       </div>
       <p
         className={`mt-1 text-sm font-medium tabular-nums ${
-          tone === 'low'
-            ? 'text-destructive'
-            : tone === 'high'
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-foreground'
+          tone === 'low' ? RESIDENT_SEMANTIC.danger.text : tone === 'high' ? RESIDENT_SEMANTIC.success.text : 'text-foreground'
         }`}
       >
         {valueNum != null && Number.isFinite(valueNum) ? valueNum.toFixed(1) : '—'}
@@ -2012,9 +1859,9 @@ function HealthGoalDrillIn({
         {
           key: 'nut',
           name: 'Nutrition',
-          strokeClass: 'stroke-amber-600',
-          fillClass: 'fill-amber-600',
-          legendClass: 'bg-amber-600',
+          strokeClass: 'stroke-[#9A5B00]',
+          fillClass: 'fill-[#9A5B00]',
+          legendClass: 'bg-[#9A5B00]',
           values: chronological.map((r) => r.nutritionScore),
         },
         {
@@ -2273,7 +2120,7 @@ function HealthGoalDrillIn({
                         <InlineActionButton onClick={() => onOpenHealth(row.id)}>Full record</InlineActionButton>
                         <button
                           type="button"
-                          className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                          className={RESIDENT_SEMANTIC.danger.outlineButton}
                           onClick={() => setDeleteHealthId(row.id)}
                         >
                           Delete…
@@ -2546,7 +2393,7 @@ function EducationGoalDrillIn({
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                         Attend {row.attendanceRate != null ? `${Math.round(row.attendanceRate * 100)}%` : '—'}
                       </span>
-                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${RESIDENT_SEMANTIC.success.chip}`}>
                         Progress {row.progressPercent != null ? `${Math.round(row.progressPercent)}%` : '—'}
                       </span>
                     </div>
@@ -2611,7 +2458,7 @@ function EducationGoalDrillIn({
                       <InlineActionButton onClick={() => onOpenEducation(row.id)}>Full record</InlineActionButton>
                       <button
                         type="button"
-                        className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                        className={RESIDENT_SEMANTIC.danger.outlineButton}
                         onClick={() => setDeleteId(row.id)}
                       >
                         Delete…
@@ -2831,7 +2678,7 @@ function SafetyGoalDrillIn({
                         <InlineActionButton onClick={() => onOpenVisit(row.visitRow!)}>View</InlineActionButton>
                         <button
                           type="button"
-                          className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                          className={RESIDENT_SEMANTIC.danger.outlineButton}
                           onClick={() => onRequestDeleteVisit(row.visitRow!.id)}
                         >
                           Delete…
@@ -2844,7 +2691,7 @@ function SafetyGoalDrillIn({
                         <InlineActionButton onClick={() => onOpenIncident(row.incidentRow!)}>View</InlineActionButton>
                         <button
                           type="button"
-                          className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                          className={RESIDENT_SEMANTIC.danger.outlineButton}
                           onClick={() => onRequestDeleteIncident(row.incidentRow!.id)}
                         >
                           Delete…
@@ -2867,54 +2714,6 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-border/70 bg-background px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-medium text-foreground">{value}</p>
-    </div>
-  )
-}
-
-function SafetyBlock({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
-      <div className="space-y-2">{children}</div>
-    </section>
-  )
-}
-
-function SafetyRow({
-  title,
-  subtitle,
-  meta,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  title: string
-  subtitle: string
-  meta: string[]
-  onView: () => void
-  onEdit: () => void
-  onDelete: () => void
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">{title}</p>
-          <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">{subtitle}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {meta.filter(Boolean).map((item) => (
-              <span key={item} className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <InlineActionButton onClick={onView}>View</InlineActionButton>
-          <InlineActionButton onClick={onEdit}>Edit</InlineActionButton>
-          <InlineActionButton onClick={onDelete}>Delete</InlineActionButton>
-        </div>
-      </div>
     </div>
   )
 }
@@ -3035,7 +2834,7 @@ function IncidentDrawer({
             </button>
             <button
               type="button"
-              className="rounded-lg border border-destructive/50 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+              className={RESIDENT_SEMANTIC.danger.outlineButtonWide}
               onClick={() => onDeleteRequest(initial.id)}
             >
               Delete

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { RESIDENT_SEMANTIC } from '../residentSemanticPalette'
 
 type BadgeVariant = 'success' | 'warning' | 'danger' | 'neutral' | 'info' | 'category'
 
@@ -6,10 +7,10 @@ const badgeBase =
   'inline-flex max-w-full items-center whitespace-nowrap rounded-full border px-2.5 py-[3px] text-xs font-semibold leading-[1.2] tracking-normal'
 
 const badgeStyles: Record<BadgeVariant, string> = {
-  success: 'border-[#B7E4C7] bg-[#E8F7EE] text-[#166534]',
-  warning: 'border-[#F3D19C] bg-[#FFF4E5] text-[#9A5B00]',
-  danger: 'border-[#F5B5B2] bg-[#FDECEC] text-[#B42318]',
-  neutral: 'border-[#D1D5DB] bg-[#F3F4F6] text-[#4B5563]',
+  success: RESIDENT_SEMANTIC.success.chip,
+  warning: RESIDENT_SEMANTIC.warning.chip,
+  danger: RESIDENT_SEMANTIC.danger.chip,
+  neutral: RESIDENT_SEMANTIC.neutral.chip,
   info: 'border-[#BDD3FF] bg-[#EAF2FF] text-[#1D4ED8]',
   category: 'border-[#CBD5E1] bg-[#F1F5F9] text-[#334155]',
 }

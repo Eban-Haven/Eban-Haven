@@ -169,8 +169,9 @@ function FacebookBrandIcon({ className }: { className?: string }) {
   )
 }
 
+/** Brand marks use #f9f2e6; shell is dark enough for contrast on the queue card. */
 const platformIconShell =
-  'flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200'
+  'flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#5c5348] text-[#f9f2e6] dark:bg-[#3d3834] dark:text-[#f9f2e6]'
 
 function PlatformIcon({ platform }: { platform: string }) {
   const lp = platform.toLowerCase()

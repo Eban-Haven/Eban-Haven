@@ -17,6 +17,7 @@ import {
 } from '../../../api/admin'
 import { PUBLIC_CONTACT, SITE_DISPLAY_NAME } from '../../../site'
 import { alertError, btnPrimary, card, input, label, pageDesc, pageTitle } from '../shared/adminStyles'
+import { RESIDENT_SEMANTIC } from '../shared/residentSemanticPalette'
 import { formatUsd } from '../../../utils/currency'
 
 const toneOptions = ['Warm', 'Direct', 'Celebratory', 'Re-engagement'] as const
@@ -351,7 +352,7 @@ export function EmailHubPage() {
       <div className="border-l-4 border-primary pl-4">
         <h2 className={pageTitle}>Donor Outreach</h2>
         <p className={pageDesc}>
-          Review donor history, generate a tailored outreach email, and open a ready-to-send draft from the admin tools area.
+          Review donor history, select ideal candidates for outreach and generate a tailored email.
         </p>
       </div>
 
@@ -367,13 +368,13 @@ export function EmailHubPage() {
               </p>
               <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 {atRiskMap.size > 0 && (
-                  <span className="flex items-center gap-1 font-medium text-red-600">
+                  <span className={`flex items-center gap-1 font-medium ${RESIDENT_SEMANTIC.danger.text}`}>
                     <TriangleAlert className="h-3.5 w-3.5" />
                     {atRiskMap.size} at risk
                   </span>
                 )}
                 {upgradeMap.size > 0 && (
-                  <span className="flex items-center gap-1 font-medium text-emerald-600">
+                  <span className={`flex items-center gap-1 font-medium ${RESIDENT_SEMANTIC.success.textBold}`}>
                     <TrendingUp className="h-3.5 w-3.5" />
                     {upgradeMap.size} upgrade ready
                   </span>
@@ -410,8 +411,12 @@ export function EmailHubPage() {
                 }`}
               >
                 {label_}
-                {value === 'at-risk'  && atRiskMap.size  > 0 && <span className="ml-1 rounded-full bg-red-100 px-1.5 text-red-700">{atRiskMap.size}</span>}
-                {value === 'upgrade'  && upgradeMap.size > 0 && <span className="ml-1 rounded-full bg-emerald-100 px-1.5 text-emerald-700">{upgradeMap.size}</span>}
+                {value === 'at-risk' && atRiskMap.size > 0 && (
+                  <span className={`ml-1 rounded-full border px-1.5 ${RESIDENT_SEMANTIC.danger.chip}`}>{atRiskMap.size}</span>
+                )}
+                {value === 'upgrade' && upgradeMap.size > 0 && (
+                  <span className={`ml-1 rounded-full border px-1.5 ${RESIDENT_SEMANTIC.success.chip}`}>{upgradeMap.size}</span>
+                )}
               </button>
             ))}
           </div>
@@ -447,11 +452,11 @@ export function EmailHubPage() {
                       selected
                         ? 'border-primary/50 bg-primary/5 ring-1 ring-primary/20'
                         : isHigh
-                          ? 'border-red-200 bg-red-50/50 hover:bg-red-50/80'
+                          ? RESIDENT_SEMANTIC.danger.listRow
                           : isMod
-                            ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-50/80'
+                            ? RESIDENT_SEMANTIC.warning.listRow
                             : upgrade
-                              ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70'
+                              ? RESIDENT_SEMANTIC.success.listRow
                               : 'border-border bg-background hover:border-primary/30 hover:bg-muted/40'
                     }`}
                   >
@@ -461,19 +466,31 @@ export function EmailHubPage() {
                       className="block w-full text-left"
                     >
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`font-medium ${isHigh ? 'text-red-800' : isMod ? 'text-amber-800' : upgrade ? 'text-emerald-800' : 'text-foreground'}`}>
+                        <p
+                          className={`font-medium ${
+                            isHigh
+                              ? RESIDENT_SEMANTIC.danger.textBold
+                              : isMod
+                                ? RESIDENT_SEMANTIC.warning.textBold
+                                : upgrade
+                                  ? RESIDENT_SEMANTIC.success.textBold
+                                  : 'text-foreground'
+                          }`}
+                        >
                           {supporter.displayName}
                         </p>
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           {risk && (
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                              isHigh ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                            }`}>
+                            <span
+                              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                                isHigh ? RESIDENT_SEMANTIC.danger.chip : RESIDENT_SEMANTIC.warning.chip
+                              }`}
+                            >
                               {Math.round(risk.churn_probability * 100)}% churn
                             </span>
                           )}
                           {upgrade && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${RESIDENT_SEMANTIC.success.chip}`}>
                               {Math.round(upgrade.upgrade_probability * 100)}% upgrade
                             </span>
                           )}
@@ -538,9 +555,11 @@ export function EmailHubPage() {
                         {atRiskMap.get(profile.supporter.id) && (() => {
                           const r = atRiskMap.get(profile.supporter.id)!
                           return (
-                            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                              r.risk_tier === 'High Risk' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                            }`}>
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                                r.risk_tier === 'High Risk' ? RESIDENT_SEMANTIC.danger.chip : RESIDENT_SEMANTIC.warning.chip
+                              }`}
+                            >
                               <TriangleAlert className="h-3 w-3" />
                               {r.risk_tier} · {Math.round(r.churn_probability * 100)}% churn probability
                             </span>
@@ -549,7 +568,9 @@ export function EmailHubPage() {
                         {upgradeMap.get(profile.supporter.id) && (() => {
                           const u = upgradeMap.get(profile.supporter.id)!
                           return (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${RESIDENT_SEMANTIC.success.chip}`}
+                            >
                               <TrendingUp className="h-3 w-3" />
                               Upgrade candidate · {Math.round(u.upgrade_probability * 100)}% propensity
                             </span>
@@ -791,9 +812,6 @@ export function EmailHubPage() {
                   <button type="button" className={btnPrimary} onClick={() => void onGenerateEmail()} disabled={generating}>
                     {generating ? 'Generating email…' : 'Generate email'}
                   </button>
-                  <p className="text-xs text-muted-foreground">
-                    One donor is handled at a time so each message can stay personalized and easy to review.
-                  </p>
                 </div>
 
                 {generated ? (

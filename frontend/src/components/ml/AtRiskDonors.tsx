@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch, getStaffToken, parseJson } from "../../api/client";
+import { RESIDENT_SEMANTIC } from "../../pages/admin/shared/residentSemanticPalette";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,18 +31,30 @@ const SIGNAL_LABELS: Record<string, string> = {
 };
 
 const TIER_STYLES: Record<AtRiskDonor["risk_tier"], { badge: string; dot: string }> = {
-  "High Risk":     { badge: "bg-red-100 text-red-800 border-red-300",       dot: "bg-red-500" },
-  "Moderate Risk": { badge: "bg-amber-100 text-amber-800 border-amber-300", dot: "bg-amber-400" },
-  "Low Risk":      { badge: "bg-sky-100 text-sky-800 border-sky-300",       dot: "bg-sky-400" },
+  "High Risk": {
+    badge: `${RESIDENT_SEMANTIC.danger.border} ${RESIDENT_SEMANTIC.danger.bg} ${RESIDENT_SEMANTIC.danger.text}`,
+    dot: RESIDENT_SEMANTIC.danger.dot,
+  },
+  "Moderate Risk": {
+    badge: `${RESIDENT_SEMANTIC.warning.border} ${RESIDENT_SEMANTIC.warning.bg} ${RESIDENT_SEMANTIC.warning.text}`,
+    dot: RESIDENT_SEMANTIC.warning.dot,
+  },
+  "Low Risk": {
+    badge: `${RESIDENT_SEMANTIC.success.border} ${RESIDENT_SEMANTIC.success.bg} ${RESIDENT_SEMANTIC.success.text}`,
+    dot: RESIDENT_SEMANTIC.success.dot,
+  },
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function ProbabilityBar({ probability }: { probability: number }) {
   const pct   = Math.round(probability * 100);
-  const color = probability >= 0.85 ? "bg-red-500"
-               : probability >= 0.55 ? "bg-amber-400"
-               : "bg-sky-400";
+  const color =
+    probability >= 0.85
+      ? RESIDENT_SEMANTIC.danger.bar
+      : probability >= 0.55
+        ? RESIDENT_SEMANTIC.warning.bar
+        : RESIDENT_SEMANTIC.success.bar;
   return (
     <div className="flex items-center gap-2 min-w-[90px]">
       <div className="flex-1 bg-gray-100 rounded-full h-2">
@@ -139,12 +152,16 @@ export function AtRiskDonors({ limit = 25, threshold = 0.55, onScheduleOutreach,
         <div className="flex items-center gap-3">
           {!loading && !error && (
             <div className="flex gap-2 text-xs">
-              <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
+              <span
+                className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${RESIDENT_SEMANTIC.danger.chip}`}
+              >
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${RESIDENT_SEMANTIC.danger.dot}`} />
                 {highCount} High
               </span>
-              <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+              <span
+                className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-semibold ${RESIDENT_SEMANTIC.warning.chip}`}
+              >
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${RESIDENT_SEMANTIC.warning.dot}`} />
                 {modCount} Moderate
               </span>
             </div>

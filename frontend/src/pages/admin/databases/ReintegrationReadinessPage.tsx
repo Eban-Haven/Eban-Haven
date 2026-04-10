@@ -27,6 +27,7 @@ import {
   tableRowHover,
   tableWrap,
 } from '../shared/adminStyles'
+import { RESIDENT_SEMANTIC } from '../shared/residentSemanticPalette'
 
 type TierFilter = 'all' | ReintegrationResult['risk_tier']
 
@@ -50,9 +51,6 @@ function CohortOverviewCard({
     <div className={`${card} space-y-4`}>
       <div>
         <h3 className="text-base font-semibold text-foreground">Cohort Overview</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Current readiness mix across residents with a live prediction score. Click a card to filter the worklist.
-        </p>
       </div>
       <div className="grid gap-3 md:grid-cols-4">
         <button
@@ -68,12 +66,7 @@ function CohortOverviewCard({
         </button>
         {segments.map((tier) => {
           const percent = total > 0 ? Math.round((counts[tier] / total) * 100) : 0
-          const tone =
-            tier === 'High Readiness'
-              ? 'text-emerald-700'
-              : tier === 'Moderate Readiness'
-                ? 'text-amber-700'
-                : 'text-red-700'
+          const tone = TIER_CONFIG[tier].text
 
           return (
             <button
@@ -84,7 +77,7 @@ function CohortOverviewCard({
                 activeTier === tier ? 'ring-2 ring-primary/20' : 'hover:brightness-[0.99]'
               }`}
             >
-              <p className={statCardInner}>{tier}</p>
+              <p className={`${statCardInner} ${TIER_CONFIG[tier].text}`}>{tier}</p>
               <p className={statCardValue}>{counts[tier]}</p>
               <p className={`${statCardSub} ${tone}`}>{percent}% of scored residents</p>
             </button>
@@ -208,9 +201,6 @@ export function ReintegrationReadinessPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className={pageTitle}>Reintigration Readiness</h2>
-          <p className={pageDesc}>
-            Population view of resident readiness predictions using the 70% / 50% cohort thresholds for quick triage and transition planning.
-          </p>
         </div>
         <button type="button" className={btnPrimary} onClick={() => void load()}>
           Refresh readiness
@@ -218,7 +208,13 @@ export function ReintegrationReadinessPage() {
       </div>
 
       {error && <div className={alertError}>{error}</div>}
-      {partialError && <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">{partialError}</div>}
+      {partialError && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${RESIDENT_SEMANTIC.warning.border} ${RESIDENT_SEMANTIC.warning.bg} ${RESIDENT_SEMANTIC.warning.textBold}`}
+        >
+          {partialError}
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-6">
@@ -297,9 +293,6 @@ export function ReintegrationReadinessPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-semibold text-foreground">Readiness Rankings</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Click any resident to open a full action-plan page with blocker-specific tools and on-page workflows.
-                </p>
               </div>
               {lastUpdated && <p className="text-xs text-muted-foreground">Updated {lastUpdated.toLocaleTimeString()}</p>}
             </div>
@@ -321,7 +314,6 @@ export function ReintegrationReadinessPage() {
                           aria-label={rankingOrder === 'desc' ? 'Switch to lowest readiness first' : 'Switch to highest readiness first'}
                         >
                           <ArrowUpDown className="mr-1 h-3.5 w-3.5" />
-                          {rankingOrder === 'desc' ? 'Desc' : 'Asc'}
                         </button>
                       </div>
                     </th>

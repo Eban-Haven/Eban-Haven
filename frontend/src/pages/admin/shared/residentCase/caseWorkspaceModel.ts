@@ -1,7 +1,7 @@
 import type { EducationRecord, HealthRecord, HomeVisitation, InterventionPlan, JsonTableRow, ProcessRecording } from '../../../../api/admin'
 import { formatAdminDate } from '../adminDataTable/adminFormatters'
 
-export type MainWorkspaceTab = 'overview' | 'activity' | 'plans' | 'safety' | 'profile'
+export type MainWorkspaceTab = 'overview' | 'activity' | 'plans' | 'profile'
 
 export type TimelineKind = 'process' | 'visit' | 'education' | 'health' | 'plan' | 'incident'
 

@@ -1,3 +1,5 @@
+import { RESIDENT_SEMANTIC } from '../../pages/admin/shared/residentSemanticPalette'
+
 export interface ImprovementArea {
   feature: string
   label: string
@@ -32,30 +34,30 @@ export const TIER_CONFIG: Record<
   }
 > = {
   'High Readiness': {
-    badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    text: 'text-emerald-800',
-    border: 'border-emerald-300',
-    dot: 'bg-emerald-500',
-    bar: 'bg-emerald-500',
-    bg: 'bg-emerald-50',
+    badge: `${RESIDENT_SEMANTIC.success.border} ${RESIDENT_SEMANTIC.success.bg} ${RESIDENT_SEMANTIC.success.text}`,
+    text: RESIDENT_SEMANTIC.success.text,
+    border: RESIDENT_SEMANTIC.success.border,
+    dot: RESIDENT_SEMANTIC.success.dot,
+    bar: RESIDENT_SEMANTIC.success.bar,
+    bg: RESIDENT_SEMANTIC.success.bgSoft,
     icon: '✅',
   },
   'Moderate Readiness': {
-    badge: 'bg-amber-100 text-amber-800 border-amber-300',
-    text: 'text-amber-800',
-    border: 'border-amber-300',
-    dot: 'bg-amber-400',
-    bar: 'bg-amber-400',
-    bg: 'bg-amber-50',
+    badge: `${RESIDENT_SEMANTIC.warning.border} ${RESIDENT_SEMANTIC.warning.bg} ${RESIDENT_SEMANTIC.warning.text}`,
+    text: RESIDENT_SEMANTIC.warning.text,
+    border: RESIDENT_SEMANTIC.warning.border,
+    dot: RESIDENT_SEMANTIC.warning.dot,
+    bar: RESIDENT_SEMANTIC.warning.bar,
+    bg: RESIDENT_SEMANTIC.warning.bgSoft,
     icon: '⏳',
   },
   'Low Readiness': {
-    badge: 'bg-red-100 text-red-800 border-red-300',
-    text: 'text-red-800',
-    border: 'border-red-300',
-    dot: 'bg-red-500',
-    bar: 'bg-red-400',
-    bg: 'bg-red-50',
+    badge: `${RESIDENT_SEMANTIC.danger.border} ${RESIDENT_SEMANTIC.danger.bg} ${RESIDENT_SEMANTIC.danger.text}`,
+    text: RESIDENT_SEMANTIC.danger.text,
+    border: RESIDENT_SEMANTIC.danger.border,
+    dot: RESIDENT_SEMANTIC.danger.dot,
+    bar: RESIDENT_SEMANTIC.danger.bar,
+    bg: RESIDENT_SEMANTIC.danger.bgSoft,
     icon: '⚠️',
   },
 }
