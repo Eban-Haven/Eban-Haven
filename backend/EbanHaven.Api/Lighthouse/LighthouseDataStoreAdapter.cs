@@ -60,6 +60,7 @@ public sealed class LighthouseDataStoreAdapter(LighthouseDataStore inner) : ILig
         double? attendanceRate, double? progressPercent, string? completionStatus, string? notes, DateOnly? recordDate,
         string? extendedJson = null) =>
         throw new NotImplementedException();
+    public bool DeleteEducationRecord(int id) => throw new NotImplementedException();
     public IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId) => throw new NotImplementedException();
     public HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore, double? nutritionScore,
         double? sleepQualityScore, double? energyLevelScore, double? heightCm, double? weightKg, double? bmi,

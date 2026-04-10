@@ -14,6 +14,8 @@ import {
   listEducationRecords,
   listHealthRecords,
   listIncidentReports,
+  patchEducationRecord,
+  deleteEducationRecord,
   patchHealthRecord,
   deleteHealthRecord,
   patchIncidentReport,
@@ -233,7 +235,6 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const [profileSaving, setProfileSaving] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [sessionWorkflowOpen, setSessionWorkflowOpen] = useState(false)
-  const [expandedGoal, setExpandedGoal] = useState<GoalKey | null>('health')
   const [profileSections, setProfileSections] = useState<Record<string, boolean>>({
     identity: true,
     admission: false,
@@ -255,6 +256,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
 
   const [createSig, setCreateSig] = useState({ education: 0, health: 0, plan: 0 })
   const [focusPlanId, setFocusPlanId] = useState<number | null>(null)
+  const [expandedGoal, setExpandedGoal] = useState<GoalKey | null>(null)
   const [tlEduId, setTlEduId] = useState<number | null>(null)
   const [tlHealthId, setTlHealthId] = useState<number | null>(null)
 
@@ -352,6 +354,46 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
   const safetyScore = useMemo(() => deriveSafetyScore(vis, inc), [vis, inc])
   const priorSafetyScore = useMemo(() => deriveSafetyScore(vis.slice(1), inc.slice(1)), [vis, inc])
 
+  const goalCards = useMemo<Record<GoalKey, GoalCardData>>(
+    () => ({
+      health: {
+        key: 'health',
+        label: 'Health goal',
+        target: latestHealthPlan?.targetValue ?? 4.2,
+        current: latestHealth?.healthScore ?? null,
+        currentLabel: scoreLabel(latestHealth?.healthScore ?? null),
+        targetLabel: scoreLabel(latestHealthPlan?.targetValue ?? 4.2),
+        detail: latestHealth ? `Latest wellbeing on ${formatAdminDate(latestHealth.recordDate)}` : 'No health record yet',
+      },
+      education: {
+        key: 'education',
+        label: 'Education goal',
+        target: latestEducationPlan?.targetValue ?? 0.85,
+        current: latestEducation?.attendanceRate ?? null,
+        currentLabel: attendanceLabel(latestEducation?.attendanceRate ?? null),
+        targetLabel: attendanceLabel(latestEducationPlan?.targetValue ?? 0.85),
+        detail: latestEducation ? `Latest attendance on ${formatAdminDate(latestEducation.recordDate)}` : 'No education record yet',
+      },
+      safety: {
+        key: 'safety',
+        label: 'Safety goal',
+        target: latestSafetyPlan?.targetValue ?? 4.2,
+        current: safetyScore,
+        currentLabel: scoreLabel(safetyScore),
+        targetLabel: scoreLabel(latestSafetyPlan?.targetValue ?? 4.2),
+        detail: safetyScore != null ? 'Derived from recent incidents and safety-related home visits' : 'No recent safety activity',
+      },
+    }),
+    [
+      latestEducation,
+      latestEducationPlan,
+      latestHealth,
+      latestHealthPlan,
+      latestSafetyPlan,
+      safetyScore,
+    ],
+  )
+
   const currentStateCards = useMemo<Record<GoalKey, CurrentStateCard>>(
     () => ({
       health: {
@@ -406,39 +448,6 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
       },
     }),
     [inc, latestEducation, latestEducationPlan, latestHealth, latestHealthPlan, latestSafetyPlan, previousEducation, previousHealth, priorSafetyScore, safetyScore],
-  )
-
-  const goalCards = useMemo<Record<GoalKey, GoalCardData>>(
-    () => ({
-      health: {
-        key: 'health',
-        label: 'Health goal',
-        target: latestHealthPlan?.targetValue ?? 4.2,
-        current: latestHealth?.healthScore ?? null,
-        currentLabel: scoreLabel(latestHealth?.healthScore ?? null),
-        targetLabel: scoreLabel(latestHealthPlan?.targetValue ?? 4.2),
-        detail: latestHealthPlan?.planDescription || 'Wellbeing goal from the latest intervention plan.',
-      },
-      education: {
-        key: 'education',
-        label: 'Education goal',
-        target: latestEducationPlan?.targetValue ?? 0.85,
-        current: latestEducation?.attendanceRate ?? null,
-        currentLabel: attendanceLabel(latestEducation?.attendanceRate ?? null),
-        targetLabel: attendanceLabel(latestEducationPlan?.targetValue ?? 0.85),
-        detail: latestEducationPlan?.planDescription || 'Attendance goal from the latest intervention plan.',
-      },
-      safety: {
-        key: 'safety',
-        label: 'Safety goal',
-        target: latestSafetyPlan?.targetValue ?? 4.2,
-        current: safetyScore,
-        currentLabel: scoreLabel(safetyScore),
-        targetLabel: scoreLabel(latestSafetyPlan?.targetValue ?? 4.2),
-        detail: latestSafetyPlan?.planDescription || 'Safety goal informed by incidents and safety-related visits.',
-      },
-    }),
-    [latestEducation, latestEducationPlan, latestHealth, latestHealthPlan, latestSafetyPlan, safetyScore],
   )
 
   const unresolvedIncidents = useMemo(
@@ -1126,7 +1135,7 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
         <PlansTabContent
           residentId={residentId}
           plans={plans}
-          onReload={load}
+          onReload={() => void load()}
           openCreateSignal={createSig.plan}
           layout="workspace"
           focusPlanId={focusPlanId}
@@ -1146,7 +1155,6 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                     <ProgressRing label={goal.label} progress={percentage(goal.current, goal.target)}>
                       <div className="text-xl font-semibold tabular-nums text-foreground">{goal.currentLabel}</div>
                     </ProgressRing>
-                    <p className="mt-4 text-xs uppercase tracking-wide text-muted-foreground">{goal.label.replace(' goal', '')}</p>
                   </button>
                 ))}
               </div>
@@ -1160,7 +1168,13 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                     educationRows={edu}
                     visitRows={vis}
                     incidentRows={inc}
-                    relatedPlan={expandedGoal === 'health' ? latestHealthPlan : expandedGoal === 'education' ? latestEducationPlan : latestSafetyPlan}
+                    relatedPlan={
+                      expandedGoal === 'health'
+                        ? latestHealthPlan
+                        : expandedGoal === 'education'
+                          ? latestEducationPlan
+                          : latestSafetyPlan
+                    }
                     onReload={load}
                     onAddHealth={() => bumpCreate('health')}
                     onAddEducation={() => bumpCreate('education')}
@@ -1175,6 +1189,10 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
                     }}
                     onOpenIncident={(row) => setIncidentDrawer({ mode: 'view', row })}
                     onOpenVisit={(row) => setVisitDrawer({ mode: 'view', row })}
+                    onEditIncident={(row) => setIncidentDrawer({ mode: 'edit', row })}
+                    onEditVisit={(row) => setVisitDrawer({ mode: 'edit', row })}
+                    onRequestDeleteIncident={(id) => setDeleteIncidentId(id)}
+                    onRequestDeleteVisit={(id) => setDeleteVisitId(id)}
                   />
                 </InlineDetailCard>
               ) : null}
@@ -1554,15 +1572,6 @@ function OverviewSection({ title, children }: { title: string; children: ReactNo
   )
 }
 
-function InlineDetailCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card px-5 py-5">
-      <h4 className="text-base font-semibold text-foreground">{title}</h4>
-      <div className="mt-4">{children}</div>
-    </div>
-  )
-}
-
 function FocusCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -1612,33 +1621,32 @@ function SummaryTile({ label, value }: { label: string; value: string | number }
 
 function ProgressRing({ label, progress, children }: { label: string; progress: number; children: ReactNode }) {
   const normalized = Math.max(0, Math.min(progress, 100))
-  const radius = 36
+  const radius = 44
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference * (1 - normalized / 100)
-  const vb = 88
+  const vb = 108
   const c = vb / 2
+  const sw = 7
   return (
-    <div className="flex flex-col items-center text-center">
-      <div className="relative h-[7.5rem] w-[7.5rem] shrink-0">
+    <div className="flex flex-col items-center text-center" aria-label={`${label}, ${Math.round(normalized)} percent of target`}>
+      <div className="relative h-[9.25rem] w-[9.25rem] shrink-0">
         <svg viewBox={`0 0 ${vb} ${vb}`} className="h-full w-full -rotate-90">
-          <circle cx={c} cy={c} r={radius} fill="none" stroke="currentColor" strokeOpacity="0.14" strokeWidth="5" />
+          <circle cx={c} cy={c} r={radius} fill="none" stroke="currentColor" strokeOpacity="0.12" strokeWidth={sw} />
           <circle
             cx={c}
             cy={c}
             r={radius}
             fill="none"
             stroke="currentColor"
-            strokeWidth="5"
+            strokeWidth={sw}
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={dashOffset}
             className="text-primary"
           />
         </svg>
-        <div className="absolute inset-0 grid place-items-center px-1 text-center">{children}</div>
+        <div className="absolute inset-0 grid place-items-center px-2 text-center">{children}</div>
       </div>
-      <p className="mt-3 text-sm font-semibold text-foreground">{label}</p>
-      <p className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">{Math.round(normalized)}% of target</p>
     </div>
   )
 }
@@ -1648,6 +1656,15 @@ function InlineActionButton({ children, onClick }: { children: ReactNode; onClic
     <button type="button" className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50" onClick={onClick}>
       {children}
     </button>
+  )
+}
+
+function InlineDetailCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <h4 className="text-sm font-semibold text-foreground">{title}</h4>
+      <div className="mt-4">{children}</div>
+    </div>
   )
 }
 
@@ -1701,6 +1718,10 @@ function GoalDrillIn({
   onOpenEducation,
   onOpenIncident,
   onOpenVisit,
+  onEditIncident,
+  onEditVisit,
+  onRequestDeleteIncident,
+  onRequestDeleteVisit,
 }: {
   goal: GoalKey
   data: GoalCardData
@@ -1717,6 +1738,10 @@ function GoalDrillIn({
   onOpenEducation: (id: number) => void
   onOpenIncident: (row: JsonTableRow) => void
   onOpenVisit: (row: HomeVisitation) => void
+  onEditIncident: (row: JsonTableRow) => void
+  onEditVisit: (row: HomeVisitation) => void
+  onRequestDeleteIncident: (id: number) => void
+  onRequestDeleteVisit: (id: number) => void
 }) {
   if (goal === 'health') {
     return (
@@ -1736,6 +1761,7 @@ function GoalDrillIn({
       <EducationGoalDrillIn
         educationRows={educationRows}
         relatedPlan={relatedPlan}
+        onReload={onReload}
         onAddEducation={onAddEducation}
         onOpenEducation={onOpenEducation}
       />
@@ -1748,9 +1774,14 @@ function GoalDrillIn({
         visitRows={visitRows}
         incidentRows={incidentRows}
         relatedPlan={relatedPlan}
+        onReload={onReload}
         onLogIncident={onLogIncident}
         onOpenIncident={onOpenIncident}
         onOpenVisit={onOpenVisit}
+        onEditIncident={onEditIncident}
+        onEditVisit={onEditVisit}
+        onRequestDeleteIncident={onRequestDeleteIncident}
+        onRequestDeleteVisit={onRequestDeleteVisit}
       />
     )
   }
@@ -1869,7 +1900,7 @@ function RecapScoreCell({ label, valueNum }: { label: string; valueNum: number |
 function HealthGoalDrillIn({
   data,
   healthRows,
-  relatedPlan,
+  relatedPlan: _relatedPlan,
   onReload,
   onAddHealth,
   onOpenHealth,
@@ -1881,6 +1912,7 @@ function HealthGoalDrillIn({
   onAddHealth: () => void
   onOpenHealth: (id: number) => void
 }) {
+  void _relatedPlan
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [apptSearch, setApptSearch] = useState('')
   const [apptFilter, setApptFilter] = useState<'all' | 'stable' | 'improving' | 'declining'>('all')
@@ -2112,18 +2144,6 @@ function HealthGoalDrillIn({
           <InlineActionButton onClick={onAddHealth}>Add</InlineActionButton>
         </div>
 
-        <p className="text-sm font-semibold text-foreground">Appointment notes</p>
-
-        {relatedPlan ? (
-          <div className="rounded-xl bg-muted/20 px-4 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <CategoryBadge>{relatedPlan.planCategory}</CategoryBadge>
-              <StatusBadge status={relatedPlan.status} />
-            </div>
-            <p className="mt-2 text-sm text-foreground">{relatedPlan.planDescription}</p>
-          </div>
-        ) : null}
-
         {notesErr ? <div className={alertError}>{notesErr}</div> : null}
 
         {sortedRows.length === 0 ? (
@@ -2232,49 +2252,170 @@ function HealthGoalDrillIn({
 
 function EducationGoalDrillIn({
   educationRows,
-  relatedPlan,
+  relatedPlan: _relatedPlan,
+  onReload,
   onAddEducation,
   onOpenEducation,
 }: {
   educationRows: EducationRecord[]
   relatedPlan: InterventionPlan | null
+  onReload: () => Promise<void>
   onAddEducation: () => void
   onOpenEducation: (id: number) => void
 }) {
+  void _relatedPlan
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const sortedRows = byNewestDate(educationRows, (row) => row.recordDate)
+  const [edSearch, setEdSearch] = useState('')
+  const [edFilter, setEdFilter] = useState<'all' | 'active' | 'completed'>('all')
+  const [notesDraft, setNotesDraft] = useState('')
+  const [schoolDraft, setSchoolDraft] = useState('')
+  const [levelDraft, setLevelDraft] = useState('')
+  const [enrollDraft, setEnrollDraft] = useState('')
+  const [completeDraft, setCompleteDraft] = useState('')
+  const [attendPctDraft, setAttendPctDraft] = useState('')
+  const [progressDraft, setProgressDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [deleteId, setDeleteId] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const sortedRows = useMemo(() => byNewestDate(educationRows, (row) => row.recordDate), [educationRows])
   const latest = sortedRows[0] ?? null
-  const distinctCourses = new Set(
-    sortedRows
-      .map((row) => {
-        const ext = parseEducationExtendedLite(row.extendedJson)
-        return ext.courseName || row.schoolName || ''
-      })
-      .filter(Boolean),
-  ).size
+  const distinctCourses = useMemo(
+    () =>
+      new Set(
+        sortedRows
+          .map((row) => {
+            const ext = parseEducationExtendedLite(row.extendedJson)
+            return ext.courseName || row.schoolName || ''
+          })
+          .filter(Boolean),
+      ).size,
+    [sortedRows],
+  )
   const latestProgress = latest?.progressPercent ?? null
   const latestAttendance = latest?.attendanceRate ?? null
 
-  const chartPoints = sortedRows
-    .slice()
-    .reverse()
-    .filter((row) => row.attendanceRate != null)
-    .map((row) => ({
-      label: new Date(row.recordDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      value: (row.attendanceRate ?? 0) * 100,
-    }))
+  const chartPoints = useMemo(
+    () =>
+      sortedRows
+        .slice()
+        .reverse()
+        .filter((row) => row.attendanceRate != null)
+        .map((row) => ({
+          label: new Date(row.recordDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          value: (row.attendanceRate ?? 0) * 100,
+        })),
+    [sortedRows],
+  )
+
+  const filteredRows = useMemo(() => {
+    let list = sortedRows
+    if (edSearch.trim()) {
+      const s = edSearch.trim().toLowerCase()
+      list = list.filter(
+        (r) =>
+          (r.schoolName ?? '').toLowerCase().includes(s) ||
+          (r.notes ?? '').toLowerCase().includes(s) ||
+          formatAdminDate(r.recordDate).toLowerCase().includes(s) ||
+          (r.educationLevel ?? '').toLowerCase().includes(s),
+      )
+    }
+    if (edFilter !== 'all') {
+      list = list.filter((r) => {
+        const c = (r.completionStatus ?? '').toLowerCase()
+        if (edFilter === 'completed') return c.includes('complete') || c.includes('graduat')
+        return !(c.includes('complete') || c.includes('graduat'))
+      })
+    }
+    if (selectedId != null && !list.some((r) => r.id === selectedId)) {
+      const sel = sortedRows.find((r) => r.id === selectedId)
+      if (sel) list = [sel, ...list]
+    }
+    return list
+  }, [sortedRows, edSearch, edFilter, selectedId])
+
+  const selectedRow = sortedRows.find((r) => r.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (!selectedRow) {
+      setNotesDraft('')
+      setSchoolDraft('')
+      setLevelDraft('')
+      setEnrollDraft('')
+      setCompleteDraft('')
+      setAttendPctDraft('')
+      setProgressDraft('')
+      return
+    }
+    setNotesDraft(selectedRow.notes ?? '')
+    setSchoolDraft(selectedRow.schoolName ?? '')
+    setLevelDraft(selectedRow.educationLevel ?? '')
+    setEnrollDraft(selectedRow.enrollmentStatus ?? '')
+    setCompleteDraft(selectedRow.completionStatus ?? '')
+    setAttendPctDraft(
+      selectedRow.attendanceRate != null ? String(Math.round(selectedRow.attendanceRate * 100)) : '',
+    )
+    setProgressDraft(selectedRow.progressPercent != null ? String(Math.round(selectedRow.progressPercent)) : '')
+    setErr(null)
+  }, [selectedRow?.id, selectedRow?.notes, selectedRow?.schoolName])
+
+  async function saveEducation(id: number) {
+    setErr(null)
+    const att = attendPctDraft.trim()
+    const pr = progressDraft.trim()
+    let attendanceRate: number | null | undefined
+    if (att !== '') {
+      const n = parseFloat(att)
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        setErr('Attendance must be between 0 and 100%.')
+        return
+      }
+      attendanceRate = n / 100
+    }
+    let progressPercent: number | null | undefined
+    if (pr !== '') {
+      const n = parseFloat(pr)
+      if (!Number.isFinite(n) || n < 0 || n > 100) {
+        setErr('Progress must be between 0 and 100.')
+        return
+      }
+      progressPercent = n
+    }
+    setSaving(true)
+    try {
+      await patchEducationRecord(id, {
+        notes: notesDraft.trim(),
+        schoolName: schoolDraft.trim() || null,
+        educationLevel: levelDraft.trim() || null,
+        enrollmentStatus: enrollDraft.trim() || null,
+        completionStatus: completeDraft.trim() || null,
+        ...(att !== '' ? { attendanceRate } : {}),
+        ...(pr !== '' ? { progressPercent } : {}),
+      })
+      await onReload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border bg-background px-4 py-4">
         <p className="text-sm font-semibold text-foreground">Education</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Participation is tracked as attendance rate (0–100%) per record date.
+        </p>
         {chartPoints.length > 0 ? (
           <div className="mt-4">
             <SimpleLineChart
               points={chartPoints}
               formatY={(n) => `${Math.round(n)}%`}
-              height={220}
-              ariaLabel="Attendance trend"
+              height={232}
+              ariaLabel="Attendance participation over time"
+              chartCaption="Attendance participation (%)"
             />
           </div>
         ) : (
@@ -2289,72 +2430,159 @@ function EducationGoalDrillIn({
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground">Records</p>
-          <div className="flex flex-wrap gap-2">
-            <InlineActionButton onClick={onAddEducation}>Add education record</InlineActionButton>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[10rem] flex-1">
+            <label className={label} htmlFor="ed-rec-search">
+              Search
+            </label>
+            <input
+              id="ed-rec-search"
+              type="search"
+              className={input}
+              value={edSearch}
+              onChange={(e) => setEdSearch(e.target.value)}
+              placeholder="School, notes, date…"
+            />
           </div>
+          <label className={label}>
+            Filter
+            <select
+              className={input}
+              value={edFilter}
+              onChange={(e) => setEdFilter(e.target.value as typeof edFilter)}
+            >
+              <option value="all">All</option>
+              <option value="active">Active / in progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+          <InlineActionButton onClick={onAddEducation}>Add</InlineActionButton>
         </div>
-        {relatedPlan ? (
-          <div className="rounded-xl bg-muted/20 px-4 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <CategoryBadge>{relatedPlan.planCategory}</CategoryBadge>
-              <StatusBadge status={relatedPlan.status} />
-            </div>
-            <p className="mt-2 text-sm text-foreground">{relatedPlan.planDescription}</p>
-          </div>
-        ) : null}
+
+        {err ? <div className={alertError}>{err}</div> : null}
+
         {sortedRows.length === 0 ? (
           <EmptyState title="No education records yet" />
         ) : (
-          sortedRows.map((row) => {
+          filteredRows.map((row) => {
             const ext = parseEducationExtendedLite(row.extendedJson)
             const status = ext.attendanceStatus || row.enrollmentStatus || row.completionStatus || 'No status'
             return (
-              <button
+              <div
                 key={row.id}
-                type="button"
-                onClick={() => setSelectedId((value) => (value === row.id ? null : row.id))}
-                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/30"
+                className={`w-full rounded-xl border bg-card px-4 py-3 ${selectedId === row.id ? 'border-primary' : 'border-border'}`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">{formatAdminDate(row.recordDate)}</span>
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                      Attend {row.attendanceRate != null ? `${Math.round(row.attendanceRate * 100)}%` : '—'}
-                    </span>
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                      Progress {row.progressPercent != null ? `${Math.round(row.progressPercent)}%` : '—'}
-                    </span>
+                <button
+                  type="button"
+                  className="w-full text-left hover:opacity-95"
+                  onClick={() => setSelectedId((value) => (value === row.id ? null : row.id))}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">{formatAdminDate(row.recordDate)}</span>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                        Attend {row.attendanceRate != null ? `${Math.round(row.attendanceRate * 100)}%` : '—'}
+                      </span>
+                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                        Progress {row.progressPercent != null ? `${Math.round(row.progressPercent)}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{status}</span>
+                      <span className="text-sm text-muted-foreground">{selectedId === row.id ? 'Hide' : 'Open'}</span>
+                    </div>
                   </div>
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{status}</span>
-                </div>
+                </button>
                 {selectedId === row.id ? (
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className="mt-4 space-y-4 border-t border-border/60 pt-4">
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <MiniMetric label="School" value={row.schoolName || '—'} />
-                      <MiniMetric label="Level" value={row.educationLevel || '—'} />
                       <MiniMetric label="Program" value={ext.programName || '—'} />
                       <MiniMetric label="Course" value={ext.courseName || '—'} />
-                      <MiniMetric label="Enrollment" value={row.enrollmentStatus || '—'} />
-                      <MiniMetric label="Completion" value={row.completionStatus || '—'} />
                     </div>
-                    <div className="rounded-lg bg-muted/20 px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{status}</span>
-                      </div>
-                      <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{row.notes || 'No notes recorded.'}</p>
-                      <div className="mt-4">
-                        <InlineActionButton onClick={() => onOpenEducation(row.id)}>Open full record</InlineActionButton>
-                      </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className={label}>
+                        School
+                        <input className={input} value={schoolDraft} onChange={(e) => setSchoolDraft(e.target.value)} />
+                      </label>
+                      <label className={label}>
+                        Education level
+                        <input className={input} value={levelDraft} onChange={(e) => setLevelDraft(e.target.value)} />
+                      </label>
+                      <label className={label}>
+                        Enrollment status
+                        <input className={input} value={enrollDraft} onChange={(e) => setEnrollDraft(e.target.value)} />
+                      </label>
+                      <label className={label}>
+                        Completion status
+                        <input className={input} value={completeDraft} onChange={(e) => setCompleteDraft(e.target.value)} />
+                      </label>
+                      <label className={label}>
+                        Attendance (%)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={attendPctDraft}
+                          onChange={(e) => setAttendPctDraft(e.target.value)}
+                          placeholder="e.g. 85"
+                        />
+                      </label>
+                      <label className={label}>
+                        Progress (%)
+                        <input
+                          className={input}
+                          inputMode="decimal"
+                          value={progressDraft}
+                          onChange={(e) => setProgressDraft(e.target.value)}
+                          placeholder="e.g. 72"
+                        />
+                      </label>
+                    </div>
+                    <label className={label}>
+                      Notes
+                      <textarea className={input} rows={4} value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} />
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className={btnPrimary} disabled={saving} onClick={() => void saveEducation(row.id)}>
+                        {saving ? 'Saving…' : 'Save changes'}
+                      </button>
+                      <InlineActionButton onClick={() => onOpenEducation(row.id)}>Full record</InlineActionButton>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteId(row.id)}
+                      >
+                        Delete…
+                      </button>
                     </div>
                   </div>
                 ) : null}
-              </button>
+              </div>
             )
           })
         )}
       </div>
+
+      <AdminDeleteModal
+        open={deleteId != null}
+        title="Delete this education record?"
+        body="This removes the row from education_records. This cannot be undone."
+        loading={deleting}
+        onCancel={() => setDeleteId(null)}
+        onConfirm={async () => {
+          if (deleteId == null) return
+          setDeleting(true)
+          try {
+            await deleteEducationRecord(deleteId)
+            setDeleteId(null)
+            setSelectedId(null)
+            await onReload()
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : 'Delete failed')
+          } finally {
+            setDeleting(false)
+          }
+        }}
+      />
     </div>
   )
 }
@@ -2362,18 +2590,30 @@ function EducationGoalDrillIn({
 function SafetyGoalDrillIn({
   visitRows,
   incidentRows,
-  relatedPlan,
+  relatedPlan: _relatedPlan,
+  onReload: _onReload,
   onLogIncident,
   onOpenIncident,
   onOpenVisit,
+  onEditIncident,
+  onEditVisit,
+  onRequestDeleteIncident,
+  onRequestDeleteVisit,
 }: {
   visitRows: HomeVisitation[]
   incidentRows: JsonTableRow[]
   relatedPlan: InterventionPlan | null
+  onReload: () => Promise<void>
   onLogIncident: () => void
   onOpenIncident: (row: JsonTableRow) => void
   onOpenVisit: (row: HomeVisitation) => void
+  onEditIncident: (row: JsonTableRow) => void
+  onEditVisit: (row: HomeVisitation) => void
+  onRequestDeleteIncident: (id: number) => void
+  onRequestDeleteVisit: (id: number) => void
 }) {
+  void _relatedPlan
+  void _onReload
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'visit' | 'incident'>('all')
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
@@ -2386,6 +2626,8 @@ function SafetyGoalDrillIn({
       .map((row) => ({
         key: `visit-${row.id}`,
         type: 'visit' as const,
+        visitRow: row,
+        incidentRow: null as JsonTableRow | null,
         sort: new Date(row.visitDate).getTime(),
         date: row.visitDate,
         location: row.locationVisited || '—',
@@ -2398,12 +2640,13 @@ function SafetyGoalDrillIn({
           notes: row.followUpNotes || row.observations || row.purpose || 'No notes recorded.',
           worker: row.socialWorker,
         },
-        onOpen: () => onOpenVisit(row),
       }))
 
     const incidentItems = incidentRows.map((row) => ({
       key: `incident-${row.id}`,
       type: 'incident' as const,
+      visitRow: null as HomeVisitation | null,
+      incidentRow: row,
       sort: new Date(row.fields.incident_date ?? '').getTime(),
       date: row.fields.incident_date ?? '',
       location: row.fields.safehouse_id ? `Safehouse ${row.fields.safehouse_id}` : '—',
@@ -2416,7 +2659,6 @@ function SafetyGoalDrillIn({
         notes: row.fields.description || 'No notes recorded.',
         worker: row.fields.reported_by || '—',
       },
-      onOpen: () => onOpenIncident(row),
     }))
 
     return [...visitItems, ...incidentItems]
@@ -2427,7 +2669,7 @@ function SafetyGoalDrillIn({
         if (!q) return true
         return `${row.location} ${row.chip} ${row.detail.notes} ${row.detail.status}`.toLowerCase().includes(q)
       })
-  }, [filter, incidentRows, onOpenIncident, onOpenVisit, search, visitRows])
+  }, [filter, incidentRows, search, visitRows])
 
   return (
     <div className="space-y-5">
@@ -2447,80 +2689,109 @@ function SafetyGoalDrillIn({
       </div>
 
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-foreground">Records</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-[10rem] flex-1">
+            <label className={label} htmlFor="safety-rec-search">
+              Search
+            </label>
             <input
+              id="safety-rec-search"
               type="search"
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              className={input}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search"
+              placeholder="Notes, location, type…"
             />
+          </div>
+          <label className={label}>
+            Filter
             <select
-              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              className={input}
               value={filter}
-              onChange={(e) => setFilter(e.target.value as 'all' | 'visit' | 'incident')}
+              onChange={(e) => setFilter(e.target.value as typeof filter)}
             >
               <option value="all">All</option>
               <option value="visit">Visits</option>
               <option value="incident">Incidents</option>
             </select>
-            <InlineActionButton onClick={onLogIncident}>Add</InlineActionButton>
-          </div>
+          </label>
+          <InlineActionButton onClick={onLogIncident}>Add</InlineActionButton>
         </div>
-        {relatedPlan ? (
-          <div className="rounded-xl bg-muted/20 px-4 py-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <CategoryBadge>{relatedPlan.planCategory}</CategoryBadge>
-              <StatusBadge status={relatedPlan.status} />
-            </div>
-            <p className="mt-2 text-sm text-foreground">{relatedPlan.planDescription}</p>
-          </div>
-        ) : null}
+
         {safetyRecords.length === 0 ? (
           <EmptyState title="No safety records yet" />
         ) : (
           safetyRecords.map((row) => (
-            <button
+            <div
               key={row.key}
-              type="button"
-              onClick={() => setExpandedKey((value) => (value === row.key ? null : row.key))}
-              className="w-full rounded-xl border border-border bg-card px-4 py-3 text-left hover:bg-muted/30"
+              className={`w-full rounded-xl border bg-card px-4 py-3 ${expandedKey === row.key ? 'border-primary' : 'border-border'}`}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-foreground">
-                    {formatAdminDate(row.date)}
-                    {row.location !== '—' ? ` · ${row.location}` : ''}
-                  </span>
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{row.chip}</span>
-                  {row.detail.outcome !== '—' ? (
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{row.detail.outcome}</span>
-                  ) : null}
-                </div>
-                <span className="text-sm text-muted-foreground">{expandedKey === row.key ? 'Hide' : 'Open'}</span>
-              </div>
-              {expandedKey === row.key ? (
-                <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <MiniMetric label="Date" value={formatAdminDate(row.date)} />
-                    <MiniMetric label="Location" value={row.detail.location} />
-                    <MiniMetric label="Type" value={row.detail.type} />
-                    <MiniMetric label="Status" value={row.detail.status} />
-                    <MiniMetric label="Outcome" value={row.detail.outcome} />
-                    <MiniMetric label="Worker" value={row.detail.worker} />
+              <button
+                type="button"
+                className="w-full text-left hover:opacity-95"
+                onClick={() => setExpandedKey((value) => (value === row.key ? null : row.key))}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-foreground">
+                      {formatAdminDate(row.date)}
+                      {row.location !== '—' ? ` · ${row.location}` : ''}
+                    </span>
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">{row.chip}</span>
+                    {row.detail.outcome !== '—' ? (
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{row.detail.outcome}</span>
+                    ) : null}
                   </div>
-                  <div className="rounded-lg bg-muted/20 px-4 py-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Details</p>
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{row.detail.notes}</p>
-                    <div className="mt-4">
-                      <InlineActionButton onClick={row.onOpen}>Open full record</InlineActionButton>
+                  <span className="text-sm text-muted-foreground">{expandedKey === row.key ? 'Hide' : 'Open'}</span>
+                </div>
+              </button>
+              {expandedKey === row.key ? (
+                <div className="mt-4 space-y-4 border-t border-border/60 pt-4">
+                  <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <MiniMetric label="Date" value={formatAdminDate(row.date)} />
+                      <MiniMetric label="Location" value={row.detail.location} />
+                      <MiniMetric label="Type" value={row.detail.type} />
+                      <MiniMetric label="Status" value={row.detail.status} />
+                      <MiniMetric label="Outcome" value={row.detail.outcome} />
+                      <MiniMetric label="Worker" value={row.detail.worker} />
                     </div>
+                    <div className="rounded-lg bg-muted/20 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Details</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{row.detail.notes}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {row.type === 'visit' && row.visitRow ? (
+                      <>
+                        <InlineActionButton onClick={() => onEditVisit(row.visitRow!)}>Edit</InlineActionButton>
+                        <InlineActionButton onClick={() => onOpenVisit(row.visitRow!)}>View</InlineActionButton>
+                        <button
+                          type="button"
+                          className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                          onClick={() => onRequestDeleteVisit(row.visitRow!.id)}
+                        >
+                          Delete…
+                        </button>
+                      </>
+                    ) : null}
+                    {row.type === 'incident' && row.incidentRow ? (
+                      <>
+                        <InlineActionButton onClick={() => onEditIncident(row.incidentRow!)}>Edit</InlineActionButton>
+                        <InlineActionButton onClick={() => onOpenIncident(row.incidentRow!)}>View</InlineActionButton>
+                        <button
+                          type="button"
+                          className="rounded-lg border border-destructive/50 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10"
+                          onClick={() => onRequestDeleteIncident(row.incidentRow!.id)}
+                        >
+                          Delete…
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
-            </button>
+            </div>
           ))
         )}
       </div>

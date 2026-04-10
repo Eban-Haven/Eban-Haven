@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { card, sectionFormTitle } from '../../shared/adminStyles'
 
 type ChartCardProps = {
@@ -39,12 +40,16 @@ export function SimpleLineChart({
   formatY,
   height = 200,
   ariaLabel,
+  chartCaption,
 }: {
   points: { label: string; value: number }[]
   formatY: (n: number) => string
   height?: number
   ariaLabel: string
+  /** Shown above the chart (e.g. axis / metric title). */
+  chartCaption?: string
 }) {
+  const [hover, setHover] = useState<number | null>(null)
   if (points.length === 0) return null
   const vals = points.map((p) => p.value)
   const max = Math.max(...vals, 1)
@@ -62,34 +67,61 @@ export function SimpleLineChart({
   const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
   return (
-    <svg
-      viewBox={`0 0 ${w} ${height}`}
-      className="h-auto w-full text-primary"
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <title>{ariaLabel}</title>
-      <path
-        d={d}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-primary"
-      />
-      {pts.map((p, i) => (
-        <g key={i}>
-          <circle cx={p.x} cy={p.y} r="4" className="fill-primary" />
-          <text x={p.x} y={height - 4} textAnchor="middle" className="fill-muted-foreground text-[9px]">
-            {p.label}
+    <div className="space-y-2">
+      {chartCaption ? <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{chartCaption}</p> : null}
+      <div className="relative rounded-lg border border-border/50 bg-muted/15 p-2" onMouseLeave={() => setHover(null)}>
+        {hover != null && points[hover] ? (
+          <div
+            className="pointer-events-none absolute left-3 top-10 z-10 max-w-[14rem] rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md"
+            role="status"
+          >
+            <p className="font-semibold text-foreground">{points[hover].label}</p>
+            <p className="mt-0.5 tabular-nums text-muted-foreground">{formatY(points[hover].value)}</p>
+          </div>
+        ) : null}
+        <svg
+          viewBox={`0 0 ${w} ${height}`}
+          className="h-auto w-full text-primary"
+          role="img"
+          aria-label={ariaLabel}
+        >
+          <title>{ariaLabel}</title>
+          <text x={pad} y={14} className="fill-muted-foreground text-[10px]">
+            {formatY(max)} – {formatY(min)}
           </text>
-        </g>
-      ))}
-      <text x={pad} y={14} className="fill-muted-foreground text-[10px]">
-        {formatY(max)} – {formatY(min)}
-      </text>
-    </svg>
+          <path
+            d={d}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-primary"
+          />
+          {pts.map((p, i) => (
+            <g key={i}>
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r="14"
+                fill="transparent"
+                className="cursor-crosshair"
+                onMouseEnter={() => setHover(i)}
+              />
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={hover === i ? 6 : 4}
+                className="fill-primary transition-[r] duration-150"
+              />
+              <text x={p.x} y={height - 4} textAnchor="middle" className="fill-muted-foreground text-[9px] pointer-events-none">
+                {p.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
   )
 }
 
@@ -118,6 +150,7 @@ export function SimpleMultiLineChart({
   yMin?: number
   yMax?: number
 }) {
+  const [hoverI, setHoverI] = useState<number | null>(null)
   if (labels.length === 0) return null
   const flat = series.flatMap((s) => s.values.filter((v): v is number => v != null && Number.isFinite(v)))
   const minV = yMin ?? (flat.length ? Math.min(...flat, 1) : 1)
@@ -125,8 +158,9 @@ export function SimpleMultiLineChart({
   const span = Math.max(maxV - minV, 0.01)
   const w = 400
   const pad = 28
+  const bottomPad = 22
   const innerW = w - pad * 2
-  const innerH = height - pad * 2
+  const innerH = height - pad - bottomPad
   const n = labels.length
 
   function xAt(i: number) {
@@ -136,54 +170,109 @@ export function SimpleMultiLineChart({
     return pad + innerH - ((val - minV) / span) * innerH
   }
 
+  const bandW = n <= 1 ? innerW : innerW / (n - 1)
+
   return (
     <div className="space-y-3">
-      <svg viewBox={`0 0 ${w} ${height}`} className="h-auto w-full" role="img" aria-label={ariaLabel}>
-        <title>{ariaLabel}</title>
-        <text x={pad} y={16} className="fill-muted-foreground text-[10px]">
-          {formatY(maxV)} – {formatY(minV)}
-        </text>
-        {series.map((s) => {
-          const segments: string[] = []
-          let d = ''
-          for (let i = 0; i < n; i++) {
-            const v = s.values[i]
-            if (v == null || !Number.isFinite(v)) {
-              if (d) {
-                segments.push(d)
-                d = ''
-              }
-              continue
-            }
-            const x = xAt(i)
-            const y = yAt(v)
-            d += d === '' ? `M ${x} ${y}` : ` L ${x} ${y}`
-          }
-          if (d) segments.push(d)
-          return segments.map((pathD, segIdx) => (
-            <path
-              key={`${s.key}-${segIdx}`}
-              d={pathD}
-              fill="none"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={s.strokeClass}
-            />
-          ))
-        })}
-        {series.map((s) =>
-          s.values.map((v, i) => {
-            if (v == null || !Number.isFinite(v)) return null
-            return <circle key={`${s.key}-pt-${i}`} cx={xAt(i)} cy={yAt(v)} r="3.5" className={s.fillClass} />
-          }),
-        )}
-        {labels.map((lab, i) => (
-          <text key={`${lab}-${i}`} x={xAt(i)} y={height - 6} textAnchor="middle" className="fill-muted-foreground text-[8px]">
-            {lab}
+      <div
+        className="relative rounded-xl border border-border/60 bg-gradient-to-b from-muted/25 to-muted/5 p-3 shadow-sm"
+        onMouseLeave={() => setHoverI(null)}
+      >
+        {hoverI != null && labels[hoverI] ? (
+          <div
+            className="pointer-events-none absolute right-3 top-3 z-10 max-w-[16rem] rounded-lg border border-border bg-card/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm"
+            role="status"
+          >
+            <p className="font-semibold text-foreground">{labels[hoverI]}</p>
+            <ul className="mt-1.5 space-y-0.5">
+              {series.map((s) => {
+                const v = s.values[hoverI]
+                if (v == null || !Number.isFinite(v)) return null
+                return (
+                  <li key={s.key} className="flex justify-between gap-3 tabular-nums">
+                    <span className="text-muted-foreground">{s.name}</span>
+                    <span className="font-medium text-foreground">{formatY(v)}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+        ) : null}
+        <svg viewBox={`0 0 ${w} ${height}`} className="h-auto w-full" role="img" aria-label={ariaLabel}>
+          <title>{ariaLabel}</title>
+          <text x={pad} y={16} className="fill-muted-foreground text-[10px]">
+            Scale {formatY(maxV)} – {formatY(minV)}
           </text>
-        ))}
-      </svg>
+          {[0, 0.25, 0.5, 0.75, 1].map((t) => {
+            const y = pad + innerH * (1 - t)
+            return (
+              <line
+                key={t}
+                x1={pad}
+                y1={y}
+                x2={w - pad}
+                y2={y}
+                className="stroke-border/40"
+                strokeWidth="1"
+                strokeDasharray="4 6"
+              />
+            )
+          })}
+          {series.map((s) => {
+            const segments: string[] = []
+            let d = ''
+            for (let i = 0; i < n; i++) {
+              const v = s.values[i]
+              if (v == null || !Number.isFinite(v)) {
+                if (d) {
+                  segments.push(d)
+                  d = ''
+                }
+                continue
+              }
+              const x = xAt(i)
+              const y = yAt(v)
+              d += d === '' ? `M ${x} ${y}` : ` L ${x} ${y}`
+            }
+            if (d) segments.push(d)
+            return segments.map((pathD, segIdx) => (
+              <path
+                key={`${s.key}-${segIdx}`}
+                d={pathD}
+                fill="none"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={s.strokeClass}
+              />
+            ))
+          })}
+          {series.map((s) =>
+            s.values.map((v, i) => {
+              if (v == null || !Number.isFinite(v)) return null
+              const r = hoverI === i ? 5 : 3.5
+              return <circle key={`${s.key}-pt-${i}`} cx={xAt(i)} cy={yAt(v)} r={r} className={s.fillClass} />
+            }),
+          )}
+          {labels.map((lab, i) => (
+            <text key={`${lab}-${i}`} x={xAt(i)} y={height - 6} textAnchor="middle" className="fill-muted-foreground text-[8px] pointer-events-none">
+              {lab}
+            </text>
+          ))}
+          {labels.map((_, i) => (
+            <rect
+              key={`band-${i}`}
+              x={xAt(i) - bandW / 2}
+              y={pad}
+              width={bandW}
+              height={innerH}
+              fill="transparent"
+              className="cursor-crosshair"
+              onMouseEnter={() => setHoverI(i)}
+            />
+          ))}
+        </svg>
+      </div>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px]" aria-label="Legend">
         {series.map((s) => (
           <li key={s.key} className="flex items-center gap-1.5">

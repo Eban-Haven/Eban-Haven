@@ -1070,6 +1070,15 @@ public sealed class SupabaseLighthouseRepository(HavenDbContext db) : ILighthous
             NullIfEmpty(row.ExtendedJson));
     }
 
+    public bool DeleteEducationRecord(int id)
+    {
+        var row = db.EducationRecords.FirstOrDefault(x => x.EducationRecordId == id);
+        if (row is null) return false;
+        db.EducationRecords.Remove(row);
+        db.SaveChanges();
+        return true;
+    }
+
     public IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId)
     {
         IQueryable<HealthWellbeingRecord> q = db.HealthWellbeingRecords;

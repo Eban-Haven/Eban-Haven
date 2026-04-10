@@ -55,6 +55,7 @@ export {
   listEducationRecords,
   createEducationRecord,
   patchEducationRecord,
+  deleteEducationRecord,
   listHealthRecords,
   createHealthRecord,
   patchHealthRecord,

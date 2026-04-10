@@ -55,6 +55,7 @@ public interface ILighthouseRepository
     EducationRecordDto? PatchEducationRecord(int id, string? educationLevel, string? schoolName, string? enrollmentStatus,
         double? attendanceRate, double? progressPercent, string? completionStatus, string? notes, DateOnly? recordDate,
         string? extendedJson = null);
+    bool DeleteEducationRecord(int id);
     IReadOnlyList<HealthRecordDto> ListHealthRecords(int? residentId);
     HealthRecordDto CreateHealthRecord(int residentId, DateOnly recordDate, double? healthScore, double? nutritionScore,
         double? sleepQualityScore, double? energyLevelScore, double? heightCm, double? weightKg, double? bmi,

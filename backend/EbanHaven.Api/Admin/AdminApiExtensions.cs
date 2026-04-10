@@ -345,6 +345,9 @@ public static class AdminApiExtensions
             return u is null ? Results.NotFound() : Results.Ok(u);
         });
 
+        admin.MapDelete("/education-records/{id:int}", (int id, ILighthouseRepository repo) =>
+            repo.DeleteEducationRecord(id) ? Results.NoContent() : Results.NotFound());
+
         admin.MapGet("/health-records", (int? residentId, ILighthouseRepository repo) =>
             Results.Ok(repo.ListHealthRecords(residentId)));
 

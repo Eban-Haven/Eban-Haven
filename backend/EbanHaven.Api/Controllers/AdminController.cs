@@ -411,6 +411,9 @@ public sealed class AdminController(ILighthouseRepository repo) : ControllerBase
         return u is null ? NotFound() : Ok(u);
     }
 
+    [HttpDelete("education-records/{id:int}")]
+    public IActionResult DeleteEducationRecord(int id) => repo.DeleteEducationRecord(id) ? NoContent() : NotFound();
+
     [HttpGet("health-records")]
     public IActionResult HealthRecords([FromQuery] int? residentId) => Ok(repo.ListHealthRecords(residentId));
 
