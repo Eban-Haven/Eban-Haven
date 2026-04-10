@@ -378,94 +378,119 @@ public sealed class SocialChatContextService(
 
     private async Task<PostStrategyInsightsSnapshot> GetPostStrategyInsightsAsync(CancellationToken cancellationToken)
     {
+        var evidenceStrength = "Directional guidance only — live social-post rankings plus any available ML analysis.";
+        var validated = new List<string>();
+        var directional = new List<string>();
+        var dataGaps = new List<string>();
+        var tacticalInsights = new List<SocialTacticalInsight>();
+        var recommendedHashtags = new List<string>();
+        var recommendations = new List<StrategyRecommendation>();
+        var mlUnavailableReason = string.Empty;
+
         try
         {
             var client = httpFactory.CreateClient("MlService");
             var response = await client.GetAsync("/marketing/post-strategy-analysis", cancellationToken);
 
-            if (!response.IsSuccessStatusCode)
-                return FallbackPostStrategyInsights("Post-strategy pipeline returned a non-success status.");
-
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-
-            var evidenceStrength = root.TryGetProperty("evidence_strength", out var ev)
-                ? ev.GetString() ?? "Live post-level analysis from ML pipeline."
-                : "Live post-level analysis from ML pipeline.";
-
-            var validated = ReadStringArray(root, "validated_findings");
-            var directional = ReadStringArray(root, "directional_findings");
-            var dataGaps = ReadStringArray(root, "data_gaps");
-            var tacticalInsights = new List<SocialTacticalInsight>();
-            var recommendedHashtags = new List<string>();
-
-            var recommendations = new List<StrategyRecommendation>();
-            if (root.TryGetProperty("recommendations", out var recs) &&
-                recs.ValueKind == JsonValueKind.Array)
+            if (response.IsSuccessStatusCode)
             {
-                foreach (var rec in recs.EnumerateArray())
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                evidenceStrength = root.TryGetProperty("evidence_strength", out var ev)
+                    ? ev.GetString() ?? "Live post-level analysis from ML pipeline."
+                    : "Live post-level analysis from ML pipeline.";
+
+                validated.AddRange(ReadStringArray(root, "validated_findings"));
+                directional.AddRange(ReadStringArray(root, "directional_findings"));
+                dataGaps.AddRange(ReadStringArray(root, "data_gaps"));
+
+                if (root.TryGetProperty("recommendations", out var recs) &&
+                    recs.ValueKind == JsonValueKind.Array)
                 {
-                    if (rec.ValueKind != JsonValueKind.Object) continue;
-                    var title = rec.TryGetProperty("title", out var titleProp)
-                        ? titleProp.GetString() ?? "Recommendation"
-                        : "Recommendation";
-                    var detail = rec.TryGetProperty("detail", out var detailProp)
-                        ? detailProp.GetString() ?? string.Empty
-                        : string.Empty;
-                    if (string.IsNullOrWhiteSpace(detail)) continue;
-                    recommendations.Add(new StrategyRecommendation(title, detail));
+                    foreach (var rec in recs.EnumerateArray())
+                    {
+                        if (rec.ValueKind != JsonValueKind.Object) continue;
+                        var title = rec.TryGetProperty("title", out var titleProp)
+                            ? titleProp.GetString() ?? "Recommendation"
+                            : "Recommendation";
+                        var detail = rec.TryGetProperty("detail", out var detailProp)
+                            ? detailProp.GetString() ?? string.Empty
+                            : string.Empty;
+                        if (string.IsNullOrWhiteSpace(detail)) continue;
+                        recommendations.Add(new StrategyRecommendation(title, detail));
+                    }
                 }
             }
-
-            var liveSocialInsights = await GetLiveSocialTacticalInsightsAsync(cancellationToken);
-            tacticalInsights.AddRange(liveSocialInsights.Insights);
-            recommendedHashtags.AddRange(liveSocialInsights.RecommendedHashtags);
-            dataGaps.AddRange(liveSocialInsights.DataGaps);
-
-            if (validated.Count == 0)
-                validated.Add("No post-level findings are validated yet. Treat content guidance as directional until the pipeline is run on attributed post outcomes.");
-
-            if (directional.Count == 0)
-                directional.Add("Track platform, CTA, timing, and attributed revenue per post so the analysis can move from hypothesis to evidence.");
-
-            if (tacticalInsights.Count > 0)
+            else
             {
-                directional.AddRange(tacticalInsights.Select(insight =>
-                    $"{insight.Title}: {insight.Value}. {insight.Detail}"));
+                mlUnavailableReason = "Post-strategy ML metadata is currently unavailable, so the chatbot is using live social rankings plus broader directional guidance.";
             }
-
-            if (recommendations.Count == 0)
-            {
-                recommendations.Add(new StrategyRecommendation(
-                    "Improve attribution",
-                    "Attach a campaign tag or tracked donation link to every published post so future runs can compare post characteristics against real revenue outcomes."
-                ));
-            }
-
-            if (dataGaps.Count == 0)
-                dataGaps.Add("No explicit data gaps were returned by the post-strategy pipeline.");
-
-            if (recommendedHashtags.Count == 0)
-                recommendedHashtags.AddRange(FallbackRecommendedHashtags());
-
-            return new PostStrategyInsightsSnapshot(
-                EvidenceStrength: evidenceStrength,
-                ValidatedFindings: validated,
-                DirectionalFindings: directional,
-                TacticalInsights: tacticalInsights,
-                RecommendedHashtags: recommendedHashtags
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray(),
-                Recommendations: recommendations,
-                DataGaps: dataGaps
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray());
         }
         catch
         {
-            return FallbackPostStrategyInsights("Post-strategy pipeline is currently unavailable.");
+            mlUnavailableReason = "Post-strategy ML pipeline is currently unavailable, so the chatbot is using live social rankings plus broader directional guidance.";
         }
+
+        var liveSocialInsights = await GetLiveSocialTacticalInsightsAsync(cancellationToken);
+        tacticalInsights.AddRange(liveSocialInsights.Insights);
+        recommendedHashtags.AddRange(liveSocialInsights.RecommendedHashtags);
+        dataGaps.AddRange(liveSocialInsights.DataGaps);
+
+        if (!string.IsNullOrWhiteSpace(mlUnavailableReason))
+            dataGaps.Add(mlUnavailableReason);
+
+        if (validated.Count == 0)
+            validated.Add("No post-level findings are statistically validated yet. Use the current social rankings as directional operational guidance, not causal proof.");
+
+        if (directional.Count == 0)
+            directional.Add("Track platform, CTA, timing, and attributed revenue per post so the analysis can move from hypothesis to evidence.");
+
+        if (tacticalInsights.Count > 0)
+        {
+            directional.AddRange(tacticalInsights.Select(insight =>
+                $"{insight.Title}: {insight.Value}. {insight.Detail}"));
+        }
+
+        if (recommendations.Count == 0)
+        {
+            recommendations.Add(new StrategyRecommendation(
+                "Improve attribution",
+                "Attach a campaign tag or tracked donation link to every published post so future runs can compare post characteristics against real revenue outcomes."
+            ));
+        }
+
+        if (dataGaps.Count == 0)
+            dataGaps.Add("No explicit data gaps were returned by the post-strategy pipeline.");
+
+        if (recommendedHashtags.Count == 0)
+            recommendedHashtags.AddRange(FallbackRecommendedHashtags());
+
+        if (tacticalInsights.Count == 0 &&
+            validated.Count == 1 &&
+            recommendations.Count == 1 &&
+            recommendedHashtags.Count == FallbackRecommendedHashtags().Count)
+        {
+            return FallbackPostStrategyInsights(string.IsNullOrWhiteSpace(mlUnavailableReason)
+                ? "Post-strategy pipeline is currently unavailable."
+                : mlUnavailableReason);
+        }
+
+        return new PostStrategyInsightsSnapshot(
+            EvidenceStrength: evidenceStrength,
+            ValidatedFindings: validated,
+            DirectionalFindings: directional
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            TacticalInsights: tacticalInsights,
+            RecommendedHashtags: recommendedHashtags
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            Recommendations: recommendations,
+            DataGaps: dataGaps
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray());
     }
 
     private async Task<(IReadOnlyList<SocialTacticalInsight> Insights, IReadOnlyList<string> RecommendedHashtags, IReadOnlyList<string> DataGaps)>
