@@ -23,6 +23,7 @@ function pct(n: number) {
 }
 
 function prettyLabel(value: string) {
+  if (value.startsWith('#')) return value
   return value
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ')
@@ -192,7 +193,7 @@ function EffectivenessChart({
       {rows.map((row, i) => (
         <div key={row.label} className="group flex items-center gap-4">
           <div className="w-36 shrink-0 text-right">
-            <span className="text-sm text-foreground">{row.label}</span>
+            <span className="text-sm text-foreground">{prettyLabel(row.label)}</span>
             <span className="block text-xs text-muted-foreground">{row.postCount} posts</span>
           </div>
 
@@ -246,7 +247,7 @@ function EffectivenessCard({
       <EffectivenessChart rows={rows} emptyLabel={emptyLabel ?? 'No ranking data available yet.'} />
       {leader && (
         <p className="mt-4 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground">{leader.label}</span> currently leads, with a typical post generating{' '}
+          <span className="font-medium text-foreground">{prettyLabel(leader.label)}</span> currently leads, with a typical post generating{' '}
           <span className="font-medium text-foreground">{php(leader.medianRevenuePerPostPhp)}</span> and{' '}
           <span className="font-medium text-foreground">{leader.medianDonationReferrals.toFixed(1)}</span> donation referrals.
         </p>
