@@ -908,6 +908,7 @@ export function EducationSection({
   onInitialOpenConsumed?: () => void
   hideChrome?: boolean
 }) {
+  const [q, setQ] = useState('')
   const [sel, setSel] = useState<EducationRecord | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -943,6 +944,27 @@ export function EducationSection({
     () => [...rows].sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime()),
     [rows],
   )
+  const filtered = useMemo(() => {
+    if (!q.trim()) return sorted
+    const s = q.trim().toLowerCase()
+    return sorted.filter((r) => {
+      const x = educationStateFromRecord(r)
+      return [
+        r.recordDate,
+        x.programName,
+        x.courseName,
+        x.educationLevel,
+        x.attendanceStatus,
+        x.completionStatus,
+        x.notes,
+        r.schoolName,
+        r.enrollmentStatus,
+        r.notes,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(s))
+    })
+  }, [sorted, q])
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -1027,10 +1049,13 @@ export function EducationSection({
               </QuickActionButton>
             }
           />
+          <div className="max-w-sm">
+            <SearchField value={q} onChange={setQ} placeholder="Search date, program, notes…" />
+          </div>
           <div className="space-y-2">
-            {sorted.length === 0 ? (
+            {filtered.length === 0 ? (
               <EmptyState
-                title="No education records"
+                title={rows.length === 0 ? 'No education records' : 'No education records match search'}
                 action={
                   <QuickActionButton
                     onClick={() => {
@@ -1046,7 +1071,7 @@ export function EducationSection({
                 }
               />
             ) : (
-              sorted.map((r) => {
+              filtered.map((r) => {
                 const x = educationStateFromRecord(r)
                 return (
                   <RecordCardRow key={r.id} onClick={() => openRow(r)}>
@@ -1267,6 +1292,7 @@ export function HealthSection({
   onInitialOpenConsumed?: () => void
   hideChrome?: boolean
 }) {
+  const [q, setQ] = useState('')
   const [sel, setSel] = useState<HealthRecord | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [recordDate, setRecordDate] = useState(() => new Date().toISOString().slice(0, 10))
@@ -1302,6 +1328,26 @@ export function HealthSection({
     () => [...rows].sort((a, b) => new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime()),
     [rows],
   )
+  const filtered = useMemo(() => {
+    if (!q.trim()) return sorted
+    const s = q.trim().toLowerCase()
+    return sorted.filter((r) => {
+      const x = healthStateFromRecord(r)
+      return [
+        r.recordDate,
+        r.notes,
+        x.medicalNotes,
+        x.weightKg,
+        x.heightCm,
+        x.bmi,
+        x.nutritionScore,
+        x.sleepScore,
+        x.energyScore,
+      ]
+        .filter((value) => value != null && value !== '')
+        .some((value) => String(value).toLowerCase().includes(s))
+    })
+  }, [sorted, q])
 
   function scoreInRange(v: number | null | undefined, lo: number, hi: number, label: string): string | null {
     if (v == null || Number.isNaN(v)) return null
@@ -1402,10 +1448,13 @@ export function HealthSection({
               </QuickActionButton>
             }
           />
+          <div className="max-w-sm">
+            <SearchField value={q} onChange={setQ} placeholder="Search date, vitals, notes…" />
+          </div>
           <div className="space-y-2">
-            {sorted.length === 0 ? (
+            {filtered.length === 0 ? (
               <EmptyState
-                title="No health records"
+                title={rows.length === 0 ? 'No health records' : 'No health records match search'}
                 action={
                   <QuickActionButton
                     onClick={() => {
@@ -1421,7 +1470,7 @@ export function HealthSection({
                 }
               />
             ) : (
-              sorted.map((r) => {
+              filtered.map((r) => {
                 const x = healthStateFromRecord(r)
                 return (
                   <RecordCardRow key={r.id} onClick={() => openRow(r)}>

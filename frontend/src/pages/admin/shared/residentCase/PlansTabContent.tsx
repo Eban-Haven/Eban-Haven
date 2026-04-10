@@ -36,6 +36,10 @@ export function PlansTabContent({
   layout = 'list',
   focusPlanId,
   onFocusPlanConsumed,
+  categoryFilter,
+  titleOverride,
+  descriptionOverride,
+  addLabel = 'Add plan',
 }: {
   residentId: number
   plans: InterventionPlan[]
@@ -46,6 +50,10 @@ export function PlansTabContent({
   /** When set, opens the plan drawer for this id (e.g. from timeline). */
   focusPlanId?: number | null
   onFocusPlanConsumed?: () => void
+  categoryFilter?: string
+  titleOverride?: string
+  descriptionOverride?: string
+  addLabel?: string
 }) {
   const [q, setQ] = useState('')
   const [df, setDf] = useState('')
@@ -83,6 +91,10 @@ export function PlansTabContent({
       const tb = b.targetDate ? new Date(b.targetDate).getTime() : 0
       return tb - ta
     })
+    if (categoryFilter?.trim()) {
+      const category = categoryFilter.trim().toLowerCase()
+      list = list.filter((p) => p.planCategory.trim().toLowerCase() === category)
+    }
     if (df || dt) list = list.filter((p) => p.targetDate && inDateRange(p.targetDate, df, dt))
     if (overdueOnly) list = list.filter(planIsOverdue)
     if (q.trim()) {
@@ -105,7 +117,7 @@ export function PlansTabContent({
       list.sort((a, b) => order(a) - order(b))
     }
     return list
-  }, [plans, q, df, dt, overdueOnly, layout])
+  }, [plans, q, df, dt, overdueOnly, layout, categoryFilter])
 
   const bucketed = useMemo(() => {
     const overdue: InterventionPlan[] = []
@@ -141,13 +153,14 @@ export function PlansTabContent({
     <div className="space-y-6">
       {err && <div className={alertError}>{err}</div>}
       <SectionHeader
-        title={layout === 'workspace' ? 'Plans & goals' : 'Intervention plans'}
+        title={titleOverride ?? (layout === 'workspace' ? 'Plans & goals' : 'Intervention plans')}
         description={
-          layout === 'workspace'
+          descriptionOverride ??
+          (layout === 'workspace'
             ? 'Intervention plans grouped by urgency and status — link activities from the timeline to plans when reviewing progress.'
-            : 'Case conference plans, targets, and status for this resident.'
+            : 'Case conference plans, targets, and status for this resident.')
         }
-        actions={<QuickActionButton onClick={() => setCreateOpen(true)}>Add plan</QuickActionButton>}
+        actions={<QuickActionButton onClick={() => setCreateOpen(true)}>{addLabel}</QuickActionButton>}
       />
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[12rem] flex-1">

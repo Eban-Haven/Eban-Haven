@@ -37,6 +37,7 @@ import {
   ProcessRecordingDrawer,
   VisitsSection,
 } from './CareProgressContent'
+import { GoalsTabContent } from './GoalsTabContent'
 import { PlansTabContent } from './PlansTabContent'
 import {
   buildProfileNextSteps,
@@ -62,6 +63,7 @@ function gf(fields: Record<string, string>, ...keys: string[]): string {
 const TAB_LABELS: { k: MainWorkspaceTab; label: string }[] = [
   { k: 'overview', label: 'Overview' },
   { k: 'timeline', label: 'Case timeline' },
+  { k: 'goals', label: 'Goals' },
   { k: 'plans', label: 'Plans & goals' },
   { k: 'safety', label: 'Safety & incidents' },
   { k: 'info', label: 'Resident info' },
@@ -711,6 +713,27 @@ export function ResidentCaseWorkspace({ residentId }: { residentId: number }) {
           layout="workspace"
           focusPlanId={focusPlanId}
           onFocusPlanConsumed={() => setFocusPlanId(null)}
+        />
+      )}
+
+      {mainTab === 'goals' && (
+        <GoalsTabContent
+          residentId={residentId}
+          plans={plans}
+          education={edu}
+          health={hl}
+          visitations={vis}
+          incidents={inc}
+          onReload={load}
+          openCreateSignals={{
+            education: createSig.education,
+            health: createSig.health,
+            plan: createSig.plan,
+          }}
+          onOpenIncident={() => {
+            setIncidentFormError(null)
+            setIncidentInfoOpen(true)
+          }}
         />
       )}
 
