@@ -88,6 +88,8 @@ public sealed class OpenAISocialChatService(
             - Default to a SHORT answer: 2 short paragraphs max, or 3 bullets max when bullets are clearer.
             - Keep planningSummary under 120 words unless the user explicitly asks for detail.
             - ALWAYS reference specific numbers from the context snapshot when available (channel revenue, donor counts, causal effect sizes, R² values).
+            - If the user asks about engagement, prioritize postStrategyInsights.tacticalInsights entries about engagement before discussing limitations.
+            - If the user asks about best day, best platform, best time, best content, or best hashtags, use the matching tacticalInsights values directly when available.
             - Clearly label what is statistically validated (causalInsights.insights) vs. hypothesis (causalInsights.hypotheses) vs. general best practice.
             - Set postIdeas to an EMPTY array []. Do NOT generate posts.
             - Leave captions, timingRecommendations, ctaRecommendations, confidenceNotes, and reasoning EMPTY unless they are necessary to answer the user well.

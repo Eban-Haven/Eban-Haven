@@ -148,6 +148,42 @@ public sealed class SocialChatContextService(
         LIMIT 4
         """;
 
+    private const string TopEngagementContentTopicTacticalSql = """
+        SELECT
+            COALESCE(content_topic, 'Unknown') AS label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(engagement_rate, 0))::numeric, 4) AS median_engagement_rate,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(likes, 0) + COALESCE(comments, 0) + COALESCE(shares, 0))::numeric, 2) AS median_interactions
+        FROM social_media_posts
+        GROUP BY COALESCE(content_topic, 'Unknown')
+        HAVING COUNT(*) >= 5
+        ORDER BY median_engagement_rate DESC, median_interactions DESC, post_count DESC
+        LIMIT 1
+        """;
+
+    private const string TopEngagementRecurringHashtagsTacticalSql = """
+        WITH exploded AS (
+            SELECT
+                LOWER(TRIM(tag)) AS label,
+                COALESCE(engagement_rate, 0) AS engagement_rate,
+                COALESCE(likes, 0) + COALESCE(comments, 0) + COALESCE(shares, 0) AS interactions
+            FROM social_media_posts
+            CROSS JOIN LATERAL regexp_split_to_table(COALESCE(hashtags, ''), '\s*,\s*') AS tag
+            WHERE NULLIF(TRIM(tag), '') IS NOT NULL
+              AND NULLIF(TRIM(COALESCE(campaign_name, '')), '') IS NULL
+        )
+        SELECT
+            label,
+            COUNT(*)::int AS post_count,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY engagement_rate)::numeric, 4) AS median_engagement_rate,
+            ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY interactions)::numeric, 2) AS median_interactions
+        FROM exploded
+        GROUP BY label
+        HAVING COUNT(*) >= 20
+        ORDER BY median_engagement_rate DESC, median_interactions DESC, post_count DESC
+        LIMIT 4
+        """;
+
     // ── Public entry point ────────────────────────────────────────────────────
 
     public async Task<SocialChatContextSnapshot> BuildContextAsync(CancellationToken cancellationToken)
@@ -546,6 +582,19 @@ public sealed class SocialChatContextService(
                     Detail: $"Typical post revenue is ₱{topTopic.median_revenue_per_post_php:N0} with {topTopic.median_donation_referrals:N1} donation referrals across {topTopic.post_count} posts."));
             }
 
+            var topEngagementTopic = await conn.QuerySingleOrDefaultAsync<dynamic>(TopEngagementContentTopicTacticalSql);
+            if (topEngagementTopic is not null)
+            {
+                var engagementRate = Convert.ToDecimal(topEngagementTopic.median_engagement_rate ?? 0m) * 100m;
+                var medianInteractions = Convert.ToDecimal(topEngagementTopic.median_interactions ?? 0m);
+                var postCount = Convert.ToInt32(topEngagementTopic.post_count ?? 0);
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-engagement-content-topic",
+                    Title: "Best engagement content topic",
+                    Value: (string)(topEngagementTopic.label ?? "Unknown"),
+                    Detail: $"Typical engagement rate is {engagementRate:F1}% with {medianInteractions:N0} interactions across {postCount} posts."));
+            }
+
             var hashtagRows = (await conn.QueryAsync<dynamic>(TopRecurringHashtagsTacticalSql)).ToList();
             if (hashtagRows.Count > 0)
             {
@@ -570,6 +619,30 @@ public sealed class SocialChatContextService(
             else
             {
                 dataGaps.Add("No recurring hashtags currently meet the minimum post-count threshold for reliable ranking.");
+            }
+
+            var engagementHashtagRows = (await conn.QueryAsync<dynamic>(TopEngagementRecurringHashtagsTacticalSql)).ToList();
+            if (engagementHashtagRows.Count > 0)
+            {
+                var engagementHashtagSummary = string.Join(", ", engagementHashtagRows.Select(row =>
+                {
+                    var label = NormalizeHashtagForPrompt((string?)row.label);
+                    var engagementRate = Convert.ToDecimal(row.median_engagement_rate ?? 0m) * 100m;
+                    var postCount = Convert.ToInt32(row.post_count ?? 0);
+                    return $"{label} ({engagementRate:F1}% engagement, n={postCount})";
+                }));
+
+                insights.Add(new SocialTacticalInsight(
+                    Key: "best-engagement-recurring-hashtags",
+                    Title: "Best engagement hashtags",
+                    Value: string.Join(' ', engagementHashtagRows
+                        .Select(row => NormalizeHashtagForPrompt((string?)row.label))
+                        .Where(static tag => !string.IsNullOrWhiteSpace(tag))),
+                    Detail: $"Current engagement leaders are {engagementHashtagSummary}."));
+            }
+            else
+            {
+                dataGaps.Add("No recurring hashtags currently meet the minimum post-count threshold for engagement ranking.");
             }
 
             return (insights, recommendedHashtags, dataGaps);
