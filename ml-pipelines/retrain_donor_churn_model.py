@@ -153,7 +153,11 @@ def build_historical_snapshots(
             future_dates = [dt for dt in donation_dates[snap_idx + 1 :] if dt <= horizon_end]
             churned = 1 if len(future_dates) == 0 else 0
 
-            day_gaps = np.diff(pd.Series(observed_dates).view("int64")) / 86_400_000_000_000 if len(observed_dates) > 1 else []
+            day_gaps = (
+                np.diff(pd.to_datetime(observed_dates).astype("int64")) / 86_400_000_000_000
+                if len(observed_dates) > 1
+                else []
+            )
 
             rows.append(
                 {
@@ -231,7 +235,6 @@ def candidate_search_spaces(preprocessor: ColumnTransformer) -> list[tuple[str, 
             ),
             {
                 "classifier__C": np.logspace(-2, 2, 20),
-                "classifier__penalty": ["l1", "l2"],
             },
         ),
         (
